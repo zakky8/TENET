@@ -1,0 +1,9 @@
+packages:
+  - "packages/*"
+  - "surfaces/*"
+  - "connectors/*"
+  - "models/*"
+  - "stores/vector/*"
+  - "stores/state/*"
+  - "apps/*"
+  - "eval"

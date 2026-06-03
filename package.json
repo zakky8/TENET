@@ -1,0 +1,31 @@
+{
+  "name": "tenet",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Verification-first, multi-surface agent platform. Community-grade to enterprise technical support.",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/zakky8/TENET",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zakky8/TENET.git"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "eval": "pnpm --filter @tenet/eval run eval",
+    "audit": "pnpm audit --prod --audit-level high",
+    "clean": "pnpm -r exec rimraf dist .turbo node_modules"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "rimraf": "^6.0.0"
+  }
+}

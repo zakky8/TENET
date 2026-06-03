@@ -1,0 +1,22 @@
+{
+  "name": "@tenet/telemetry",
+  "version": "0.0.0",
+  "description": "TENET telemetry — OpenTelemetry GenAI semconv native; outcome events as first-class.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no tests yet' && exit 0",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}
