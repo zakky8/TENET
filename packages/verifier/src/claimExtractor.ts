@@ -50,9 +50,14 @@ export async function extractClaims(
   const text = raw.trim();
   if (/^NONE$/i.test(text)) return [];
 
+  // List-marker strip: ONLY strip recognized list prefixes ("1. ", "1) ",
+  // "(1) ", "- ", "* ", "• ") plus surrounding whitespace. Do NOT eat bare
+  // leading digits — claims like "2025 EU regulation" or "5000 AST per slot"
+  // must survive verbatim.
+  const LIST_MARKER_RE = /^\s*(?:\d+[.)]\s+|\(\d+\)\s+|[-*•]\s+)/;
   return text
     .split('\n')
-    .map((l) => l.replace(/^[\s\-•*\d.)]+/, '').trim())
+    .map((l) => l.replace(LIST_MARKER_RE, '').trim())
     .filter((l) => l.length >= 8 && l.length <= 240)
     .slice(0, config.maxClaims);
 }

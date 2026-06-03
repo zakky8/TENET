@@ -109,8 +109,15 @@ describe('CostMeter', () => {
     expect(m.total()).toBeCloseTo(5.25, 5);
   });
 
-  it('skips silently on unknown model (avoids over-counting at zero)', () => {
+  it('throws on unknown model by default (prevents silent zero-cost typo class)', () => {
     const m = new CostMeter(PRICE);
+    expect(() => m.record('claude-3-5-sonnet-20241022', 1_000_000, 0))
+      .toThrow(/Unknown model/);
+    expect(m.total()).toBe(0);
+  });
+
+  it("opt-in 'skip' policy preserves silent-skip behavior for allowlist mode", () => {
+    const m = new CostMeter(PRICE, 'skip');
     m.record('unknown-model', 1_000_000, 1_000_000);
     expect(m.total()).toBe(0);
   });

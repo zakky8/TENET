@@ -119,16 +119,34 @@ export interface ModelPrice {
   outputPerMillion: number;
 }
 
+/**
+ * Default 'throw' surfaces typo'd model names immediately — preventing the
+ * silent zero-cost class where a misconfigured budget guardrail never trips.
+ * Pass 'skip' to explicitly opt in to silent-skip (allowlist mode).
+ */
+export type UnknownModelPolicy = 'throw' | 'skip';
+
 export class CostMeter {
   private totalUsd = 0;
-  constructor(private readonly priceTable: Readonly<Record<string, ModelPrice>>) {}
+  constructor(
+    private readonly priceTable: Readonly<Record<string, ModelPrice>>,
+    private readonly onUnknownModel: UnknownModelPolicy = 'throw',
+  ) {}
 
   record(model: string, inputTokens: number, outputTokens: number): void {
     if (inputTokens < 0 || outputTokens < 0) {
       throw new Error('token counts must be >= 0');
     }
     const price = this.priceTable[model];
-    if (!price) return; // unknown model — skip silently rather than overcounting at 0
+    if (!price) {
+      if (this.onUnknownModel === 'throw') {
+        throw new Error(
+          `Unknown model "${model}" — not in price table. ` +
+            `Add it or construct CostMeter(table, 'skip') for allowlist mode.`,
+        );
+      }
+      return;
+    }
     this.totalUsd +=
       (inputTokens / 1_000_000) * price.inputPerMillion +
       (outputTokens / 1_000_000) * price.outputPerMillion;

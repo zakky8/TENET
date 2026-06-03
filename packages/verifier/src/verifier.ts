@@ -78,19 +78,31 @@ export async function verifyDraft(
     };
   }
 
-  // Permissive re-judge of failures only
+  // Permissive re-judge of failures only.
+  //
+  // Index-based merge (not Map-by-claim-string): when two strict-failed
+  // claims happen to be identical strings (extractor non-determinism,
+  // duplicate factual assertions in the draft), keying the permissive
+  // verdicts by string collapses to a single Map entry and both strict
+  // failures get the wrong permissive result. Tracking by original index
+  // keeps the alignment exact.
+  const strictFailIndices: number[] = [];
+  strictVerdicts.forEach((v, i) => {
+    if (!v.supported) strictFailIndices.push(i);
+  });
+  const permissiveClaims = strictFailIndices.map((i) => strictVerdicts[i]!.claim);
   const permissiveVerdicts = await judgeBatched(
     model,
     input.sources,
-    strictFails.map((v) => v.claim),
+    permissiveClaims,
     true,
     config,
   );
-  const permissiveByClaim = new Map(permissiveVerdicts.map((v) => [v.claim, v]));
 
-  const merged: ClaimVerdict[] = strictVerdicts.map((strict) => {
+  const merged: ClaimVerdict[] = strictVerdicts.map((strict, i) => {
     if (strict.supported) return strict;
-    const permissive = permissiveByClaim.get(strict.claim);
+    const failOrder = strictFailIndices.indexOf(i);
+    const permissive = failOrder >= 0 ? permissiveVerdicts[failOrder] : undefined;
     if (permissive && permissive.supported) {
       return { ...strict, supported: true, reason: '' };
     }

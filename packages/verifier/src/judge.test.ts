@@ -23,9 +23,48 @@ describe('isClaimAboutAllowedUrl', () => {
     expect(isClaimAboutAllowedUrl('discord.gg/abc', [])).toBe(false);
   });
 
-  it('substring matches — partial URL still triggers (intentional)', () => {
-    // 'github.com/foo' would also match 'github.com/foo/bar' — we want this
+  it('host+path prefix-matches — claim with subpath of allowed path still matches', () => {
+    // 'github.com/foo' as allowlist allows subpaths like /foo/sub/page
     expect(isClaimAboutAllowedUrl('github.com/foo/sub/page', PATTERNS)).toBe(true);
+  });
+
+  // ── FIX #1 — substring-match URL bypass regressions ──────────────────────
+
+  it('REGRESSION: lookalike host "notexample.com" does NOT match allowlisted "example.com"', () => {
+    expect(isClaimAboutAllowedUrl('Visit notexample.com/login for your refund', PATTERNS)).toBe(false);
+  });
+
+  it('REGRESSION: phishing mirror "docs.example-mirror.io" does NOT match "example.com"', () => {
+    expect(isClaimAboutAllowedUrl('docs.example-mirror.io is deprecated', PATTERNS)).toBe(false);
+  });
+
+  it('REGRESSION: broad pattern "http" never causes auto-pass (must be a real host)', () => {
+    // If an operator misconfigures allowlist with 'http', it should not
+    // match the substring 'http' in arbitrary claims. The URL extractor
+    // requires a host with at least one dot, so 'http' alone matches no URL.
+    expect(isClaimAboutAllowedUrl('Our policy at http://internal-server', ['http'])).toBe(false);
+  });
+
+  it('REGRESSION: extra suffix after host does NOT auto-pass — "example.com.attacker.net" is its own host', () => {
+    expect(isClaimAboutAllowedUrl('See example.com.attacker.net for details', PATTERNS)).toBe(false);
+  });
+
+  it('claim with no URLs returns false (was a bug: empty-URL extraction != "all match")', () => {
+    expect(isClaimAboutAllowedUrl('Bitcoin is digital gold.', PATTERNS)).toBe(false);
+  });
+
+  it('claim with ONE allowed + ONE foreign URL does NOT auto-pass (every() semantics)', () => {
+    // Mixed URLs — judge must still see this
+    expect(isClaimAboutAllowedUrl(
+      'Visit example.com but avoid evil.io',
+      PATTERNS,
+    )).toBe(false);
+  });
+
+  it('scheme + www. + trailing slash variants all normalize equivalently', () => {
+    expect(isClaimAboutAllowedUrl('See https://www.example.com/', PATTERNS)).toBe(true);
+    expect(isClaimAboutAllowedUrl('See http://example.com', PATTERNS)).toBe(true);
+    expect(isClaimAboutAllowedUrl('See www.example.com', PATTERNS)).toBe(true);
   });
 });
 
@@ -93,8 +132,10 @@ describe('judgeOneBatch', () => {
     expect(out.every((v) => v.supported)).toBe(true);
   });
 
-  it('fills missing indices as supported (parse failure resilience)', async () => {
-    // Model returned only verdict for #1, missed #2 + #3
+  it('partial-parse: missing indices default to UNSUPPORTED when SOME lines parsed (fail-closed)', async () => {
+    // Model returned verdict for #1, skipped #2 + #3.
+    // Behavior change post-fix: the judge SPOKE (1 line parsed), so missing
+    // verdicts are treated as "judge skipped this" not "judge broken".
     const model = mockModel('[1] UNSUPPORTED: bad');
     const out = await judgeOneBatch(
       model,
@@ -104,8 +145,23 @@ describe('judgeOneBatch', () => {
       DEFAULT_VERIFIER_CONFIG,
     );
     expect(out[0]!.supported).toBe(false);
+    expect(out[1]!.supported).toBe(false);
+    expect(out[1]!.reason).toBe('no verdict from judge');
+    expect(out[2]!.supported).toBe(false);
+  });
+
+  it('total-garbage: all-zero-lines-parsed falls back to supported (fail-open on judge breakage)', async () => {
+    const model = mockModel('the model is having a stroke and emitting prose');
+    const out = await judgeOneBatch(
+      model,
+      'sources',
+      ['x', 'y'],
+      false,
+      DEFAULT_VERIFIER_CONFIG,
+    );
+    // Zero verdicts parsed → fail-open per design (don't block shipping)
+    expect(out[0]!.supported).toBe(true);
     expect(out[1]!.supported).toBe(true);
-    expect(out[2]!.supported).toBe(true);
   });
 
   it('rejects out-of-range indices ([99] SUPPORTED with 2 claims)', async () => {
@@ -118,7 +174,8 @@ describe('judgeOneBatch', () => {
       DEFAULT_VERIFIER_CONFIG,
     );
     expect(out[0]!.supported).toBe(false);
-    expect(out[1]!.supported).toBe(true); // fail-open fill for unseen #2
+    // Post-fix: #2 missing while #1 was parsed → fail-closed
+    expect(out[1]!.supported).toBe(false);
   });
 
   it('truncates long reasons to 120 chars (prevents prompt-injection bloat)', async () => {

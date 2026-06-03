@@ -26,11 +26,7 @@ export interface Principle {
 export class PrincipleRegistry {
   private readonly principles = new Map<string, Principle>();
 
-  /** Register a principle. Throws if id already exists. */
-  register(p: Principle): void {
-    if (this.principles.has(p.id)) {
-      throw new Error(`Principle ${p.id} already registered — use replace() to override`);
-    }
+  private validate(p: Principle): void {
     if (!/^[A-Z][A-Z0-9_]{0,30}$/.test(p.id)) {
       throw new Error(`Principle id must be uppercase alphanumeric+_, got ${JSON.stringify(p.id)}`);
     }
@@ -40,14 +36,23 @@ export class PrincipleRegistry {
     if (p.version < 1) {
       throw new Error(`Principle ${p.id}: version must be >= 1`);
     }
+  }
+
+  /** Register a principle. Throws if id already exists. */
+  register(p: Principle): void {
+    if (this.principles.has(p.id)) {
+      throw new Error(`Principle ${p.id} already registered — use replace() to override`);
+    }
+    this.validate(p);
     this.principles.set(p.id, p);
   }
 
-  /** Replace an existing principle. Throws if id doesn't exist. */
+  /** Replace an existing principle. Throws if id doesn't exist or replacement is invalid. */
   replace(p: Principle): void {
     if (!this.principles.has(p.id)) {
       throw new Error(`Principle ${p.id} not registered — use register()`);
     }
+    this.validate(p);
     this.principles.set(p.id, p);
   }
 

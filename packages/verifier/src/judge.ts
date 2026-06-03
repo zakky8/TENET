@@ -1,13 +1,57 @@
 import type { ChatModel, ClaimVerdict, VerifierConfig } from './types.js';
 
-/** Pre-pass: claims that only reference allowlisted URLs auto-pass. */
+/**
+ * Pre-pass: a claim auto-passes ONLY when every URL-shaped token it contains
+ * matches an allowlisted host (or host + path prefix).
+ *
+ * Previous implementation used `claim.toLowerCase().includes(pattern)` which
+ * was vulnerable to:
+ *   - lookalike domains: `notexample.com` substring-matches `example.com`
+ *   - phishing siblings: `docs.example-mirror.io` matches `docs.example.com`
+ *     when pattern was `example.com` — actually doesn't here, but partial
+ *     URL substrings still slip through (e.g. pattern `http` would match
+ *     every URL).
+ *
+ * New rules:
+ *   1. Extract URL-shaped tokens via regex.
+ *   2. Normalize each (strip scheme, strip leading www., lowercase).
+ *   3. Normalize each pattern the same way.
+ *   4. Match by exact equality OR allowed-is-prefix-with-trailing-slash.
+ *   5. Claim only auto-passes when AT LEAST ONE URL is present AND
+ *      EVERY extracted URL matches the allowlist.
+ */
+const URL_RE = /\b(?:https?:\/\/)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)((?:\/[^\s)\]"']*)?)/gi;
+
+function normalizeUrlForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/+$/, '');
+}
+
 export function isClaimAboutAllowedUrl(
   claim: string,
   allowedUrlPatterns: ReadonlyArray<string>,
 ): boolean {
   if (allowedUrlPatterns.length === 0) return false;
-  const lower = claim.toLowerCase();
-  return allowedUrlPatterns.some((u) => lower.includes(u.toLowerCase()));
+
+  const matches = Array.from(claim.matchAll(URL_RE));
+  if (matches.length === 0) return false;
+
+  const allowedNormalized = allowedUrlPatterns.map(normalizeUrlForMatch);
+
+  const extracted = matches.map((m) => {
+    const host = (m[1] ?? '').toLowerCase().replace(/^www\./, '');
+    const path = m[2] ?? '';
+    return host + path.replace(/\/+$/, '');
+  });
+
+  return extracted.every((url) =>
+    allowedNormalized.some(
+      (allowed) => url === allowed || url.startsWith(allowed + '/'),
+    ),
+  );
 }
 
 async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
@@ -86,9 +130,22 @@ export async function judgeOneBatch(
     });
   }
 
-  return claims.map(
-    (claim, i) => verdictByIdx.get(i + 1) ?? { claim, supported: true, reason: '' },
-  );
+  // Differential fallback for unparsed verdicts:
+  //   - If SOME lines parsed but this index is missing → judge spoke but
+  //     skipped this claim. Default UNSUPPORTED (fail-CLOSED): don't ship
+  //     fabrication just because the judge forgot a line.
+  //   - If NO lines parsed at all → judge response was total garbage / down.
+  //     Fail-OPEN (supported) to avoid blocking shipping on judge breakage.
+  const parsedAny = verdictByIdx.size > 0;
+  return claims.map((claim, i) => {
+    const v = verdictByIdx.get(i + 1);
+    if (v) return v;
+    return {
+      claim,
+      supported: !parsedAny,
+      reason: parsedAny ? 'no verdict from judge' : '',
+    };
+  });
 }
 
 /** Run judging in bounded-parallel batches. */
