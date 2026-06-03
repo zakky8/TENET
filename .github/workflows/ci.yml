@@ -22,8 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        # version intentionally not pinned here — package.json packageManager
+        # field is the single source of truth (Corepack-compatible).
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -44,8 +44,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        # version intentionally not pinned here — package.json packageManager
+        # field is the single source of truth (Corepack-compatible).
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -85,8 +85,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        # version intentionally not pinned here — package.json packageManager
+        # field is the single source of truth (Corepack-compatible).
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
