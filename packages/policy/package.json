@@ -1,7 +1,7 @@
 {
-  "name": "@tenet/telemetry",
+  "name": "@tenet/policy",
   "version": "0.0.0",
-  "description": "TENET telemetry — OTel GenAI semconv keys, outcome emitter, cost meter, attribute builder.",
+  "description": "TENET policy — Constitutional Principles registry + composer + drift fingerprint.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,8 +18,5 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  },
-  "dependencies": {
-    "@tenet/core": "workspace:*"
   }
 }

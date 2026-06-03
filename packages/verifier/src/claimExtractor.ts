@@ -1,0 +1,58 @@
+import type { ChatModel, VerifierConfig } from './types.js';
+
+const EXTRACT_SYSTEM = (maxClaims: number) =>
+  `You extract atomic factual claims from a draft response for fact-checking.
+
+A "claim" is a single specific factual assertion: a number, date, name, rule, relationship, or feature. Each claim must be standalone (no pronouns).
+
+OUTPUT FORMAT: one claim per line. No numbering, no bullets, no commentary. Maximum ${maxClaims} claims.
+
+EXCLUDE: greetings, follow-up questions, clarifying questions, generic filler, opinion words ("great", "amazing"), "I can't see your account"-style disclaimers.
+
+If the draft has NO factual claims (it's just a greeting / clarifying question / filler), output exactly the word: NONE`;
+
+/** Run with a hard timeout, throwing on timeout. */
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
+    });
+    return await Promise.race([p, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Extract up to config.maxClaims atomic claims from a draft. Fail-open: returns [] on error. */
+export async function extractClaims(
+  model: ChatModel,
+  draft: string,
+  config: VerifierConfig,
+): Promise<string[]> {
+  if (!draft || draft.trim().length === 0) return [];
+
+  let raw: string;
+  try {
+    raw = await withTimeout(
+      model.chat({
+        system: EXTRACT_SYSTEM(config.maxClaims),
+        user: `DRAFT:\n${draft}\n\nClaims:`,
+        maxTokens: 256,
+      }),
+      config.extractionTimeoutMs,
+      'extract',
+    );
+  } catch {
+    return [];
+  }
+
+  const text = raw.trim();
+  if (/^NONE$/i.test(text)) return [];
+
+  return text
+    .split('\n')
+    .map((l) => l.replace(/^[\s\-•*\d.)]+/, '').trim())
+    .filter((l) => l.length >= 8 && l.length <= 240)
+    .slice(0, config.maxClaims);
+}

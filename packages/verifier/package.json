@@ -1,7 +1,7 @@
 {
   "name": "@tenet/verifier",
   "version": "0.0.0",
-  "description": "TENET verifier — CoVe, Reflexion, Constitutional Principles, citation enforcement, source-grounding.",
+  "description": "TENET verifier — atomic-claim multi-judge with strict+permissive flow and URL allow-list pre-pass.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'no tests yet' && exit 0",
+    "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
   },
   "dependencies": {

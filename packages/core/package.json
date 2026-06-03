@@ -1,7 +1,7 @@
 {
   "name": "@tenet/core",
   "version": "0.0.0",
-  "description": "TENET core runtime — state machine, conversation events, tool-use, lifecycle.",
+  "description": "TENET core types — Conversation, Surface, AgentState, Secret<T>, PathHandle, Filter.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'no tests yet' && exit 0",
+    "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
   }
 }
