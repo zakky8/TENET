@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
         # version intentionally not pinned here — package.json packageManager
         # field is the single source of truth (Corepack-compatible).
@@ -42,7 +42,7 @@ jobs:
     # rimraf chain). Tighten to a hard gate once @tenet/* ship real prod deps.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
         # version intentionally not pinned here — package.json packageManager
         # field is the single source of truth (Corepack-compatible).
@@ -62,7 +62,7 @@ jobs:
     # 1.0 milestone once we have a stable dep surface.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: aquasecurity/trivy-action@master
         with:
           scan-type: fs
@@ -83,7 +83,7 @@ jobs:
     timeout-minutes: 30
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
         # version intentionally not pinned here — package.json packageManager
         # field is the single source of truth (Corepack-compatible).
