@@ -16,7 +16,7 @@
   "packageManager": "pnpm@9.12.0",
   "scripts": {
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r build",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "lint": "pnpm -r lint",

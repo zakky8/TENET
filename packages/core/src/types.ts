@@ -210,7 +210,7 @@ export class TenetError extends Error {
   constructor(
     public readonly code: TenetErrorCode,
     message: string,
-    public readonly cause?: unknown,
+    public override readonly cause?: unknown,
   ) {
     super(message);
     this.name = 'TenetError';

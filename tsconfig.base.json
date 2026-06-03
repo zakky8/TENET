@@ -17,10 +17,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "incremental": true,
-    "composite": true,
-    "outDir": "dist",
-    "rootDir": "src"
+    "incremental": true
   },
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
