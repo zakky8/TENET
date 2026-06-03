@@ -52,8 +52,8 @@ export async function extractClaims(
 
   // List-marker strip: ONLY strip recognized list prefixes ("1. ", "1) ",
   // "(1) ", "- ", "* ", "• ") plus surrounding whitespace. Do NOT eat bare
-  // leading digits — claims like "2025 EU regulation" or "5000 AST per slot"
-  // must survive verbatim.
+  // leading digits — claims like "2025 EU regulation" or "5000 units per
+  // shipment" must survive verbatim.
   const LIST_MARKER_RE = /^\s*(?:\d+[.)]\s+|\(\d+\)\s+|[-*•]\s+)/;
   return text
     .split('\n')

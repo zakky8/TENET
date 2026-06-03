@@ -20,7 +20,7 @@ describe('verifyDraft — duplicate-claim permissive merge (FIX #10)', () => {
   }
 
   it('two strict-failed claims with identical strings: permissive verdicts respect input order', async () => {
-    const dup = 'LITE Node price is five hundred dollars';
+    const dup = 'the listed item price is five hundred dollars';
     const replies = [
       // extract returns the same claim twice (extractor non-determinism)
       `${dup}\n${dup}`,
@@ -39,7 +39,7 @@ describe('verifyDraft — duplicate-claim permissive merge (FIX #10)', () => {
   });
 
   it('all duplicates pass on permissive: index alignment lets every duplicate get rescued', async () => {
-    const dup = 'AST allocation includes Ecosystem and Team buckets';
+    const dup = 'budget allocation includes ops and team buckets in the doc';
     const replies = [
       `${dup}\n${dup}\n${dup}`,
       '[1] UNSUPPORTED: x\n[2] UNSUPPORTED: x\n[3] UNSUPPORTED: x',

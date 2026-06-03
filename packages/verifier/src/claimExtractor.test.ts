@@ -90,36 +90,36 @@ describe('extractClaims — list-marker stripping (FIX #2 — leading digit pres
   // REGRESSION FIXES — the old /^[\s\-•*\d.)]+/ would eat leading digits of
   // the claim itself. Locked in so this never regresses.
 
-  it('REGRESSION: "2025 EU MiCA regulation banned X" survives intact (leading year preserved)', async () => {
+  it('REGRESSION: "2025 EU rule banned X" survives intact (leading year preserved)', async () => {
     const out = await extractClaims(
-      mockModel('2025 EU MiCA regulation banned algorithmic stablecoin marketing'),
+      mockModel('2025 EU rule banned the use of unverified data sources'),
       'd',
       DEFAULT_VERIFIER_CONFIG,
     );
-    expect(out).toEqual(['2025 EU MiCA regulation banned algorithmic stablecoin marketing']);
+    expect(out).toEqual(['2025 EU rule banned the use of unverified data sources']);
   });
 
-  it('REGRESSION: "5000 AST per ABox PRO slot" survives — no leading-digit strip', async () => {
-    const out = await extractClaims(mockModel('5000 AST per ABox PRO slot'), 'd', DEFAULT_VERIFIER_CONFIG);
-    expect(out).toEqual(['5000 AST per ABox PRO slot']);
+  it('REGRESSION: "5000 units per shipment" survives — no leading-digit strip', async () => {
+    const out = await extractClaims(mockModel('5000 units per shipment crate'), 'd', DEFAULT_VERIFIER_CONFIG);
+    expect(out).toEqual(['5000 units per shipment crate']);
   });
 
-  it('REGRESSION: "0.005 BNB entry yields 5000 points" survives (leading decimal preserved)', async () => {
+  it('REGRESSION: "0.005 ETH gas fee per call" survives (leading decimal preserved)', async () => {
     const out = await extractClaims(
-      mockModel('0.005 BNB entry yields 5000 points'),
+      mockModel('0.005 ETH gas fee per call is the baseline rate'),
       'd',
       DEFAULT_VERIFIER_CONFIG,
     );
-    expect(out).toEqual(['0.005 BNB entry yields 5000 points']);
+    expect(out).toEqual(['0.005 ETH gas fee per call is the baseline rate']);
   });
 
-  it('REGRESSION: "12,000 slots in the LITE tier" survives (leading comma-number)', async () => {
+  it('REGRESSION: "12,000 records in the dataset" survives (leading comma-number)', async () => {
     const out = await extractClaims(
-      mockModel('12,000 slots in the LITE tier'),
+      mockModel('12,000 records in the dataset are tagged'),
       'd',
       DEFAULT_VERIFIER_CONFIG,
     );
-    expect(out).toEqual(['12,000 slots in the LITE tier']);
+    expect(out).toEqual(['12,000 records in the dataset are tagged']);
   });
 
   it('does not strip "1.5%" because there is no following space (not a list marker)', async () => {

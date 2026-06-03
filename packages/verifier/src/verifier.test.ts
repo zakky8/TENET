@@ -145,15 +145,15 @@ describe('verifyDraft — strict + permissive flow', () => {
 
 describe('verifyDraft — citation building', () => {
   it('attaches citations from sourceRecords when claim text matches a source', async () => {
-    const replies = ['LITE node costs $500', '[1] SUPPORTED'];
+    const replies = ['the answer to question seven is forty two', '[1] SUPPORTED'];
     const out = await verifyDraft(scriptedModel(replies), {
-      sources: 'LITE node costs $500 and includes 1,333 AST',
-      draft: 'The LITE node is $500.',
+      sources: 'the answer to question seven is forty two per the manual',
+      draft: 'Q7 answer is 42.',
       sourceRecords: [
         {
           id: 'src-1',
-          uri: 'https://example.com/nodes',
-          text: 'LITE node costs $500 and includes 1,333 AST',
+          uri: 'https://example.com/manual',
+          text: 'the answer to question seven is forty two per the manual',
           confidence: 0.95,
         },
       ],

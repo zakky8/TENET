@@ -2,9 +2,8 @@
  * TENET policy — generic Constitutional Principles framework.
  *
  * The framework provides the registry + composer. Applications register
- * their own principles (e.g. the Astarter app keeps P1-P13 from TENET v1).
- * Principles are versioned so the framework can detect drift between
- * registered set and tested set.
+ * their own principles. Principles are versioned so the framework can
+ * detect drift between the registered set and the tested set.
  *
  * See @tenet/core for AgentState. Verifier in @tenet/verifier consumes
  * the composed principles as part of its prompt.
