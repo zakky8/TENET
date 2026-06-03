@@ -9,7 +9,7 @@
 
 TENET is an open-source agent framework that ships with verification, source-grounding, and platform rate-limit scheduling as first-class layers — not bolt-ons. One config powers Telegram, Discord, Slack, MS Teams, embedded web widget, REST/gRPC, and ticketing webhooks (Zendesk / Intercom / Freshdesk / ServiceNow).
 
-**Status: pre-MVP, v0.0.0.** Architecture is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**Status: pre-MVP, v0.0.0.** Architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Measurable 100× targets + method-of-attack per dimension in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Why another agent framework
 
@@ -22,20 +22,36 @@ We surveyed the 2025/2026 landscape ([research report cached on contributor mach
 
 TENET answers each with a deliberate design choice. See [docs/ARCHITECTURE.md §3](docs/ARCHITECTURE.md).
 
+## 100× targets (measured, not marketed)
+
+Full method-of-attack per dimension in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+| Dimension | Market today | TENET target | Multiplier |
+|-----------|--------------|--------------|-----------|
+| Hallucination rate | 5-10% | < 0.1% | ~100× |
+| Cost per resolution | $0.99 (Intercom Fin) | < $0.01 | ~100× |
+| First-token latency p95 | 2-4s | < 200ms | ~10-20× |
+| Time-to-integrate | days/weeks | < 10 minutes | ~1000× |
+| High-severity CVEs / 6mo | 3 (LangChain) | 0 | floor |
+| Eval-set size | ~100-500 cases | 1M+ auto-grown | ~1000× |
+| Surfaces / one config | 1-3 | 8+ | new category |
+
 ## Differentiators
 
 | # | What |
 |---|------|
 | 1 | Verification by default (CoVe + Reflexion + Constitutional Principles, not opt-in) |
 | 2 | Source-grounded only (URLs in output constrained to a compiled allow-list) |
-| 3 | CVE-class mistakes prevented by construction (no `pickle`, no Jinja2 default, parameterized queries, path allow-list) |
+| 3 | CVE-class mistakes prevented by construction (no `pickle`, no Jinja2 default, parameterized queries, path allow-list, WASM tool sandbox) |
 | 4 | All surfaces, one config |
 | 5 | Rate-limit as scheduling primitive (per-platform token buckets, circuit breakers) |
 | 6 | Outcome as first-class telemetry primitive (`resolved` / `handed_off` / `disqualified` / `qualified`) |
-| 7 | Hybrid contextual retrieval out of the box (BM25 + dense + contextual chunk prepending + rerank) |
-| 8 | MCP-native tool use |
-| 9 | Eval-as-CI |
+| 7 | Hybrid contextual retrieval (BM25 + dense + ctx prepend + rerank, + ColBERT/HyDE option) |
+| 8 | MCP-native tool use, WASM-sandboxed |
+| 9 | Eval-as-CI; eval set auto-grows from production |
 | 10 | Multi-tenancy + on-prem from day 1 |
+| 11 | Self-distillation pipeline — cheap-path model fine-tuned weekly on verified flagship outputs |
+| 12 | Adaptive routing — classifier picks cheap-vs-flagship per turn; semantic answer cache; speculative streaming |
 
 ## Repo layout
 

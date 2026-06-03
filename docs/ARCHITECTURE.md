@@ -6,6 +6,7 @@
 **Date:** 2026-06-03
 **Owner:** TBD
 **Based on:** Research Pass 1 (108 agents, 23 verified claims, 26 sources — full report in `research-2026-06-03.json`)
+**Companion:** [BENCHMARKS.md](BENCHMARKS.md) — measurable 100× targets + method-of-attack per dimension
 
 ---
 
