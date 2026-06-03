@@ -17,8 +17,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r build",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "lint": "pnpm -r lint",
     "eval": "pnpm --filter @tenet/eval run eval",
     "audit": "pnpm audit --prod --audit-level high",
