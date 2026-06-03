@@ -24,7 +24,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         # version intentionally not pinned here — package.json packageManager
         # field is the single source of truth (Corepack-compatible).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -46,7 +46,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         # version intentionally not pinned here — package.json packageManager
         # field is the single source of truth (Corepack-compatible).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -87,7 +87,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         # version intentionally not pinned here — package.json packageManager
         # field is the single source of truth (Corepack-compatible).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: pnpm
