@@ -65,6 +65,12 @@ importers:
 
   stores/state/redis: {}
 
+  stores/vector/pgvector:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+
 packages:
 
   '@babel/code-frame@7.29.7':
