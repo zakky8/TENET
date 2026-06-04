@@ -147,6 +147,8 @@ importers:
 
   packages/router: {}
 
+  packages/skills: {}
+
   packages/streaming: {}
 
   packages/telemetry:
@@ -221,6 +223,8 @@ importers:
       '@tenet/core':
         specifier: workspace:*
         version: link:../../packages/core
+
+  surfaces/matrix: {}
 
   surfaces/rest:
     dependencies:

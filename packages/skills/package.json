@@ -1,0 +1,21 @@
+{
+  "name": "@tenet/skills",
+  "version": "0.0.0",
+  "description": "SKILL.md format loader + registry. YAML frontmatter + lazy-loaded body, with @tenet/governance allowed-tools enforcement. Composable skill packaging pattern (Claude Code / OpenClaw convention).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "keywords": [
+    "agent-framework", "ai", "ai-agents", "langchain-alternative", "llm",
+    "skill-loader", "skills", "tenet", "tool-registry", "typescript", "yaml-frontmatter"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

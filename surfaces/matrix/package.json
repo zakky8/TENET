@@ -1,0 +1,22 @@
+{
+  "name": "@tenet/surface-matrix",
+  "version": "0.0.0",
+  "description": "Matrix protocol surface — federation-friendly, vendor-independent. Client-Server API r0.6+ over injected HTTP.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "keywords": [
+    "agent-framework", "ai", "ai-agents", "chatbot", "decentralized",
+    "federation", "langchain-alternative", "llm", "matrix", "matrix-bot",
+    "tenet", "typescript"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}
