@@ -1,6 +1,8 @@
 # Pending — Research + Architecture Triage
 
-**As of:** 2026-06-04. Lists what's queued, why, and how I'd rank it.
+**As of:** 2026-06-04 (revised after the "all" sweep). Lists what's queued, why, and how I'd rank it.
+
+> **All 26 original rows closed.** See [RESEARCH-PASS-2.md](RESEARCH-PASS-2.md) for buckets A + D (research), [CHANGELOG.md](CHANGELOG.md) for bucket B (5 adversarial fixes) + bucket C (11 MVP packages). This doc is preserved as the historical triage; future open items live in GitHub Issues.
 
 Companion to [ROADMAP.md](ROADMAP.md). This doc is the "what to read / build / verify next." Roadmap is the "what ships in which phase."
 
