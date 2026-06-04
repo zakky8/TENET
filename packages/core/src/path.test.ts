@@ -43,8 +43,12 @@ describe('openPath — security properties', () => {
     expect(h.absolute).toBe(path.resolve(ROOT, 'subdir/file.txt'));
   });
 
-  it('REJECTS absolute paths', () => {
+  it('REJECTS POSIX-absolute paths', () => {
     expect(() => openPath('/etc/passwd')).toThrow(/absolute paths rejected/);
+  });
+
+  it('REJECTS Windows-absolute paths (when running on Windows)', () => {
+    if (process.platform !== 'win32') return; // POSIX path.isAbsolute won't flag 'C:\\...'
     expect(() => openPath('C:\\Windows\\System32\\config')).toThrow(/absolute paths rejected/);
   });
 
