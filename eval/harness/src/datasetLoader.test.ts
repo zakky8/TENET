@@ -76,6 +76,17 @@ describe('loadDatasetFromGlob', () => {
     expect(out.issues.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('rejects patterns containing ".." (escape attempt)', async () => {
+    await expect(
+      loadDatasetFromGlob({
+        rootDir: root,
+        pattern: '../**/*.jsonl',
+        name: 'x',
+        version: '1',
+      }),
+    ).rejects.toThrow(/may not contain/);
+  });
+
   it('matches multiple files via glob pattern across subdirs', async () => {
     await mkdir(join(root, 'sub'), { recursive: true });
     await writeFile(join(root, 'a.jsonl'), '{"id":"a","input":1}\n');

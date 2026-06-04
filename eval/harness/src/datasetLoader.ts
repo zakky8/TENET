@@ -11,7 +11,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { glob } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 import type { EvalCase, EvalDataset } from './types.js';
 
 export interface LoadDatasetOptions {
@@ -38,14 +38,36 @@ export interface LoadResult {
  *
  * Bad lines (invalid JSON or missing required fields) are collected
  * into `issues` and skipped. Callers decide whether to fail-fast.
+ *
+ * Security: patterns containing `..` are rejected at the entry. Each
+ * matched path is re-resolved against the absolute rootDir and any
+ * file that lands outside rootDir is dropped + recorded as an issue.
+ * This is belt + braces — Node's fs.glob already roots at cwd, but
+ * symlinks / odd Windows path forms can still surprise.
  */
 export async function loadDatasetFromGlob(opts: LoadDatasetOptions): Promise<LoadResult> {
+  if (opts.pattern.includes('..')) {
+    throw new Error(`loadDatasetFromGlob: pattern may not contain '..' (got ${JSON.stringify(opts.pattern)})`);
+  }
+  const absRoot = resolve(opts.rootDir);
+  const rootWithSep = absRoot.endsWith(sep) ? absRoot : absRoot + sep;
+
   const cases: EvalCase[] = [];
   const issues: DatasetLoadIssue[] = [];
 
   // Node 22 stable fs.glob — async iterator over matching paths.
   for await (const absPath of glob(opts.pattern, { cwd: opts.rootDir })) {
     const fullPath = join(opts.rootDir, absPath.toString());
+    const resolvedPath = resolve(fullPath);
+    // Reject if the resolved path escapes the configured root (symlinks etc.)
+    if (resolvedPath !== absRoot && !resolvedPath.startsWith(rootWithSep)) {
+      issues.push({
+        file: absPath.toString(),
+        line: 0,
+        reason: `resolved path escapes rootDir`,
+      });
+      continue;
+    }
     const relPath = relative(opts.rootDir, fullPath);
     let text: string;
     try {
