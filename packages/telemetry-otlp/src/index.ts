@@ -13,7 +13,7 @@
  *   GenAI Semantic Conventions: opentelemetry.io/docs/specs/semconv/gen-ai
  */
 
-import type { OutcomeEvent } from '@tenet/telemetry';
+import type { OutcomeEvent } from '@tenet/core';
 
 // ── Span types (OTLP-JSON shape) ──────────────────────────────────────
 
@@ -76,17 +76,19 @@ function attrs(record: Readonly<Record<string, unknown>>): OtlpAttribute[] {
  * outcome become semconv-friendly attributes (`tenet.tenant.id`, etc).
  */
 export function outcomeEventToSpan(event: OutcomeEvent, traceId: string, spanId: string): OtlpSpan {
-  const start = (event as { tMs?: number }).tMs ?? 0;
+  const ev = event as unknown as Record<string, unknown>;
+  const start = typeof ev['tMs'] === 'number' ? ev['tMs'] : 0;
+  const kind = typeof ev['kind'] === 'string' ? ev['kind'] : 'unknown';
   const nano = (ms: number): string => String(BigInt(ms) * 1000000n);
-  const a: Record<string, unknown> = { 'tenet.event.kind': (event as { kind: string }).kind };
-  for (const [k, v] of Object.entries(event as Record<string, unknown>)) {
+  const a: Record<string, unknown> = { 'tenet.event.kind': kind };
+  for (const [k, v] of Object.entries(ev)) {
     if (k === 'kind' || k === 'tMs') continue;
     a[`tenet.${k}`] = typeof v === 'object' ? JSON.stringify(v) : v;
   }
   return {
     traceId,
     spanId,
-    name: `tenet.outcome.${(event as { kind: string }).kind}`,
+    name: `tenet.outcome.${kind}`,
     startTimeUnixNano: nano(start),
     endTimeUnixNano: nano(start),
     attributes: attrs(a),

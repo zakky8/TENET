@@ -157,6 +157,9 @@ importers:
 
   packages/telemetry-otlp:
     dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../core
       '@tenet/telemetry':
         specifier: workspace:*
         version: link:../telemetry
