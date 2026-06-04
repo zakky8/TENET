@@ -54,8 +54,20 @@ const VALID_OUTCOMES: ReadonlySet<Outcome> = new Set<Outcome>([
   'pending',
 ]);
 
+/** Optional callback for swallowed sink errors so they don't disappear. */
+export type SwallowedErrorReporter = (
+  err: unknown,
+  ctx: { sinkIndex: number; event: OutcomeEvent },
+) => void;
+
+const MAX_EMIT_DEPTH = 4;
+
 export class OutcomeEmitter {
-  constructor(private readonly sinks: ReadonlyArray<OutcomeSink>) {}
+  private depth = 0;
+  constructor(
+    private readonly sinks: ReadonlyArray<OutcomeSink>,
+    private readonly onSwallowed?: SwallowedErrorReporter,
+  ) {}
 
   emit(e: OutcomeEvent): void {
     if (!VALID_OUTCOMES.has(e.outcome)) {
@@ -70,13 +82,44 @@ export class OutcomeEmitter {
     if (!e.conversationId || !e.tenantId) {
       throw new Error(`conversationId and tenantId are required`);
     }
-    for (const sink of this.sinks) {
-      // Sink failures are isolated — one broken sink doesn't kill telemetry.
-      try {
-        sink(e);
-      } catch {
-        // swallow — telemetry must not break the agent
+
+    // Re-entrancy guard: a sink that calls back into emit() (synchronously
+    // or via microtask) increments depth. Past the cap we drop the event
+    // and report — preferable to an unbounded recursion that the catch
+    // block silently absorbs.
+    if (this.depth >= MAX_EMIT_DEPTH) {
+      this.reportSwallowed(
+        new Error(`OutcomeEmitter re-entrancy depth ${this.depth} exceeded cap ${MAX_EMIT_DEPTH}`),
+        { sinkIndex: -1, event: e },
+      );
+      return;
+    }
+
+    this.depth++;
+    try {
+      for (let i = 0; i < this.sinks.length; i++) {
+        // Sink failures are isolated — one broken sink doesn't kill telemetry.
+        try {
+          this.sinks[i]!(e);
+        } catch (err) {
+          this.reportSwallowed(err, { sinkIndex: i, event: e });
+        }
       }
+    } finally {
+      this.depth--;
+    }
+  }
+
+  /** Forward a swallowed error to the optional reporter; never throws. */
+  private reportSwallowed(
+    err: unknown,
+    ctx: { sinkIndex: number; event: OutcomeEvent },
+  ): void {
+    if (!this.onSwallowed) return;
+    try {
+      this.onSwallowed(err, ctx);
+    } catch {
+      // reporter itself broken; intentional drop — telemetry must not break the agent
     }
   }
 }

@@ -5,6 +5,7 @@ import {
   CostMeter,
   buildAttributes,
   type ModelPrice,
+  type OutcomeSink,
 } from './index.js';
 import type { OutcomeEvent } from '@tenet/core';
 
@@ -75,6 +76,51 @@ describe('OutcomeEmitter', () => {
     const em = new OutcomeEmitter([broken, good]);
     expect(() => em.emit(event())).not.toThrow();
     expect(good).toHaveBeenCalledTimes(1);
+  });
+
+  // FIX B4 — sink errors are now reported to an optional callback
+  it('forwards swallowed sink errors to the onSwallowed reporter', () => {
+    const reporter = jest.fn();
+    const broken = () => {
+      throw new Error('explosion');
+    };
+    const em = new OutcomeEmitter([broken], reporter);
+    em.emit(event());
+    expect(reporter).toHaveBeenCalledTimes(1);
+    const [err, ctx] = reporter.mock.calls[0]!;
+    expect((err as Error).message).toBe('explosion');
+    expect((ctx as { sinkIndex: number }).sinkIndex).toBe(0);
+  });
+
+  it('survives a broken reporter — never re-throws from emit', () => {
+    const brokenReporter = () => {
+      throw new Error('reporter dead');
+    };
+    const brokenSink = () => {
+      throw new Error('sink dead');
+    };
+    const em = new OutcomeEmitter([brokenSink], brokenReporter);
+    expect(() => em.emit(event())).not.toThrow();
+  });
+
+  // FIX B4 — re-entrancy guard
+  it('drops the inner event when a sink re-enters past the depth cap', () => {
+    const reporter = jest.fn();
+    let em!: OutcomeEmitter;
+    let recursiveCalls = 0;
+    const recurser: OutcomeSink = (e) => {
+      recursiveCalls++;
+      em.emit({ ...e, conversationId: e.conversationId + '-r' });
+    };
+    em = new OutcomeEmitter([recurser], reporter);
+    em.emit(event());
+    // 1st emit + recursion to depth cap → bounded, no stack blow-up
+    expect(recursiveCalls).toBeLessThanOrEqual(5);
+    // Reporter should have been notified at least once about exceeded depth
+    const swallowedDepthExceeded = reporter.mock.calls.some(
+      ([err]) => err instanceof Error && /re-entrancy/i.test(err.message),
+    );
+    expect(swallowedDepthExceeded).toBe(true);
   });
 
   it('accepts every documented outcome literal', () => {
