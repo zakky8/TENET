@@ -33,6 +33,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  connectors/ticketing: {}
+
   eval/harness: {}
 
   models/anthropic: {}
