@@ -32,6 +32,7 @@ export function reciprocalRankFusion(
     }
   }
 
-  const out = Array.from(fused.values()).sort((a, b) => b.score - a.score);
+  // ES2023 Array.prototype.toSorted — non-mutating sort, no .slice() needed.
+  const out = Array.from(fused.values()).toSorted((a, b) => b.score - a.score);
   return opts.limit !== undefined ? out.slice(0, opts.limit) : out;
 }

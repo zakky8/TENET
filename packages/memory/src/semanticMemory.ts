@@ -92,15 +92,8 @@ export class InMemorySemanticMemory implements SemanticMemory {
   }
 
   private evictPerTenantOverCap(): void {
-    const byTenant = new Map<string, SemanticFact[]>();
-    for (const f of this.facts.values()) {
-      let arr = byTenant.get(f.tenantId);
-      if (!arr) {
-        arr = [];
-        byTenant.set(f.tenantId, arr);
-      }
-      arr.push(f);
-    }
+    // ES2024 Map.groupBy — replaces the hand-rolled tenant grouping loop.
+    const byTenant = Map.groupBy(this.facts.values(), (f) => f.tenantId);
     for (const arr of byTenant.values()) {
       if (arr.length <= this.cap) continue;
       // Drop lowest-confidence, then oldest, until at cap

@@ -64,14 +64,14 @@ export class SpeculativeAgent {
       signal: composedSignal,
     });
 
-    let flagshipTimer: ReturnType<typeof setTimeout> | undefined;
-    const flagshipWithTimeout = new Promise<string | typeof TIMEOUT>((resolve, reject) => {
-      flagshipTimer = setTimeout(() => resolve(TIMEOUT), this.flagshipTimeoutMs);
-      flagshipPromise.then(
-        (v) => resolve(v),
-        (e) => reject(e),
-      );
-    });
+    // ES2024 Promise.withResolvers — same pattern as withTimeoutAndSignal.
+    const { promise: flagshipWithTimeout, resolve, reject } =
+      Promise.withResolvers<string | typeof TIMEOUT>();
+    const flagshipTimer = setTimeout(() => resolve(TIMEOUT), this.flagshipTimeoutMs);
+    flagshipPromise.then(
+      (v) => resolve(v),
+      (e) => reject(e),
+    );
 
     let cheapResult: string;
     try {
@@ -81,7 +81,7 @@ export class SpeculativeAgent {
       const fl = await flagshipPromise.catch(() => {
         throw e;
       });
-      if (flagshipTimer) clearTimeout(flagshipTimer);
+      clearTimeout(flagshipTimer);
       return { cheap: '', flagship: fl, accepted: false, reason: 'cheap-error' };
     }
 
@@ -89,7 +89,7 @@ export class SpeculativeAgent {
     try {
       flagshipResult = await flagshipWithTimeout;
     } catch {
-      if (flagshipTimer) clearTimeout(flagshipTimer);
+      clearTimeout(flagshipTimer);
       flagshipCtrl.abort();
       return { cheap: cheapResult, accepted: true, reason: 'flagship-error' };
     }
