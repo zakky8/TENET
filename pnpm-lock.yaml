@@ -49,6 +49,8 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/router: {}
+
   packages/telemetry:
     dependencies:
       '@tenet/core':
