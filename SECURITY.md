@@ -2,7 +2,9 @@
 
 ## Reporting a vulnerability
 
-Email: **security@tenet.dev** (TODO: confirm domain / use github.com/zakky8 contact until set up)
+**Use GitHub Private Vulnerability Reporting**: https://github.com/zakky8/TENET/security/advisories/new
+
+We don't currently operate a security mailing list. The GitHub private advisory channel is end-to-end private between you and the maintainers, gives us a private fix branch to work on, and assigns a CVE through GitHub when we publish.
 
 Please include:
 - Affected version(s) / commit SHA
