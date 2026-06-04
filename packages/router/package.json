@@ -12,11 +12,26 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  }
+  },
+  "keywords": [
+    "adaptive-routing",
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "cost-optimization",
+    "langchain-alternative",
+    "llm",
+    "speculative-execution",
+    "tenet",
+    "typescript"
+  ]
 }

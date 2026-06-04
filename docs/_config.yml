@@ -1,0 +1,41 @@
+title: TENET
+tagline: "Verification-first TypeScript AI agent framework — BENCHMARKS gated in CI on every PR"
+description: >
+  TENET is a TypeScript AI agent framework with multi-judge hallucination
+  verifier, Vectara HHEM-2.1 adapter, pre-tool-call governance + approval gates
+  + audit trail, WASM-sandboxed tools, MCP OAuth gateway, 10 surfaces
+  (Discord/Slack/Telegram/Teams/web/REST/gRPC/ticketing), and BENCHMARKS gated
+  in CI on every pull request. LangChain alternative. 0 high-severity CVEs.
+  Apache-2.0.
+
+remote_theme: pages-themes/cayman@v0.2.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+# SEO metadata
+url: "https://zakky8.github.io"
+baseurl: "/TENET"
+author:
+  name: TENET contributors
+twitter:
+  card: summary_large_image
+social:
+  name: TENET
+  links:
+    - https://github.com/zakky8/TENET
+
+# Include the right docs in the site
+include:
+  - BENCHMARKS.md
+  - ARCHITECTURE.md
+  - ROADMAP.md
+  - CHANGELOG.md
+
+# Exclude noisy dev artefacts
+exclude:
+  - node_modules
+  - "*.test.ts"
+  - dist
+  - "**/*.lock"

@@ -6,12 +6,35 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
-  "files": ["dist", "README.md"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  }
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "approval-gates",
+    "audit",
+    "compliance",
+    "governance",
+    "langchain-alternative",
+    "llm",
+    "policy",
+    "tenet",
+    "tool-call-policy",
+    "typescript"
+  ]
 }

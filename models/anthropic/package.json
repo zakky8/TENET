@@ -12,12 +12,30 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
-  "dependencies": { "@tenet/streaming": "workspace:*" },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@tenet/streaming": "workspace:*"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  }
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "anthropic",
+    "chat-model",
+    "claude",
+    "langchain-alternative",
+    "llm",
+    "streaming",
+    "tenet",
+    "typescript"
+  ]
 }

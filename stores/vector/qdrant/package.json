@@ -12,7 +12,10 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
@@ -21,5 +24,17 @@
   },
   "dependencies": {
     "@tenet/core": "workspace:*"
-  }
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "langchain-alternative",
+    "llm",
+    "multi-tenant",
+    "qdrant",
+    "tenet",
+    "typescript",
+    "vector-database"
+  ]
 }

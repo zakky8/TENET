@@ -12,11 +12,27 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  }
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "anthropic",
+    "aws-bedrock",
+    "chat-model",
+    "claude",
+    "langchain-alternative",
+    "llm",
+    "tenet",
+    "typescript"
+  ]
 }

@@ -6,13 +6,35 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
-  "files": ["dist", "README.md"],
-  "dependencies": { "@tenet/eval-harness": "workspace:*" },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "@tenet/eval-harness": "workspace:*"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  }
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "assertion-mining",
+    "auto-grow-dataset",
+    "eval",
+    "langchain-alternative",
+    "llm",
+    "tenet",
+    "typescript"
+  ]
 }

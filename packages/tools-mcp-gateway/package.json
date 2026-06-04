@@ -6,13 +6,37 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
-  "files": ["dist", "README.md"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
   },
-  "dependencies": { "@tenet/tools-mcp": "workspace:*" }
+  "dependencies": {
+    "@tenet/tools-mcp": "workspace:*"
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "gateway",
+    "langchain-alternative",
+    "llm",
+    "mcp",
+    "multi-tenant",
+    "oauth",
+    "rfc-9207",
+    "tenet",
+    "typescript"
+  ]
 }

@@ -12,11 +12,26 @@
       "types": "./dist/index.d.ts"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  }
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "circuit-breaker",
+    "langchain-alternative",
+    "llm",
+    "rate-limit",
+    "tenet",
+    "token-bucket",
+    "typescript"
+  ]
 }

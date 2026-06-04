@@ -6,9 +6,19 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "tenet-measure-real": "./dist/cli.js" },
-  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
-  "files": ["dist", "README.md"],
+  "bin": {
+    "tenet-measure-real": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "dependencies": {
     "@tenet/eval-metrics": "workspace:*",
     "@tenet/judge-hhem": "workspace:*",
@@ -19,5 +29,17 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  }
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "benchmarks",
+    "eval",
+    "langchain-alternative",
+    "llm",
+    "measurement",
+    "tenet",
+    "typescript"
+  ]
 }

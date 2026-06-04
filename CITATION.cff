@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+title: "TENET: A Verification-First TypeScript Agent Framework with BENCHMARKS Gated in CI"
+message: "If you use TENET in academic work, please cite this software."
+type: software
+authors:
+  - name: "TENET contributors"
+repository-code: "https://github.com/zakky8/TENET"
+url: "https://github.com/zakky8/TENET"
+abstract: >
+  TENET is an open-source TypeScript agent framework with a multi-judge
+  atomic-claim hallucination verifier (Vectara HHEM-2.1 adapter),
+  pre-tool-call governance with approval gates and structured audit
+  trail, WASM-sandboxed tool execution with capability tokens
+  (wasmtime adapter), Model Context Protocol (MCP) OAuth gateway with
+  RFC 9207 issuer validation, ten channel surfaces (Discord, Slack,
+  Telegram, MS Teams, web widget, REST, gRPC, and four ticketing
+  webhooks: Zendesk, Intercom, Freshdesk, ServiceNow), and a
+  measurement plane (hermetic stub SUT plus a real-ChatModel harness
+  against a public-shape dataset slice) whose BENCHMARKS dimensions
+  are gated in continuous integration on every pull request. The
+  framework is designed to be hardened by construction (zero
+  high-severity CVEs across the 2025-2026 disclosure window) and
+  source-grounded by default. Apache-2.0 licensed.
+keywords:
+  - AI agent framework
+  - TypeScript
+  - hallucination detection
+  - multi-judge verifier
+  - HHEM-2.1
+  - Vectara
+  - retrieval-augmented generation
+  - RAG
+  - WASM sandbox
+  - capability tokens
+  - Model Context Protocol
+  - MCP
+  - OAuth
+  - governance
+  - approval gates
+  - audit trail
+  - OpenTelemetry GenAI
+  - source grounding
+  - prompt injection
+  - LangChain alternative
+  - LangGraph alternative
+  - agent benchmarks
+license: Apache-2.0
+version: 0.0.0
+date-released: 2026-06-04

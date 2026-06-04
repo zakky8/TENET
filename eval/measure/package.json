@@ -6,12 +6,23 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "tenet-measure": "./dist/cli.js" },
-  "exports": {
-    ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" },
-    "./fixtures": { "import": "./dist/fixtures.js", "types": "./dist/fixtures.d.ts" }
+  "bin": {
+    "tenet-measure": "./dist/cli.js"
   },
-  "files": ["dist", "README.md"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./fixtures": {
+      "import": "./dist/fixtures.js",
+      "types": "./dist/fixtures.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "dependencies": {
     "@tenet/eval-metrics": "workspace:*"
   },
@@ -20,5 +31,18 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
-  }
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "benchmarks",
+    "eval",
+    "gate",
+    "hermetic-ci",
+    "langchain-alternative",
+    "llm",
+    "tenet",
+    "typescript"
+  ]
 }
