@@ -13,6 +13,7 @@
     }
   },
   "files": ["dist", "README.md"],
+  "dependencies": { "@tenet/streaming": "workspace:*" },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",

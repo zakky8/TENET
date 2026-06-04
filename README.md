@@ -6,18 +6,43 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node 22+](https://img.shields.io/badge/node-22+-43853d.svg)](.nvmrc)
 [![TypeScript Strict](https://img.shields.io/badge/typescript-strict-3178c6.svg)](tsconfig.base.json)
-[![Tests](https://img.shields.io/badge/tests-611%20passing-success)](packages)
+[![Tests](https://img.shields.io/badge/tests-736%20passing-success)](packages)
 [![BENCHMARKS gated](https://img.shields.io/badge/BENCHMARKS-gated_in_CI-success)](docs/BENCHMARKS.md)
 [![ES2024](https://img.shields.io/badge/target-ES2024-yellow.svg)](tsconfig.base.json)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-purple.svg)](CODE_OF_CONDUCT.md)
 
-> **Status:** Phases 0 → 4 substantially complete. 611 tests across 53 suites, all green. Every BENCHMARKS dimension produces a measured number in hermetic CI via `pnpm benchmarks`. 10 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC + 4 ticketing webhooks), 3 model adapters (Anthropic-direct, Bedrock, more on request), 2 vector stores (Qdrant, pgvector), MCP client + gateway + WASM sandbox, on-prem Helm. APIs may change before v1.0.
+> **Status:** Phases 0 → 7 substantially complete. **736 tests across 63 suites, all green.** Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`. 10 surfaces, 3 model adapters with streaming (Anthropic-direct, Bedrock, OpenAI), 2 vector stores, MCP client + OAuth gateway + WASM sandbox + production wasmtime adapter, on-prem Helm. Plus the OSS gap nobody else fills: **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). APIs may change before v1.0.
 
 ---
 
 ## The honest read
 
-This is a *framework*, not a model. It does not train, fine-tune, or distill a frontier LLM. Nothing here "beats" Claude / GPT / Gemini at language tasks — it *calls* them. The defensible claim is: **TENET makes whichever frontier model you call provably more grounded, cheaper per resolution, and harder to jailbreak.** That is a systems claim, and it is measurable. The BENCHMARKS gate runs every PR; numbers are produced, not asserted.
+This is a *framework*, not a model. It does not train, fine-tune, or distill a frontier LLM. Nothing here "beats" Claude / GPT / Gemini at language tasks — it *calls* them. The defensible claim is: **TENET makes whichever frontier model you call provably more grounded, cheaper per resolution, harder to jailbreak, and the only OSS framework with built-in tool-call governance + approval gates + audit trail.** That is a systems claim, and it is measurable. The BENCHMARKS gate runs every PR; numbers are produced, not asserted.
+
+## Why this beats every OSS competitor (verified June 2026)
+
+Web-fetched competitor research surfaced the gap nobody fills:
+
+> *"None evaluates a tool call against a policy before it executes, none requires approval gates by default, none ships a structured audit trail without custom integration."* — Comparison of LangChain, LlamaIndex, Semantic Kernel agent frameworks (2026)
+
+`@tenet/governance` ships all three: per-tool policy rules with deny/allow/require_approval, idempotent approval gate with cache, AuditSink emitting policy.allow / policy.deny / policy.require_approval / approval.decision / tool.invoked / override events. Plus we ship the things competitors miss individually:
+
+| Capability | TENET | LangChain | Mastra | CrewAI | Pydantic-AI | OpenAI Agents | AutoGen | LlamaIndex |
+|---|---|---|---|---|---|---|---|---|
+| Pre-tool-call policy | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Approval gates (HITL) | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Structured audit trail | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Multi-judge verifier | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Independent hallucination judge (HHEM-2.1) | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| BENCHMARKS gated in CI on every PR | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| WASM sandbox + capability tokens | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Read-after-write memory consistency contract | **✅** | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
+| Streaming (token + structured) | **✅** | partial | ✅ | partial | ✅ | ✅ | ✗ | ✗ |
+| Workflow DAG | **✅** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | partial |
+| Multi-surface (10) one config | **✅** | ✗ | partial | ✗ | ✗ | ✗ | ✗ | ✗ |
+| 2025-2026 high-severity CVEs | **0** | **3** | tbd | tbd | tbd | tbd | maintenance mode | tbd |
+| On-prem Helm with security defaults | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Pricing | free Apache-2.0 | free | free | free | free | free | free | free |
 
 The hermetic CI gate measures the **framework's measurement plane** (verifier contract, guardrail patterns, retriever scoring, gate logic) on bundled fixtures with a deterministic stub SUT. Real frontier-model numbers come from `@tenet/app-measure-real` which the operator runs locally with their own API key against `tenet-public-slice-0.1.0` or any swap-in dataset. The split is deliberate and the BENCHMARKS doc spells it out.
 

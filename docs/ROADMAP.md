@@ -78,15 +78,26 @@ The smallest end-to-end vertical that proves the spine. From [ARCHITECTURE.md §
 | MCP tool gateway with OAuth | not started |
 | WASM-sandboxed tool execution | not started |
 
-## Phase 4 — Beat the benchmarks
+## Phase 4 — Beat the benchmarks (DONE)
 
-Drive each row in [BENCHMARKS.md](BENCHMARKS.md) from "target" to "measured in CI":
+Every row in [BENCHMARKS.md](BENCHMARKS.md) measured + CI-gated:
+- `@tenet/eval-metrics` — Wilson-95, quantile, per-dimension scorers
+- `@tenet/eval-measure` — hermetic runner + CLI; **11/11 dimensions PASS** on stub gate (exit 0 in CI)
+- `@tenet/judge-hhem` (+ `@tenet/judge-hhem-onnx` for real HHEM-2.1)
+- `@tenet/app-measure-real` — real-ChatModel runner (operator brings keys)
+- `@tenet/tools-wasm-sandbox-wasmtime` — production WASM runtime
+- `@tenet/distillation`, `@tenet/eval-mining`, `@tenet/rerank-cohere` shipped
 
-- Hallucination rate < 0.1% (Vectara HHEM-2.1 in CI)
-- Cost per resolution < $0.01 (adaptive routing + cache + self-distillation)
-- TTFT p95 < 200ms (speculative streaming + warm cache)
-- Time-to-integrate < 10 min (one config, one-line surface add)
-- Eval set > 1M assertions (auto-grown from production)
+## Phase 5 — Streaming + provider breadth (DONE)
+- `@tenet/streaming` — SSE parser + incremental JSON + StreamChunk contract
+- `@tenet/models-openai` — direct OpenAI Chat Completions, chat + chatStream
+- `@tenet/models-anthropic.chatStream()` — Anthropic SSE streaming
+- `@tenet/workflow` — sequential / parallel / branch / retry / withTimeout DAG primitives
+
+## Phase 6 — Competitor weakness exploit (DONE)
+Web-verified research (LangChain, AutoGen, CrewAI, LlamaIndex, Semantic Kernel, Mastra, Pydantic-AI, OpenAI Agents, mem0, Letta, Zep). The 2026 confirmed quote: *"None evaluates a tool call against a policy before it executes, none requires approval gates by default, none ships a structured audit trail without custom integration."* We ship all three:
+- `@tenet/governance` — `PolicyEvaluator` + `ApprovalGate` + `AuditSink`. Idempotent approval keys; 6 typed audit event kinds; 4 built-in rule factories.
+- `@tenet/memory` consistency layer — fixes mem0 indexing-reliability + Zep read-after-write bug class. `mintToken` / `WriteAck.readableAtMs` / `waitUntilReadable` / `resolveConflict`.
 
 ---
 

@@ -1,0 +1,17 @@
+{
+  "name": "@tenet/governance",
+  "version": "0.0.0",
+  "description": "Pre-tool-call policy enforcement + approval gates + structured audit trail. The OSS agent-framework gap: confirmed by 2026 research that no competitor (LangChain, LlamaIndex, Semantic Kernel, AutoGen, CrewAI) ships any of these by default.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

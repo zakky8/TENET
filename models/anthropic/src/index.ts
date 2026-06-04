@@ -22,6 +22,8 @@ export interface AnthropicHttp {
   }): Promise<{
     status: number;
     text(): Promise<string>;
+    /** Present on streaming responses. */
+    body?: ReadableStream<Uint8Array> | null;
   }>;
 }
 
@@ -135,6 +137,82 @@ export class AnthropicChatModel implements ChatModel {
       }
     }
     return parts.join('');
+  }
+
+  /**
+   * SSE-streamed Anthropic Messages API. Closes the OSS-streaming-gap
+   * confirmed by 2026 research. Emits StreamChunks compatible with
+   * @tenet/streaming so eval-measure's measureTtft + the verifier's
+   * streaming path see a consistent shape across providers.
+   *
+   * Anthropic event-stream events we honor:
+   *   - content_block_delta + delta.text → text chunk
+   *   - message_delta + usage → usage chunk
+   *   - message_stop → message_stop chunk
+   * Other events (ping, content_block_start/stop, message_start) are
+   * intentionally not surfaced — they're framework-internal and the
+   * verifier doesn't need them.
+   */
+  async *chatStream(args: {
+    system: string;
+    user: string;
+    maxTokens: number;
+    signal?: AbortSignal;
+  }): AsyncIterable<import('@tenet/streaming').StreamChunk> {
+    if (args.maxTokens <= 0) throw new Error('maxTokens must be > 0');
+
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      'x-api-key': this.apiKey,
+      'anthropic-version': this.anthropicVersion,
+      accept: 'text/event-stream',
+    };
+    if (this.betas.length > 0) headers['anthropic-beta'] = this.betas.join(',');
+
+    const body = JSON.stringify({
+      model: this.model,
+      max_tokens: args.maxTokens,
+      temperature: this.temperature,
+      system: args.system,
+      stream: true,
+      messages: [{ role: 'user', content: args.user }],
+    });
+
+    const res = await this.http.fetch(`${this.baseUrl}/v1/messages`, {
+      method: 'POST',
+      headers,
+      body,
+      ...(args.signal !== undefined ? { signal: args.signal } : {}),
+    });
+    if (res.status < 200 || res.status >= 300) {
+      const text = await res.text();
+      throw new AnthropicApiError(res.status, text);
+    }
+    if (!res.body) throw new Error('Anthropic streaming response missing body');
+
+    const { parseSseStream } = await import('@tenet/streaming');
+    for await (const ev of parseSseStream(res.body, args.signal)) {
+      let parsed: unknown;
+      try { parsed = JSON.parse(ev.data); } catch { continue; }
+      if (!parsed || typeof parsed !== 'object') continue;
+      const type = (parsed as { type?: unknown }).type;
+      if (type === 'content_block_delta') {
+        const delta = (parsed as { delta?: { type?: unknown; text?: unknown } }).delta;
+        if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+          yield { kind: 'text', text: delta.text };
+        }
+      } else if (type === 'message_delta') {
+        const usage = (parsed as { usage?: { output_tokens?: unknown; input_tokens?: unknown } }).usage;
+        if (usage && typeof usage === 'object') {
+          const inT = typeof usage.input_tokens === 'number' ? usage.input_tokens : 0;
+          const outT = typeof usage.output_tokens === 'number' ? usage.output_tokens : 0;
+          if (outT > 0 || inT > 0) yield { kind: 'usage', inputTokens: inT, outputTokens: outT };
+        }
+      } else if (type === 'message_stop') {
+        yield { kind: 'message_stop', stopReason: 'end_turn' };
+        return;
+      }
+    }
   }
 }
 
