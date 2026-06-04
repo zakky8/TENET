@@ -33,6 +33,8 @@ importers:
 
   packages/guardrails: {}
 
+  packages/memory: {}
+
   packages/policy: {}
 
   packages/rate-limit: {}

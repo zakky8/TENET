@@ -1,0 +1,22 @@
+{
+  "name": "@tenet/memory",
+  "version": "0.0.0",
+  "description": "Memory tiers — Working (ring buffer) + Episodic (conversation history) + Semantic (cross-conversation facts). Interfaces + in-memory impls.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}
