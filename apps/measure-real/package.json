@@ -1,0 +1,23 @@
+{
+  "name": "@tenet/app-measure-real",
+  "version": "0.0.0",
+  "description": "Real-ChatModel measurement runner — composes the framework's verifier + scorers against a public-dataset slice using a real model adapter. Operator runs locally with their own API key; not hermetic CI.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": { "tenet-measure-real": "./dist/cli.js" },
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "dependencies": {
+    "@tenet/eval-metrics": "workspace:*",
+    "@tenet/judge-hhem": "workspace:*",
+    "@tenet/models-anthropic": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

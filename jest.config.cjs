@@ -5,6 +5,12 @@ module.exports = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@tenet/eval-(.*)$': '<rootDir>/eval/$1/src',
+    '^@tenet/models-(.*)$': '<rootDir>/models/$1/src',
+    '^@tenet/surface-(.*)$': '<rootDir>/surfaces/$1/src',
+    '^@tenet/connectors-(.*)$': '<rootDir>/connectors/$1/src',
+    '^@tenet/stores-vector-(.*)$': '<rootDir>/stores/vector/$1/src',
+    '^@tenet/stores-state-(.*)$': '<rootDir>/stores/state/$1/src',
+    '^@tenet/app-(.*)$': '<rootDir>/apps/$1/src',
     '^@tenet/(.*)$': '<rootDir>/packages/$1/src',
   },
   transform: {

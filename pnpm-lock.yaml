@@ -39,6 +39,18 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  apps/measure-real:
+    dependencies:
+      '@tenet/eval-metrics':
+        specifier: workspace:*
+        version: link:../../eval/metrics
+      '@tenet/judge-hhem':
+        specifier: workspace:*
+        version: link:../../packages/judge-hhem
+      '@tenet/models-anthropic':
+        specifier: workspace:*
+        version: link:../../models/anthropic
+
   connectors/ticketing: {}
 
   eval/harness: {}
