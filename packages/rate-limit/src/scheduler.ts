@@ -43,8 +43,8 @@ export class RateLimitScheduler {
 
     const specs = policy.buckets({
       tenantId: args.tenantId,
-      conversationId: args.conversationId,
-      userId: args.userId,
+      ...(args.conversationId !== undefined ? { conversationId: args.conversationId } : {}),
+      ...(args.userId !== undefined ? { userId: args.userId } : {}),
     });
 
     for (const spec of specs) {

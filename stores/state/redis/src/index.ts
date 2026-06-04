@@ -67,9 +67,9 @@ export class InMemoryStateStore implements StateStore {
       const oldest = this.data.keys().next().value;
       if (oldest !== undefined) this.data.delete(oldest);
     }
-    const expiresAt =
-      opts?.ttlSec !== undefined ? this.now() + opts.ttlSec * 1000 : undefined;
-    this.data.set(key, { value, expiresAt });
+    const entry: Entry = { value };
+    if (opts?.ttlSec !== undefined) entry.expiresAt = this.now() + opts.ttlSec * 1000;
+    this.data.set(key, entry);
   }
 
   async del(key: string): Promise<void> {

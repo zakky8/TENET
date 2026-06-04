@@ -65,15 +65,19 @@ export class HybridPipeline {
     const embedMs = perfNow() - tEmbedStart;
 
     const tBm25Start = perfNow();
-    const bm25 = this.opts.lexical.query({ text: args.text, k: branchK, tenantId: args.tenantId });
+    const bm25 = this.opts.lexical.query({
+      text: args.text,
+      k: branchK,
+      ...(args.tenantId !== undefined ? { tenantId: args.tenantId } : {}),
+    });
     const bm25Ms = perfNow() - tBm25Start;
 
     const tDenseStart = perfNow();
     const dense = await this.opts.dense.query({
       embedding: queryEmbedding,
       k: branchK,
-      tenantId: args.tenantId,
-      signal: args.signal,
+      ...(args.tenantId !== undefined ? { tenantId: args.tenantId } : {}),
+      ...(args.signal !== undefined ? { signal: args.signal } : {}),
     });
     const denseMs = perfNow() - tDenseStart;
 
@@ -89,7 +93,7 @@ export class HybridPipeline {
         query: args.text,
         candidates: fused,
         topN,
-        signal: args.signal,
+        ...(args.signal !== undefined ? { signal: args.signal } : {}),
       });
       rerankMs = perfNow() - tRerankStart;
     }

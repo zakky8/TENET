@@ -50,7 +50,12 @@ export class Bm25Index implements LexicalScorer {
       const tf = new Map<string, number>();
       for (const t of tokens) tf.set(t, (tf.get(t) ?? 0) + 1);
 
-      const doc: Doc = { source, tenantId, termFreq: tf, length: tokens.length };
+      const doc: Doc = {
+        source,
+        termFreq: tf,
+        length: tokens.length,
+        ...(tenantId !== undefined ? { tenantId } : {}),
+      };
 
       if (existing >= 0) {
         // Replace — remove old doc's contribution to docFreq

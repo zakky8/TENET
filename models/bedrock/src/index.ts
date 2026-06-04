@@ -79,7 +79,9 @@ export class AnthropicOnBedrockChatModel implements ChatModel {
     const res = await this.invoker.invokeModel({
       modelId: this.modelId,
       body,
-      signal: args.signal,
+      // Spread conditionally — exactOptionalPropertyTypes distinguishes
+      // "absent" from "present with undefined" on optional properties.
+      ...(args.signal !== undefined ? { signal: args.signal } : {}),
     });
 
     return this.parseResponse(res.body);

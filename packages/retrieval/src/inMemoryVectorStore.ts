@@ -15,7 +15,7 @@ export class InMemoryVectorStore implements VectorStore {
       this.records.set(r.source.id, {
         source: r.source,
         embedding: r.embedding.slice(),
-        tenantId: r.tenantId,
+        ...(r.tenantId !== undefined ? { tenantId: r.tenantId } : {}),
       });
     }
   }

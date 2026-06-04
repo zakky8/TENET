@@ -33,7 +33,11 @@ importers:
 
   packages/guardrails: {}
 
-  packages/memory: {}
+  packages/memory:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/policy: {}
 
