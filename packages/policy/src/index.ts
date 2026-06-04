@@ -102,4 +102,5 @@ export function fingerprint(registry: PrincipleRegistry): string {
     .join('|');
 }
 
+export * from './standardPrinciples.js';
 export const VERSION = '0.0.0';
