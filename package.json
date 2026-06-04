@@ -20,7 +20,8 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "lint": "pnpm -r lint",
-    "eval": "pnpm --filter @tenet/eval run eval",
+    "benchmarks": "node eval/measure/dist/cli.js",
+    "benchmarks:json": "node eval/measure/dist/cli.js --json",
     "audit": "pnpm audit --prod --audit-level high",
     "clean": "pnpm -r exec rimraf dist .turbo node_modules"
   },

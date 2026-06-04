@@ -11,6 +11,13 @@
 import { measureAll, DEFAULT_TARGETS } from './runner.js';
 
 const report = measureAll(DEFAULT_TARGETS);
+const jsonOnly = process.argv.includes('--json');
+
+if (jsonOnly) {
+  console.log(JSON.stringify(report, null, 2));
+  const anyFailJson = report.verdicts?.some((v) => v.kind === 'fail' || v.kind === 'missing') ?? false;
+  process.exit(anyFailJson ? 1 : 0);
+}
 
 const rows = report.metrics.map((m) => {
   const v = report.verdicts?.find((x) => x.metric === m.metric);
@@ -42,7 +49,4 @@ console.log('-'.repeat(header.length));
 console.log(`SUT: ${report.sut}   fixtures: ${report.manifest.total}`);
 
 const anyFail = report.verdicts?.some((v) => v.kind === 'fail' || v.kind === 'missing') ?? false;
-if (process.argv.includes('--json')) {
-  console.log(JSON.stringify(report, null, 2));
-}
 process.exit(anyFail ? 1 : 0);

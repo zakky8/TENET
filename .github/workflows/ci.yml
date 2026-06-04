@@ -77,25 +77,33 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
-  eval-regression:
-    name: Eval regression
+  benchmarks-gate:
+    name: BENCHMARKS gate (hermetic)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: github.event_name == 'pull_request'
+    timeout-minutes: 15
+    # Hermetic — no secrets, no network. Runs every BENCHMARKS dimension
+    # against bundled fixtures + the deterministic stub SUT and exits
+    # non-zero on any FAIL or MISSING verdict. The numbers measured here
+    # are the framework's measurement plane, not a frontier-model claim.
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        # version intentionally not pinned here — package.json packageManager
-        # field is the single source of truth (Corepack-compatible).
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: pnpm eval
-        env:
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        continue-on-error: false
+      - run: pnpm --filter @tenet/eval-metrics build
+      - run: pnpm --filter @tenet/eval-measure build
+      - name: Run measure CLI (gate)
+        run: pnpm benchmarks
+      - name: Capture measured.json
+        if: always()
+        run: pnpm benchmarks:json > measured.json || true
+      - name: Upload measurement artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: measured-${{ github.sha }}
+          path: measured.json
+          retention-days: 90

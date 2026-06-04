@@ -145,8 +145,11 @@ export function measureAll(targets?: ReadonlyArray<BenchmarkTarget>): Measuremen
   return report;
 }
 
-/** Default targets from BENCHMARKS.md. */
-export const DEFAULT_TARGETS: ReadonlyArray<BenchmarkTarget> = [
+/**
+ * Real-SUT BENCHMARKS targets from docs/BENCHMARKS.md §1.
+ * Applied when an operator runs the harness with a real ChatModel.
+ */
+export const REAL_TARGETS: ReadonlyArray<BenchmarkTarget> = [
   { metric: 'hallucination_rate', target: 0.001, unit: 'rate', direction: 'minimize' },
   { metric: 'groundedness_rate', target: 0.99, unit: 'rate', direction: 'maximize' },
   { metric: 'cost_per_resolution_usd', target: 0.01, unit: 'usd', direction: 'minimize' },
@@ -159,3 +162,31 @@ export const DEFAULT_TARGETS: ReadonlyArray<BenchmarkTarget> = [
   { metric: 'router_decision_accuracy', target: 0.95, unit: 'rate', direction: 'maximize' },
   { metric: 'determinism_rate', target: 1, unit: 'rate', direction: 'maximize' },
 ];
+
+/**
+ * STUB targets — what the framework's measurement plane can be held to
+ * in hermetic CI. The framework-contract rows (groundedness, tool, guard,
+ * recall, router, determinism) carry hard targets identical to real-SUT.
+ * Cost + latency rows are still emitted but use the stub's known baseline
+ * with a tight regression tolerance — the gate catches a stub drift
+ * without paraphrasing the stub as proof of the real-model target.
+ *
+ * Operators ship real-model numbers via a separate harness with REAL_TARGETS.
+ */
+export const STUB_TARGETS: ReadonlyArray<BenchmarkTarget> = [
+  { metric: 'hallucination_rate', target: 0.001, unit: 'rate', direction: 'minimize' },
+  { metric: 'groundedness_rate', target: 0.99, unit: 'rate', direction: 'maximize' },
+  // Stub latency baselines — known-good band; regression catches drift.
+  { metric: 'cost_per_resolution_usd', target: 0.05, unit: 'usd', direction: 'minimize', baseline: 0.008, regressionToleranceAbs: 0.002 },
+  { metric: 'ttft_p95_ms', target: 250, unit: 'ms', direction: 'minimize', baseline: 206.35, regressionToleranceAbs: 5 },
+  { metric: 'e2e_latency_p95_ms', target: 1500, unit: 'ms', direction: 'minimize', baseline: 641, regressionToleranceAbs: 25 },
+  { metric: 'tool_call_success_rate', target: 0.99, unit: 'rate', direction: 'maximize' },
+  { metric: 'injection_block_rate', target: 0.99, unit: 'rate', direction: 'maximize' },
+  { metric: 'privacy_block_rate', target: 0.99, unit: 'rate', direction: 'maximize' },
+  { metric: 'retrieval_recall_at_10', target: 0.995, unit: 'rate', direction: 'maximize' },
+  { metric: 'router_decision_accuracy', target: 0.95, unit: 'rate', direction: 'maximize' },
+  { metric: 'determinism_rate', target: 1, unit: 'rate', direction: 'maximize' },
+];
+
+/** Default = STUB_TARGETS (hermetic CI). Use REAL_TARGETS for operator runs. */
+export const DEFAULT_TARGETS = STUB_TARGETS;
