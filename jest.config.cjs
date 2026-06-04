@@ -11,6 +11,8 @@ module.exports = {
     '^@tenet/stores-vector-(.*)$': '<rootDir>/stores/vector/$1/src',
     '^@tenet/stores-state-(.*)$': '<rootDir>/stores/state/$1/src',
     '^@tenet/app-(.*)$': '<rootDir>/apps/$1/src',
+    '^@tenet/rerank-(.*)$': '<rootDir>/packages/rerank-$1/src',
+    '^@tenet/judge-(.*)$': '<rootDir>/packages/judge-$1/src',
     '^@tenet/(.*)$': '<rootDir>/packages/$1/src',
   },
   transform: {

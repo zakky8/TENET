@@ -1,0 +1,81 @@
+name: Measure Real (gated by ANTHROPIC_API_KEY)
+
+# Real-model harness — opt-in. Runs apps/measure-real against a real
+# ChatModel using the operator's API key. Never blocks PRs (especially
+# from forks, where the secret is unavailable). Schedule it nightly
+# from main + on workflow_dispatch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: 'Anthropic model id (e.g. claude-sonnet-4-5-20250929)'
+        required: false
+        default: 'claude-sonnet-4-5-20250929'
+  schedule:
+    # Nightly at 03:17 UTC — off the hour to avoid the rush.
+    - cron: '17 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: measure-real
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Measure on tenet-public-slice
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Skip cleanly when the secret isn't set — keeps the workflow page
+    # green for repos that haven't wired the key.
+    if: ${{ github.repository == 'zakky8/TENET' }}
+    steps:
+      - name: Check secret
+        id: check
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "ANTHROPIC_API_KEY not set — skipping (this is expected on forks)."
+            echo "has_secret=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_secret=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.has_secret == 'true'
+      - uses: pnpm/action-setup@v4
+        if: steps.check.outputs.has_secret == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.has_secret == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install
+        if: steps.check.outputs.has_secret == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Build deps
+        if: steps.check.outputs.has_secret == 'true'
+        run: |
+          pnpm --filter @tenet/eval-metrics build
+          pnpm --filter @tenet/judge-hhem build
+          pnpm --filter @tenet/models-anthropic build
+          pnpm --filter @tenet/eval-measure build
+          pnpm --filter @tenet/app-measure-real build
+      - name: Run real-model measurement
+        if: steps.check.outputs.has_secret == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL_ID: ${{ github.event.inputs.model_id || 'claude-sonnet-4-5-20250929' }}
+        run: |
+          node --experimental-strip-types \
+            apps/measure-real/examples/anthropic-sonnet.ts \
+            > measured-real.json
+      - name: Upload report
+        if: steps.check.outputs.has_secret == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: measured-real-${{ github.sha }}
+          path: measured-real.json
+          retention-days: 90

@@ -1,0 +1,18 @@
+{
+  "name": "@tenet/eval-mining",
+  "version": "0.0.0",
+  "description": "Eval-set auto-growth — assertion miner over conversation traces + embedding-based deduplication.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "dependencies": { "@tenet/eval-harness": "workspace:*" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

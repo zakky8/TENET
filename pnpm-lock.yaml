@@ -63,11 +63,19 @@ importers:
 
   eval/metrics: {}
 
+  eval/mining:
+    dependencies:
+      '@tenet/eval-harness':
+        specifier: workspace:*
+        version: link:../harness
+
   models/anthropic: {}
 
   models/bedrock: {}
 
   packages/core: {}
+
+  packages/distillation: {}
 
   packages/guardrails: {}
 
@@ -98,6 +106,8 @@ importers:
   packages/policy: {}
 
   packages/rate-limit: {}
+
+  packages/rerank-cohere: {}
 
   packages/retrieval:
     dependencies:
