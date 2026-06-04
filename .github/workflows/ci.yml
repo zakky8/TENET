@@ -73,9 +73,11 @@ jobs:
       - uses: actions/checkout@v4
       # SECURITY 2026-06-04 vuln-test #SC1: pin Trivy action to a tagged
       # release. `@master` pulled arbitrary upstream commits with our CI
-      # token — supply-chain risk. Pinned to v0.28.0 SHA; renovate-bot can
-      # bump on a controlled cadence.
-      - uses: aquasecurity/trivy-action@6c175e9c4778a92ace4e4d96a4b0d9c1ef2f5f25 # v0.28.0
+      # token — supply-chain risk. SHA verified live against
+      # repos/aquasecurity/trivy-action/git/refs/tags/v0.36.0 (the latest
+      # tagged release on 2026-06-04). Renovate-bot can bump on a
+      # controlled cadence.
+      - uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
