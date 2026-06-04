@@ -1,0 +1,25 @@
+{
+  "name": "@tenet/surface-web-widget",
+  "version": "0.0.0",
+  "description": "Web-widget Surface — SSE + JWT. Framework-agnostic handler returning {status, headers, body} for Express/Fastify/Hono/Cloudflare Workers.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "dependencies": {
+    "@tenet/core": "workspace:*"
+  }
+}
