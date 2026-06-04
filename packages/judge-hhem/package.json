@@ -1,0 +1,20 @@
+{
+  "name": "@tenet/judge-hhem",
+  "version": "0.0.0",
+  "description": "Vectara HHEM-2.1 hallucination judge adapter. Inject any HHEM-shaped scorer; produces atomic-claim verdicts the verifier consumes.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "dependencies": {
+    "@tenet/eval-metrics": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

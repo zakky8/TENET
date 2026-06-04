@@ -59,6 +59,12 @@ importers:
 
   packages/guardrails: {}
 
+  packages/judge-hhem:
+    dependencies:
+      '@tenet/eval-metrics':
+        specifier: workspace:*
+        version: link:../../eval/metrics
+
   packages/memory:
     dependencies:
       '@tenet/core':
