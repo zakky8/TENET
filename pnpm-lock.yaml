@@ -101,6 +101,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  surfaces/grpc:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+
   surfaces/rest:
     dependencies:
       '@tenet/core':
