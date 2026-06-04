@@ -25,15 +25,25 @@ export class Secret<T = string> {
 
 const PathHandleBrand: unique symbol = Symbol('PathHandleBrand');
 /**
- * A path that has been opened against an allowlist root.
- * The only way to construct one is via the fs module's openPath() helper
- * which validates against the per-process root. Raw strings are rejected
- * at the type level — code that wants to do file I/O cannot accidentally
- * pass a user-controlled string.
+ * A path that has been opened against an allow-list root.
+ * The only way to construct one is via {@link openPath} (from ./path.ts)
+ * which validates against the per-process root configured by
+ * {@link configurePathRoot}. Raw strings are rejected at the type level —
+ * code that wants to do file I/O cannot accidentally pass a user-controlled
+ * string.
  */
 export interface PathHandle {
   readonly [PathHandleBrand]: true;
   readonly absolute: string;
+}
+
+/**
+ * Internal factory — exported under a deliberately ugly name so it's
+ * not part of the public API. Only ./path.ts (the validator) should
+ * call this. External callers MUST use openPath().
+ */
+export function __makePathHandle__(absolute: string): PathHandle {
+  return { [PathHandleBrand]: true, absolute };
 }
 
 // ── Conversation events ─────────────────────────────────────────────────────
