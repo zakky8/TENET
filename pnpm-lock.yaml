@@ -79,6 +79,12 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/core
 
+  surfaces/discord:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+
   surfaces/telegram:
     dependencies:
       '@tenet/core':
