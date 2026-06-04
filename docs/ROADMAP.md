@@ -6,6 +6,8 @@ Source of detail for each row: [ARCHITECTURE.md](ARCHITECTURE.md) (component map
 
 ---
 
+> **State as of 2026-06-04:** Phase 0 + Phase 1 MVP packages all landed. 327 tests passing across 31 suites. CI green. The 5 deferred review findings from the adversarial pass on `c9c9fb0` all shipped. The 7 open research questions all closed in [RESEARCH-PASS-2.md](RESEARCH-PASS-2.md).
+
 ## Phase 0 — Scaffold (DONE)
 
 | | Done |
@@ -22,31 +24,32 @@ Source of detail for each row: [ARCHITECTURE.md](ARCHITECTURE.md) (component map
 | `docs/ARCHITECTURE.md` + `docs/BENCHMARKS.md` | ✓ |
 | CONTRIBUTING / CODE_OF_CONDUCT / issue + PR templates | ✓ |
 
-## Phase 1 — MVP (in progress)
+## Phase 1 — MVP (LANDED — code complete; production wiring TBD)
 
 The smallest end-to-end vertical that proves the spine. From [ARCHITECTURE.md §12](ARCHITECTURE.md).
 
 | | Status |
 |---|---|
-| `@tenet/retrieval` — hybrid (BM25 + dense) + contextual chunk prepending + rerank | not started |
-| `@tenet/rate-limit` — token-bucket scheduler per platform | not started |
-| `@tenet/guardrails` — PII redactor, input filter | not started |
-| `@tenet/router` — adaptive cost-aware router + speculative agent | not started |
-| `@tenet/memory` — episodic + semantic + working | not started |
-| `surfaces/telegram` — grammY adapter | not started |
-| `models/bedrock` — AWS Bedrock adapter | not started |
-| `stores/vector/pgvector` — default vector store | not started |
-| `stores/state/redis` — conversation state | not started |
-| `apps/community-bot` — first reference deployment | not started |
-| `eval/harness` — eval-as-CI runner with LLM-as-judge | not started |
-| Golden eval dataset (~100 cases) committed | not started |
+| `@tenet/retrieval` — Bm25Index + InMemoryVectorStore + RRF fusion + HybridPipeline | ✓ |
+| `@tenet/rate-limit` — TokenBucket + CircuitBreaker + RateLimitScheduler + 5 platform policies | ✓ |
+| `@tenet/guardrails` — PII redactor (7 kinds), composable filters | ✓ |
+| `@tenet/router` — AdaptiveRouter + InMemorySemanticAnswerCache + SpeculativeAgent | ✓ |
+| `@tenet/memory` — WorkingMemory + InMemoryEpisodicMemory + InMemorySemanticMemory | ✓ |
+| `surfaces/telegram` — TelegramSurface adapter (HTML formatter, citation rendering, rate-limit gate) | ✓ |
+| `models/bedrock` — AnthropicOnBedrockChatModel (no AWS SDK hard dep) | ✓ |
+| `stores/vector/pgvector` — PgVectorStore adapter (no pg SDK hard dep, all values parameter-bound) | ✓ |
+| `stores/state/redis` — InMemoryStateStore + RedisStateStore adapter | ✓ |
+| `apps/community-bot` — CommunityBot reference composition | ✓ |
+| `eval/harness` — runEval + builtinAssertions + regressionGate | ✓ |
+| Golden eval dataset (~100 cases) committed | not started — Phase 2 |
+| End-to-end smoke run against real Bedrock | not started — Phase 2 |
 
 **MVP success criteria** (from ARCHITECTURE.md §12):
-1. Conversations replay through the new runtime end-to-end.
-2. CoVe + Reflexion + citation enforcement run on every output (not opt-in).
-3. Telegram rate-limit policy enforced — simulate flood, observe queueing.
-4. OTel spans visible in a local Jaeger.
-5. CI runs eval suite as a gate.
+1. ~~Conversations replay through the new runtime end-to-end.~~ → composition shipped in `@tenet/app-community-bot`; real-LLM smoke run pending.
+2. ~~CoVe + Reflexion + citation enforcement run on every output (not opt-in).~~ → atomic-claim multi-judge verifier wired; CoVe / Reflexion as `JudgePromptDecorator` strategies (B5).
+3. ~~Telegram rate-limit policy enforced — simulate flood, observe queueing.~~ → `RateLimitScheduler` with `TELEGRAM_POLICY`; integration test pending.
+4. OTel spans visible in a local Jaeger. → semconv keys defined in `@tenet/telemetry`; exporter wiring pending.
+5. CI runs eval suite as a gate. → `@tenet/eval-harness` + `regressionGate` ship the primitive; CI workflow integration pending.
 
 ## Phase 2 — Surfaces + adapters expansion
 
@@ -87,15 +90,15 @@ Drive each row in [BENCHMARKS.md](BENCHMARKS.md) from "target" to "measured in C
 
 ---
 
-## Deferred from adversarial review (carried as known work)
+## Deferred from adversarial review — ALL LANDED
 
-Surfaced by the 2026-06-04 review pass. Severity-ranked, ready to land when the affected layer reaches phase 1:
+Surfaced by the 2026-06-04 review pass, all five shipped:
 
-- **buildCitations** — naive 30-char head-substring match; replace with a `pickBackingSource(claim, sources)` strategy in `@tenet/core`.
-- **PathHandle factory** — type promises protection but the `openPath()` factory doesn't exist. Either ship the factory (per-process allow-list root, abs-path rejection) or remove the type until the fs package lands.
-- **ChatModel.chat AbortSignal** — Promise.race timeout in withTimeout rejects, but the underlying HTTP request keeps running. Add `signal: AbortSignal` to ChatModel.chat and propagate.
-- **OutcomeEmitter** — sink-isolation try/catch swallows all errors including infinite recursion and programmer mistakes. Add a re-entrancy guard + log swallowed errors at warn level (without recursing back through emit).
-- **VerifierConfig altitude** — `allowedUrlPatterns` and `adversarialExamples` are app-specific concepts in framework code. Replace with pluggable `ClaimPreFilter` and `JudgePromptDecorator` interfaces.
+- ~~**buildCitations**~~ — replaced with pluggable `SourcePicker` strategy in `@tenet/core` + default impl in `@tenet/verifier`. Two-stage fallback (head substring + significant-token overlap). Commit `43709a0`.
+- ~~**PathHandle factory**~~ — `configurePathRoot()` + `openPath()` shipped in `@tenet/core`. Abs paths, `..` traversal, root-escape all rejected at construction. Commit `509442b`.
+- ~~**ChatModel.chat AbortSignal**~~ — propagated through `ChatModel` interface; new `withTimeoutAndSignal` helper aborts the controller on timer fire. Commit `487a79c`.
+- ~~**OutcomeEmitter**~~ — re-entrancy guard (`MAX_EMIT_DEPTH=4`) + `SwallowedErrorReporter` callback. Sink errors no longer disappear silently. Commit `4ae6811`.
+- ~~**VerifierConfig altitude**~~ — `ClaimPreFilter` + `JudgePromptDecorator` interfaces in `@tenet/verifier`; built-in factories `urlAllowlistFilter` + `examplesDecorator`. App-supplied strategies run first, convenience fields last. Commit `74ea0f5`.
 
 ---
 
