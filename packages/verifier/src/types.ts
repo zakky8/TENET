@@ -18,16 +18,54 @@ export interface VerifyResult {
   approvedCitations: ReadonlyArray<Citation>;
 }
 
+/**
+ * Decide whether an individual claim can be trusted without judging.
+ * The built-in URL allow-list filter is one impl; apps can plug others
+ * (e.g. "claims that quote source code verbatim auto-pass", "claims
+ * matching a known-good-fact KB auto-pass").
+ */
+export interface ClaimPreFilter {
+  passesWithoutJudging(claim: string): boolean;
+}
+
+/**
+ * Modify the strict-judge prompt. Adversarial worked examples are one
+ * impl; apps can plug their own (domain-specific trap patterns,
+ * jurisdiction-specific guardrails, etc.).
+ */
+export interface JudgePromptDecorator {
+  appendToStrictPolicy(policy: string): string;
+}
+
 export interface VerifierConfig {
   claimsPerBatch: number;
   maxParallelBatches: number;
   maxClaims: number;
   extractionTimeoutMs: number;
   judgeTimeoutMs: number;
-  /** URLs the bot is allowed to emit — claims about these auto-pass. */
+  /**
+   * High-level convenience: URLs the bot is allowed to emit — claims
+   * mentioning only these auto-pass. Internally wrapped into a
+   * ClaimPreFilter (see urlAllowlistFilter()).
+   */
   allowedUrlPatterns: ReadonlyArray<string>;
-  /** Adversarial worked examples appended to the strict-judge prompt. */
+  /**
+   * High-level convenience: adversarial worked examples appended to
+   * the strict-judge prompt. Internally wrapped into a JudgePromptDecorator.
+   */
   adversarialExamples?: string;
+  /**
+   * Low-level escape hatch: additional ClaimPreFilters evaluated BEFORE
+   * the built-in URL allow-list. The first filter that returns true
+   * short-circuits judging for that claim.
+   */
+  claimPreFilters?: ReadonlyArray<ClaimPreFilter>;
+  /**
+   * Low-level escape hatch: additional JudgePromptDecorators applied
+   * BEFORE the adversarialExamples convenience. Use to inject
+   * app-specific trap patterns.
+   */
+  judgePromptDecorators?: ReadonlyArray<JudgePromptDecorator>;
 }
 
 export const DEFAULT_VERIFIER_CONFIG: VerifierConfig = {

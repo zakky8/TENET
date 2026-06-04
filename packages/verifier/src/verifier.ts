@@ -1,7 +1,8 @@
 import type { Citation, SourcePicker } from '@tenet/core';
 import { extractClaims } from './claimExtractor.js';
 import { defaultSourcePicker } from './defaultSourcePicker.js';
-import { isClaimAboutAllowedUrl, judgeBatched } from './judge.js';
+import { judgeBatched } from './judge.js';
+import { effectivePreFilters } from './strategies.js';
 import {
   DEFAULT_VERIFIER_CONFIG,
   type ChatModel,
@@ -37,13 +38,16 @@ export async function verifyDraft(
     return { pass: true, critique: '', verdicts: [], approvedCitations: [] };
   }
 
-  // URL pre-pass
-  const urlClaims = allClaims.filter((c) =>
-    isClaimAboutAllowedUrl(c, config.allowedUrlPatterns),
-  );
-  const claimsToJudge = allClaims.filter(
-    (c) => !isClaimAboutAllowedUrl(c, config.allowedUrlPatterns),
-  );
+  // Pre-pass: claims that pass any filter auto-trust (no judge call)
+  const preFilters = effectivePreFilters(config);
+  const claimPasses = (claim: string): boolean =>
+    preFilters.some((f) => f.passesWithoutJudging(claim));
+  const urlClaims: string[] = [];
+  const claimsToJudge: string[] = [];
+  for (const c of allClaims) {
+    if (claimPasses(c)) urlClaims.push(c);
+    else claimsToJudge.push(c);
+  }
   const urlVerdicts: ClaimVerdict[] = urlClaims.map((claim) => ({
     claim,
     supported: true,

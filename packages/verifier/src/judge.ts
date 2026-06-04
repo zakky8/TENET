@@ -55,17 +55,25 @@ export function isClaimAboutAllowedUrl(
   );
 }
 
+import { effectiveDecorators } from './strategies.js';
+
 function buildSystem(
   permissive: boolean,
-  adversarialExamples: string | undefined,
+  config: VerifierConfig,
 ): string {
   const judgePolicy = permissive
     ? `You are a PERMISSIVE fact judge. Mark a claim as SUPPORTED if the SOURCES contain the same information even with different wording, paraphrasing, or rearrangement. Only mark UNSUPPORTED if the SOURCES truly do NOT contain the claim's information.`
     : `You are a STRICT fact judge. Mark a claim as SUPPORTED only if the SOURCES explicitly contain the same information. Vague matches are NOT enough. Numbers, dates, and names must match exactly.`;
 
-  const examples = permissive ? '' : adversarialExamples ?? '';
+  // Decorators run on strict policy only; permissive policy stays minimal.
+  let policyWithDecorators = judgePolicy;
+  if (!permissive) {
+    for (const d of effectiveDecorators(config)) {
+      policyWithDecorators = d.appendToStrictPolicy(policyWithDecorators);
+    }
+  }
 
-  return `${judgePolicy}${examples}
+  return `${policyWithDecorators}
 
 OUTPUT FORMAT (one line per claim, in input order, exact format):
 [N] SUPPORTED
@@ -87,7 +95,7 @@ export async function judgeOneBatch(
 ): Promise<ClaimVerdict[]> {
   if (claims.length === 0) return [];
   const numbered = claims.map((c, i) => `[${i + 1}] ${c}`).join('\n');
-  const system = buildSystem(permissive, config.adversarialExamples);
+  const system = buildSystem(permissive, config);
 
   let raw: string;
   try {
