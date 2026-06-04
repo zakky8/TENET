@@ -107,6 +107,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  surfaces/teams:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+
   surfaces/telegram:
     dependencies:
       '@tenet/core':
