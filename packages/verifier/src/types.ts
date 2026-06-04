@@ -1,4 +1,4 @@
-import type { Citation, Source } from '@tenet/core';
+import type { Citation, Source, SourcePicker } from '@tenet/core';
 
 export interface ClaimVerdict {
   claim: string;
@@ -56,4 +56,6 @@ export interface VerifyInput {
   sourceRecords?: ReadonlyArray<Source>;
   /** The model's draft response to verify. */
   draft: string;
+  /** Override the citation backing-source picker (default in defaultSourcePicker.ts). */
+  sourcePicker?: SourcePicker;
 }

@@ -1,5 +1,6 @@
-import type { Citation } from '@tenet/core';
+import type { Citation, SourcePicker } from '@tenet/core';
 import { extractClaims } from './claimExtractor.js';
+import { defaultSourcePicker } from './defaultSourcePicker.js';
 import { isClaimAboutAllowedUrl, judgeBatched } from './judge.js';
 import {
   DEFAULT_VERIFIER_CONFIG,
@@ -135,14 +136,10 @@ function buildCitations(
   verdicts: ReadonlyArray<ClaimVerdict>,
 ): ReadonlyArray<Citation> {
   if (!input.sourceRecords || input.sourceRecords.length === 0) return [];
+  const picker: SourcePicker = input.sourcePicker ?? defaultSourcePicker;
   const supported = verdicts.filter((v) => v.supported);
   return supported.flatMap((v) => {
-    // Naive backing-source pick: first source whose text mentions the claim's first 30 chars
-    const head = v.claim.slice(0, 30).toLowerCase();
-    const backing = input.sourceRecords!.find((s) =>
-      s.text.toLowerCase().includes(head),
-    );
-    if (!backing) return [];
-    return [{ sourceId: backing.id, quote: backing.text.slice(0, 240) }];
+    const citation = picker.pick(v.claim, input.sourceRecords!);
+    return citation ? [citation] : [];
   });
 }
