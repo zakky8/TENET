@@ -83,6 +83,12 @@ importers:
 
   packages/tools-mcp: {}
 
+  packages/tools-mcp-gateway:
+    dependencies:
+      '@tenet/tools-mcp':
+        specifier: workspace:*
+        version: link:../tools-mcp
+
   packages/verifier:
     dependencies:
       '@tenet/core':
