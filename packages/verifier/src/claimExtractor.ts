@@ -1,4 +1,5 @@
 import type { ChatModel, VerifierConfig } from './types.js';
+import { withTimeoutAndSignal } from './timeout.js';
 
 const EXTRACT_SYSTEM = (maxClaims: number) =>
   `You extract atomic factual claims from a draft response for fact-checking.
@@ -11,19 +12,6 @@ EXCLUDE: greetings, follow-up questions, clarifying questions, generic filler, o
 
 If the draft has NO factual claims (it's just a greeting / clarifying question / filler), output exactly the word: NONE`;
 
-/** Run with a hard timeout, throwing on timeout. */
-async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
-    });
-    return await Promise.race([p, timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
 /** Extract up to config.maxClaims atomic claims from a draft. Fail-open: returns [] on error. */
 export async function extractClaims(
   model: ChatModel,
@@ -34,12 +22,14 @@ export async function extractClaims(
 
   let raw: string;
   try {
-    raw = await withTimeout(
-      model.chat({
-        system: EXTRACT_SYSTEM(config.maxClaims),
-        user: `DRAFT:\n${draft}\n\nClaims:`,
-        maxTokens: 256,
-      }),
+    raw = await withTimeoutAndSignal(
+      (signal) =>
+        model.chat({
+          system: EXTRACT_SYSTEM(config.maxClaims),
+          user: `DRAFT:\n${draft}\n\nClaims:`,
+          maxTokens: 256,
+          signal,
+        }),
       config.extractionTimeoutMs,
       'extract',
     );

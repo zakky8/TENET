@@ -41,11 +41,20 @@ export const DEFAULT_VERIFIER_CONFIG: VerifierConfig = {
 
 /** Adapter the verifier uses to call a language model. */
 export interface ChatModel {
-  /** System + user → completion text. Throws on timeout/error. */
+  /**
+   * System + user → completion text. Throws on timeout/error.
+   *
+   * `signal` is the verifier's cancellation channel: when the verifier's
+   * own timeout fires it calls AbortController.abort() to release the
+   * in-flight HTTP request. Adapters MUST forward `signal` to their HTTP
+   * client (fetch / AWS SDK / etc.) — otherwise zombie requests keep
+   * billing and consuming rate-limit budget after the verifier has moved on.
+   */
   chat(args: {
     system: string;
     user: string;
     maxTokens: number;
+    signal?: AbortSignal;
   }): Promise<string>;
 }
 

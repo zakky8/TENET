@@ -1,4 +1,5 @@
 import type { ChatModel, ClaimVerdict, VerifierConfig } from './types.js';
+import { withTimeoutAndSignal } from './timeout.js';
 
 /**
  * Pre-pass: a claim auto-passes ONLY when every URL-shaped token it contains
@@ -54,18 +55,6 @@ export function isClaimAboutAllowedUrl(
   );
 }
 
-async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`${label} timeout`)), ms);
-    });
-    return await Promise.race([p, timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
 function buildSystem(
   permissive: boolean,
   adversarialExamples: string | undefined,
@@ -102,12 +91,14 @@ export async function judgeOneBatch(
 
   let raw: string;
   try {
-    raw = await withTimeout(
-      model.chat({
-        system,
-        user: `SOURCES:\n${sources}\n\nCLAIMS:\n${numbered}`,
-        maxTokens: 256,
-      }),
+    raw = await withTimeoutAndSignal(
+      (signal) =>
+        model.chat({
+          system,
+          user: `SOURCES:\n${sources}\n\nCLAIMS:\n${numbered}`,
+          maxTokens: 256,
+          signal,
+        }),
       config.judgeTimeoutMs,
       'judge',
     );
