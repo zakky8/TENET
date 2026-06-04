@@ -1,0 +1,24 @@
+{
+  "name": "@tenet/eval-measure",
+  "version": "0.0.0",
+  "description": "Hermetic end-to-end measurement runner — drives the scorers against bundled fixtures + a deterministic stub SUT. Produces measured.json; runs the gate.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": { "tenet-measure": "./dist/cli.js" },
+  "exports": {
+    ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" },
+    "./fixtures": { "import": "./dist/fixtures.js", "types": "./dist/fixtures.d.ts" }
+  },
+  "files": ["dist", "README.md"],
+  "dependencies": {
+    "@tenet/eval-metrics": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

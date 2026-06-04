@@ -43,6 +43,12 @@ importers:
 
   eval/harness: {}
 
+  eval/measure:
+    dependencies:
+      '@tenet/eval-metrics':
+        specifier: workspace:*
+        version: link:../metrics
+
   eval/metrics: {}
 
   models/anthropic: {}

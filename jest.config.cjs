@@ -4,6 +4,7 @@ module.exports = {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@tenet/eval-(.*)$': '<rootDir>/eval/$1/src',
     '^@tenet/(.*)$': '<rootDir>/packages/$1/src',
   },
   transform: {

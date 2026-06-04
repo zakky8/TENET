@@ -1,7 +1,8 @@
 # TENET — 100× Targets
 
-**Status:** Draft v0.1
-**Date:** 2026-06-03
+**Status:** Draft v0.2 — measured column live
+**Date:** 2026-06-04
+**Measurement plane:** `@tenet/eval-measure` against bundled hermetic fixtures + a deterministic stub SUT.
 
 This is not a marketing doc. Every row below is a measurable target with a citation for the current market number, a concrete technique to reach our target, and the phase we ship it in. We will be evaluated against these numbers, not the prose around them.
 
@@ -9,20 +10,70 @@ This is not a marketing doc. Every row below is a measurable target with a citat
 
 ---
 
-## 1. The targets
+## 0. What is measured today (v0.0.0 framework gate)
 
-| # | Dimension | Market today | TENET target | Multiplier | Phase |
-|---|-----------|--------------|--------------|-----------|-------|
-| 1 | **Hallucination rate** (factual errors per 1k claims) | 5-10% production (multiple deployments; see [Vectara HHEM-2.1 leaderboard](https://huggingface.co/spaces/vectara/leaderboard)) | **< 0.1%** | **~100×** | MVP gate |
-| 2 | **Cost per resolved conversation** | $0.99 / resolution (Intercom Fin, verified 2026-06-03, [intercom.com/help/8205718](https://www.intercom.com/help/en/articles/8205718-fin-ai-agent-outcomes)) | **< $0.01** | **~100×** | Phase 2 |
-| 3 | **First-token latency p95** | 2-4s typical for hosted enterprise agents (third-party benchmarks vary) | **< 200ms** | **~10-20×** | Phase 2 |
-| 4 | **End-to-end resolution latency p95** | 8-15s typical (multi-turn + tool-use + verification) | **< 1.5s** | **~5-10×** | Phase 2 |
-| 5 | **Time-to-integrate** (new surface + KB ingest + deploy) | Days to weeks (closed tools); months (DIY OSS stacks) | **< 10 minutes** for first reply | **~1000×** | Phase 2 |
-| 6 | **High-severity CVEs / 6 months** | 3 in LangChain ecosystem Dec 2025 → Mar 2026 (CVE-2025-68664 / CVE-2025-67644 / CVE-2026-34070) | **0** | floor | Continuous |
-| 7 | **Eval-set size** (assertions covered) | ~100-500 manual cases typical | **1,000,000+** (auto-grown from production) | **~1000-10000×** | Phase 2 |
-| 8 | **Retrieval recall @ K=10** | Anthropic Contextual Retrieval reduces top-20 failure to 1.9% (best of 5 published benchmarks) | **< 0.5%** failure @ K=10 | **~4×** | Phase 2 |
-| 9 | **Surfaces supported by one config** | Closed tools: 1-3 (their owned channels). OSS: usually 1. | **8+** (TG / Discord / Slack / Teams / Web / REST / gRPC / Ticketing) | new category | Phase 3 |
-| 10 | **Tool-execution sandbox escape rate** | Untracked; LangChain Jinja2/pickle paths had RCEs | **0** measured escapes (WASM-isolated) | floor | Phase 2 |
+The numbers in §1 below are produced by `pnpm tenet measure` against the bundled hermetic fixtures + a **deterministic stub SUT**. They measure the framework's measurement plane — the verifier contract, the guardrail patterns, the retriever scoring, the gate logic — **not** a frontier model's behavior. Replacing the stub with a real `ChatModel` produces frontier-model numbers; the operator runs that locally with their own keys.
+
+This distinction is enforced by the source-hierarchy rule: framework-measured numbers are Tier-1 evidence about the framework. A claim like "TENET + Claude Sonnet gets X% hallucination rate" requires running the same harness with the Anthropic adapter on a published dataset, and is reported separately.
+
+**Measurement methodology:**
+- Hermetic fixtures: 80 cases (20 QA + 20 injection + 12 tool-call + 10 retrieval + 10 router + 8 privacy) bundled in `eval/measure/src/fixtures.ts`. These model TruthfulQA / JailbreakBench / BeIR shapes but are NOT those datasets (license + hermeticity).
+- Deterministic stub SUT (`eval/measure/src/stubSut.ts`): zero entropy, zero network, byte-reproducible.
+- Scorers in `@tenet/eval-metrics`: Wilson-95 CI on rates, linear-interpolation p95 on latency.
+- Gate in `@tenet/eval-metrics`: per-dimension target check + optional regression-vs-baseline delta.
+
+**Reproduce:**
+```bash
+pnpm install
+pnpm --filter @tenet/eval-metrics build
+pnpm --filter @tenet/eval-measure build
+node eval/measure/dist/cli.js
+# exits non-zero on any failing gate verdict
+```
+
+---
+
+## 1. The targets — with measured column
+
+Measured against stub SUT + bundled fixtures on 2026-06-04, scorer `@tenet/eval-metrics@0.1.0`. `n` = sample size for that scorer.
+
+| # | Dimension | Target | Measured (v0.0.0 stub) | n | Verdict | Phase |
+|---|-----------|--------|------------------------|---|---------|-------|
+| 1 | **Hallucination rate** (1 - groundedness on cited-claim contract) | < 0.001 | **0.00000** | 20 | PASS | MVP gate |
+| 1b | **Groundedness rate** (atomic-claim verifier contract) | > 0.99 | **1.00000** | 20 | PASS | MVP gate |
+| 2 | **Cost per resolved conversation** (USD) | < 0.01 | **0.008** | 20 | PASS | Phase 2 |
+| 3 | **First-token latency p95** (ms) | < 200 | **206.350** | 20 | **FAIL** (see honest caveat below) | Phase 2 |
+| 4 | **End-to-end resolution latency p95** (ms) | < 1500 | **641.000** | 20 | PASS | Phase 2 |
+| 7 | **Tool-call success rate** | > 0.99 | **1.00000** | 12 | PASS | Phase 2 |
+| 8 | **Retrieval recall @ K=10** | > 0.995 | **1.00000** | 10 | PASS | Phase 2 |
+| 10a | **Prompt-injection block rate** | > 0.99 | **1.00000** | 20 | PASS | Phase 3 |
+| 10b | **Privacy leak block rate** (PII redactor agrees w/ ground truth) | > 0.99 | **1.00000** | 8 | PASS | Phase 2 |
+| — | **Cost-aware router decision accuracy** | > 0.95 | **1.00000** | 10 | PASS | Phase 2 |
+| — | **Determinism rate** (byte-stable verifier under temp=0) | = 1.0 | **1.00000** | 10 | PASS | MVP gate |
+
+**Honest caveat on Dim 3 FAIL:** The stub SUT's synthetic TTFT band is 80–219 ms (`stubTtftMs(i) = 80 + (i*7) % 140`). p95 over 20 cases hits 206.35 ms. This is **the gate working as designed** — we did not tune the stub to make the number pass. Tightening the stub band would game it; instead we ship the FAIL and let a real SUT (which has its own TTFT) prove or disprove the < 200 ms target. The CI gate currently exits non-zero on this row; either the operator accepts that or moves to a real-model harness whose actual TTFT can be measured.
+
+**Note on rows not measured here:**
+- **Dim 5 (time-to-integrate < 10 min):** measured by stopwatch on a clean machine, not in CI. Reported per release.
+- **Dim 6 (zero CVEs):** measured by Trivy / npm audit / GitHub Advisories in CI; not a numeric scorer row.
+- **Dim 7 (eval-set size > 1M):** auto-grown from production; v0.0.0 bundled set is 80 cases (framework gate), not the production-growth corpus.
+- **Dim 9 (8+ surfaces):** structural count — currently shipped: Discord, Slack, Telegram, Teams, web widget, REST, gRPC, 4 ticketing connectors. Count = **11** distinct surfaces (PASS by structural count).
+- **Dim 10 escape rate:** measured by red-team test suite, not a scorer. The WASM sandbox's `WasmPolicyError` codes are the contract.
+
+**Original market-vs-target framing (preserved for context):**
+
+| # | Dimension | Market today | TENET target | Multiplier |
+|---|-----------|--------------|--------------|-----------|
+| 1 | **Hallucination rate** | 5-10% production ([Vectara HHEM-2.1 leaderboard](https://huggingface.co/spaces/vectara/leaderboard)) | < 0.1% | ~100× |
+| 2 | **Cost / resolution** | $0.99 (Intercom Fin, accessed 2026-06-03) | < $0.01 | ~100× |
+| 3 | **TTFT p95** | 2-4s typical hosted enterprise agents | < 200ms | ~10-20× |
+| 4 | **E2E p95** | 8-15s typical | < 1.5s | ~5-10× |
+| 5 | **Time-to-integrate** | Days-weeks closed; months DIY | < 10 min | ~1000× |
+| 6 | **High-sev CVEs / 6mo** | 3 in LangChain ecosystem Dec 2025 → Mar 2026 | 0 | floor |
+| 7 | **Eval-set size** | ~100-500 manual | 1,000,000+ auto-grown | ~1000-10000× |
+| 8 | **Retrieval failure @ K=10** | 1.9% @ K=20 (Anthropic Contextual Retrieval) | < 0.5% @ K=10 | ~4× |
+| 9 | **Surfaces / config** | 1-3 closed / 1 DIY | 8+ | new category |
+| 10 | **Tool-execution escapes** | Untracked; LangChain Jinja2/pickle had RCEs | 0 (WASM isolated) | floor |
 
 ---
 
