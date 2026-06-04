@@ -22,11 +22,25 @@ module.exports = {
       },
     ],
   },
-  testMatch: ['<rootDir>/packages/*/src/**/*.test.ts'],
+  testMatch: [
+    '<rootDir>/packages/*/src/**/*.test.ts',
+    '<rootDir>/models/*/src/**/*.test.ts',
+    '<rootDir>/surfaces/*/src/**/*.test.ts',
+    '<rootDir>/connectors/*/src/**/*.test.ts',
+    '<rootDir>/stores/*/*/src/**/*.test.ts',
+    '<rootDir>/stores/*/src/**/*.test.ts',
+    '<rootDir>/apps/*/src/**/*.test.ts',
+    '<rootDir>/eval/*/src/**/*.test.ts',
+  ],
   collectCoverageFrom: [
     'packages/*/src/**/*.ts',
-    '!packages/*/src/**/*.test.ts',
-    '!packages/*/src/index.ts',
+    'models/*/src/**/*.ts',
+    'surfaces/*/src/**/*.ts',
+    'connectors/*/src/**/*.ts',
+    'stores/*/*/src/**/*.ts',
+    'apps/*/src/**/*.ts',
+    '!**/src/**/*.test.ts',
+    '!**/src/index.ts',
   ],
   coverageThreshold: {
     global: {
