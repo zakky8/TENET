@@ -43,21 +43,17 @@ export async function runEval(
     }),
   );
 
-  let passed = 0;
-  let failed = 0;
-  let errored = 0;
-  for (const r of results) {
-    if (r.error !== undefined) errored++;
-    else if (r.passed) passed++;
-    else failed++;
-  }
+  // ES2024 Object.groupBy — partition results by outcome in one pass.
+  const buckets = Object.groupBy(results, (r) =>
+    r.error !== undefined ? 'errored' : r.passed ? 'passed' : 'failed',
+  );
   return {
     datasetName: dataset.name,
     datasetVersion: dataset.version,
     results,
-    passed,
-    failed,
-    errored,
+    passed: buckets.passed?.length ?? 0,
+    failed: buckets.failed?.length ?? 0,
+    errored: buckets.errored?.length ?? 0,
   };
 }
 
