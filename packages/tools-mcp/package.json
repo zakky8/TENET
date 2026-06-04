@@ -1,0 +1,22 @@
+{
+  "name": "@tenet/tools-mcp",
+  "version": "0.0.0",
+  "description": "MCP-native tool wiring — JSON-RPC 2.0 client, transport contract, tool registry exposing MCP tools to the agent's tool-use loop.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

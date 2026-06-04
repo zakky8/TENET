@@ -73,6 +73,8 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/tools-mcp: {}
+
   packages/verifier:
     dependencies:
       '@tenet/core':
