@@ -31,6 +31,8 @@ importers:
 
   packages/policy: {}
 
+  packages/rate-limit: {}
+
   packages/retrieval:
     dependencies:
       '@tenet/core':
