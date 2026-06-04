@@ -9,4 +9,5 @@ export {
   effectivePreFilters,
   effectiveDecorators,
 } from './strategies.js';
+export { STANDARD_ADVERSARIAL_EXAMPLES } from './standardAdversarialExamples.js';
 export const VERSION = '0.0.0';
