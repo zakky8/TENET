@@ -89,6 +89,8 @@ importers:
         specifier: workspace:*
         version: link:../tools-mcp
 
+  packages/tools-wasm-sandbox: {}
+
   packages/verifier:
     dependencies:
       '@tenet/core':

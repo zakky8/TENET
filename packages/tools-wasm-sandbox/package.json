@@ -1,0 +1,17 @@
+{
+  "name": "@tenet/tools-wasm-sandbox",
+  "version": "0.0.0",
+  "description": "WASM-sandboxed tool execution — capability tokens, fuel-bounded execution, fresh instance per call.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}
