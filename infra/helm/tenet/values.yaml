@@ -1,0 +1,126 @@
+# Default values for tenet on-prem / self-host.
+# Apps override per environment.
+
+# ── Image ─────────────────────────────────────────────────────────────
+image:
+  repository: ghcr.io/zakky8/tenet
+  tag: ""  # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# ── Replication + resources ───────────────────────────────────────────
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+# ── Container env ─────────────────────────────────────────────────────
+env:
+  NODE_ENV: production
+  PORT: "3000"
+  LOG_LEVEL: info
+
+# Pull secrets/keys via existing secret refs — do NOT commit values.
+envFromSecret:
+  - name: ANTHROPIC_API_KEY
+    secretName: tenet-secrets
+    secretKey: anthropic-api-key
+  - name: JWT_SECRET
+    secretName: tenet-secrets
+    secretKey: jwt-secret
+  - name: DATABASE_URL
+    secretName: tenet-secrets
+    secretKey: database-url
+
+# ── Probes ────────────────────────────────────────────────────────────
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+# ── Service ───────────────────────────────────────────────────────────
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+# ── Ingress ───────────────────────────────────────────────────────────
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: tenet.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# ── HPA ───────────────────────────────────────────────────────────────
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+# ── Network policy ────────────────────────────────────────────────────
+networkPolicy:
+  enabled: false
+  # Allow egress to LLM providers (Anthropic, Bedrock) + DB by default.
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 443
+          protocol: TCP
+
+# ── Pod security context ──────────────────────────────────────────────
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+securityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# ── ServiceAccount ────────────────────────────────────────────────────
+serviceAccount:
+  create: true
+  annotations: {}
+
+# ── Telemetry ─────────────────────────────────────────────────────────
+telemetry:
+  otlp:
+    endpoint: ""   # e.g. otel-collector.observability.svc.cluster.local:4317
+    protocol: grpc
+  langfuse:
+    enabled: false
+    host: ""
+    publicKey: ""
+    secretKeyRef: ""
+
+# ── Optional sidecars ─────────────────────────────────────────────────
+sidecars: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

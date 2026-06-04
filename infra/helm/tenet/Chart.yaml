@@ -1,0 +1,19 @@
+apiVersion: v2
+name: tenet
+description: TENET — verification-first agent platform. On-prem / self-host Helm chart.
+type: application
+version: 0.0.0
+appVersion: "0.0.0"
+keywords:
+  - agent-framework
+  - ai-agents
+  - rag
+  - typescript
+  - mcp
+  - opentelemetry
+home: https://github.com/zakky8/TENET
+sources:
+  - https://github.com/zakky8/TENET
+maintainers:
+  - name: zakky8
+    url: https://github.com/zakky8
