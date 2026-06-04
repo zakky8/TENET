@@ -1,0 +1,22 @@
+{
+  "name": "@tenet/stores-state-redis",
+  "version": "0.0.0",
+  "description": "Conversation-state store interface + in-memory impl + Redis adapter (any ioredis/node-redis v5 client).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}
