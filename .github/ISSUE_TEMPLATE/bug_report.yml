@@ -1,0 +1,93 @@
+name: Bug report
+description: Report a defect — something doesn't behave as documented or as intended.
+title: "bug: <one-line summary>"
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please be specific — vague reports take longer to triage.
+
+        **Not for security issues.** Use https://github.com/zakky8/TENET/security/advisories/new instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: TENET version
+      description: Output of `pnpm list @tenet/core` or the commit SHA you're on.
+      placeholder: "0.0.0 or abcd1234"
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: "v22.x.x"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which package(s)?
+      multiple: true
+      options:
+        - "@tenet/core"
+        - "@tenet/verifier"
+        - "@tenet/retrieval"
+        - "@tenet/policy"
+        - "@tenet/telemetry"
+        - "@tenet/rate-limit"
+        - surfaces/*
+        - connectors/*
+        - models/*
+        - stores/*
+        - apps/*
+        - eval/*
+        - other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what did you actually see?
+      placeholder: |
+        Steps:
+        1. ...
+        2. ...
+
+        Expected: ...
+        Actual: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproducer
+      description: A short code snippet, config, or test case that exhibits the bug. The smaller the better.
+      render: typescript
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Errors, stack traces, OTel spans. Redact secrets before pasting.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirm
+      options:
+        - label: I've redacted secrets / PII from this report.
+          required: true
+        - label: I searched [open and closed issues](https://github.com/zakky8/TENET/issues?q=is%3Aissue) for duplicates.
+          required: true
