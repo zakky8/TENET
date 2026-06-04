@@ -73,6 +73,12 @@ importers:
 
   models/bedrock: {}
 
+  models/openai:
+    dependencies:
+      '@tenet/streaming':
+        specifier: workspace:*
+        version: link:../../packages/streaming
+
   packages/core: {}
 
   packages/distillation: {}
@@ -117,6 +123,8 @@ importers:
 
   packages/router: {}
 
+  packages/streaming: {}
+
   packages/telemetry:
     dependencies:
       '@tenet/core':
@@ -144,6 +152,8 @@ importers:
       '@tenet/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/workflow: {}
 
   stores/state/redis: {}
 
