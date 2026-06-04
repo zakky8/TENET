@@ -43,6 +43,8 @@ importers:
 
   eval/harness: {}
 
+  eval/metrics: {}
+
   models/anthropic: {}
 
   models/bedrock: {}
