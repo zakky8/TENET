@@ -1,4 +1,23 @@
 # Speed up build context — drop everything the build doesn't need.
+# SECURITY 2026-06-04 vuln-test #SC9: explicit secret denies so a dev
+# leaving a credential in the workspace doesn't get baked into a layer.
+**/.env
+**/.env.*
+**/secrets/
+**/*.pem
+**/*.key
+**/id_rsa
+**/id_rsa.*
+**/id_ed25519
+**/id_ed25519.*
+**/.aws/
+**/.ssh/
+**/.npmrc
+**/.netrc
+infra/helm/**/values*.secret.yaml
+infra/helm/**/secrets.yaml
+
+# Build artefacts + non-build files.
 **/node_modules
 **/dist
 **/.turbo

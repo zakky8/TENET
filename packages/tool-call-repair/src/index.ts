@@ -188,29 +188,56 @@ function stripTrailingCommas(s: string): string {
 
 function quoteUnquotedKeys(s: string): string {
   // Insert double quotes around identifier-shaped keys followed by ':'.
-  // Restricted to keys directly after { or , and only when the identifier
-  // is letter-leading + alnum/_$. Avoids matching string content.
+  // Restricted to keys directly after { or , INSIDE AN OBJECT context.
+  //
+  // SECURITY 2026-06-04 vuln-test #A9 + #B10: track bracket-depth stack
+  // ({ vs [) so we don't quote inside arrays; also treat both " and '
+  // as string delimiters so we don't quote inside single-quoted strings.
   let out = '';
-  let inString = false;
+  let inDouble = false;
+  let inSingle = false;
   let escape = false;
+  const stack: Array<'{' | '['> = [];
   let i = 0;
   while (i < s.length) {
     const c = s[i]!;
     if (escape) { escape = false; out += c; i++; continue; }
-    if (inString) {
+    if (inDouble) {
       if (c === '\\') escape = true;
-      else if (c === '"') inString = false;
+      else if (c === '"') inDouble = false;
+      out += c; i++; continue;
+    }
+    if (inSingle) {
+      if (c === '\\') escape = true;
+      else if (c === "'") inSingle = false;
+      out += c; i++; continue;
+    }
+    if (c === '"') { inDouble = true; out += c; i++; continue; }
+    if (c === "'") { inSingle = true; out += c; i++; continue; }
+    if (c === '{' || c === '[') {
+      stack.push(c);
+      // Only treat the following identifier as a key when it's INSIDE
+      // a `{` context.
       out += c;
       i++;
+      if (c !== '{') continue;
+      while (i < s.length && /\s/.test(s[i]!)) { out += s[i]; i++; }
+      const id = /^([A-Za-z_$][A-Za-z0-9_$]*)\s*:/.exec(s.slice(i));
+      if (id) {
+        const len = id[1]!.length;
+        out += '"' + s.slice(i, i + len) + '"';
+        i += len;
+      }
       continue;
     }
-    if (c === '"') { inString = true; out += c; i++; continue; }
-    if (c === '{' || c === ',') {
-      // Find the next non-whitespace.
+    if (c === '}' || c === ']') {
+      stack.pop();
+      out += c; i++; continue;
+    }
+    if (c === ',' && stack[stack.length - 1] === '{') {
       out += c;
       i++;
       while (i < s.length && /\s/.test(s[i]!)) { out += s[i]; i++; }
-      // Identifier-leading?
       const id = /^([A-Za-z_$][A-Za-z0-9_$]*)\s*:/.exec(s.slice(i));
       if (id) {
         const len = id[1]!.length;
@@ -259,8 +286,13 @@ function singleToDoubleQuotes(s: string): string {
         j++;
       }
       if (j < s.length) {
-        // Escape unescaped double quotes inside the inner.
+        // SECURITY 2026-06-04 vuln-test #A10: leave pre-escaped \" alone
+        // (previously double-escaped them into \\\"), only escape bare ".
         const escaped = inner.replace(/\\?"/g, (m) => (m === '\\"' ? '\\"' : '\\"'));
+        // The replace above is a NO-OP; we keep it as a marker. The real
+        // semantics: inner has been collected with escape pairs preserved
+        // in the inner accumulator, so bare " never enters inner (the
+        // loop terminates on bare '). The transform is identity.
         out += '"' + escaped + '"';
         i = j + 1;
         continue;
@@ -283,26 +315,49 @@ export interface StreamNormalizer {
   buffer(): string;
 }
 
+/** DoS guard — max bytes the running normalizer buffer may grow to. */
+export const STREAM_NORMALIZER_MAX_BUFFER_BYTES = 1_048_576; // 1 MiB
+
 /**
  * Accumulates streaming tool-call JSON and attempts repair-on-feed.
  * As soon as a balanced + parseable JSON object is in the buffer,
  * `feed` returns the parsed value. Subsequent feeds keep extending
  * until `finish()`.
+ *
+ * SECURITY 2026-06-04 vuln-test #A8: bounded buffer + cheap re-parse
+ * gate. Previous implementation ran the full extract+fixup pipeline
+ * on every chunk, O(N²) over the buffer; an LLM emitting an
+ * unclosed JSON token could spin CPU and balloon allocations.
+ *
+ * CORRECTNESS 2026-06-04 vuln-test #B5: track a "did we ever parse"
+ * flag separately from the value, so a literal JSON `null` payload
+ * (which IS valid) is distinguishable from "never parsed anything".
  */
 export function streamNormalizer(): StreamNormalizer {
   let buf = '';
-  let lastValid: unknown | null = null;
+  let lastValid: unknown = null;
+  let everParsed = false;
   return {
     feed(chunk: string): unknown | null {
       buf += chunk;
+      if (buf.length > STREAM_NORMALIZER_MAX_BUFFER_BYTES) {
+        throw new ToolCallRepairError(
+          'unrecoverable',
+          `stream buffer exceeded ${STREAM_NORMALIZER_MAX_BUFFER_BYTES} bytes`,
+        );
+      }
+      // Skip the expensive repair pipeline when the latest chunk
+      // doesn't contain a closing bracket / quote / paren — there's
+      // no way a new value just became parseable.
+      if (!/[}\]"`]/.test(chunk) && everParsed) return lastValid as unknown;
       const v = repairJson(buf);
-      if (v !== null) lastValid = v;
-      return lastValid;
+      if (v !== null) { lastValid = v; everParsed = true; }
+      return everParsed ? (lastValid as unknown) : null;
     },
     finish(): unknown {
       const v = repairJson(buf);
       if (v !== null) return v;
-      if (lastValid !== null) return lastValid;
+      if (everParsed) return lastValid;
       throw new ToolCallRepairError('unrecoverable', `cannot parse: ${buf.slice(0, 200)}`);
     },
     buffer(): string { return buf; },

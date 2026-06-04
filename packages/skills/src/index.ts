@@ -112,8 +112,9 @@ export function parseFrontmatter(text: string): { frontmatter: SkillFrontmatter;
   if (typeof raw['license'] === 'string') front.license = raw['license'];
   if (typeof raw['homepage'] === 'string') front.homepage = raw['homepage'];
   if (raw['metadata'] && typeof raw['metadata'] === 'object' && !Array.isArray(raw['metadata'])) {
-    const meta: Record<string, string | number | boolean> = {};
+    const meta = Object.create(null) as Record<string, string | number | boolean>;
     for (const [k, v] of Object.entries(raw['metadata'] as Record<string, unknown>)) {
+      if (DANGEROUS_KEYS.has(k)) continue; // proto-pollution guard
       if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') meta[k] = v;
     }
     front.metadata = meta;
@@ -121,8 +122,14 @@ export function parseFrontmatter(text: string): { frontmatter: SkillFrontmatter;
   return { frontmatter: front, body: body ?? '' };
 }
 
+// SECURITY 2026-06-04 vuln-test #A1: reject __proto__ / constructor /
+// prototype keys to prevent prototype-pollution via attacker-controlled
+// SKILL.md frontmatter. Also use Object.create(null) so the bag has no
+// inherited Object.prototype keys at all.
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function parseYamlScalars(block: string): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+  const out = Object.create(null) as Record<string, unknown>;
   for (const rawLine of block.split(/\r?\n/)) {
     const line = rawLine.replace(/\s*#.*$/, ''); // strip end-of-line comments
     if (line.trim() === '') continue;
@@ -131,6 +138,9 @@ function parseYamlScalars(block: string): Record<string, unknown> {
     const key = line.slice(0, colon).trim();
     const value = line.slice(colon + 1).trim();
     if (key === '') throw new SkillError('malformed_frontmatter', `empty key — ${rawLine.slice(0, 60)}`);
+    if (DANGEROUS_KEYS.has(key)) {
+      throw new SkillError('malformed_frontmatter', `forbidden key: ${key}`);
+    }
     out[key] = parseYamlScalar(value);
   }
   return out;
@@ -202,6 +212,9 @@ function splitTopLevelCommas(s: string): string[] {
 export class SkillRegistry {
   private readonly skills = new Map<string, SkillRecord>();
   private readonly bodyCache = new Map<string, string>();
+  // CORRECTNESS 2026-06-04 vuln-test #B8: dedupe concurrent loadBody
+  // calls so a slow loader isn't invoked twice for the same source.
+  private readonly inFlight = new Map<string, Promise<string>>();
 
   constructor(private readonly loader: BodyLoader) {}
 
@@ -242,13 +255,22 @@ export class SkillRegistry {
     if (!record) throw new SkillError('unknown_skill', `skill ${name} not registered`);
     const cached = this.bodyCache.get(record.source);
     if (cached !== undefined) return cached;
-    try {
-      const body = await this.loader.load(record.source, signal);
-      this.bodyCache.set(record.source, body);
-      return body;
-    } catch (e) {
-      throw new SkillError('body_load_failed', `${record.source}: ${(e as Error).message}`);
-    }
+    // Dedupe in-flight loads for the same source.
+    const existing = this.inFlight.get(record.source);
+    if (existing) return existing;
+    const promise = (async (): Promise<string> => {
+      try {
+        const body = await this.loader.load(record.source, signal);
+        this.bodyCache.set(record.source, body);
+        return body;
+      } catch (e) {
+        throw new SkillError('body_load_failed', `${record.source}: ${(e as Error).message}`);
+      } finally {
+        this.inFlight.delete(record.source);
+      }
+    })();
+    this.inFlight.set(record.source, promise);
+    return promise;
   }
 
   /**

@@ -10,6 +10,7 @@
  * Wire / dispatch / transport live in adjacent modules.
  */
 
+import { randomBytes } from 'node:crypto';
 import {
   ACP_METHODS,
   INTERNAL_ERROR,
@@ -122,6 +123,13 @@ export class AcpAgent {
       this.sendError(req.id, INVALID_PARAMS, 'initialize requires protocolVersion + clientCapabilities + clientInfo');
       return;
     }
+    // SECURITY 2026-06-04 vuln-test #B2: reject 0/negative/non-integer
+    // versions. Spec says "single integer that identifies a MAJOR
+    // protocol version" — ≥1.
+    if (!Number.isInteger(p.protocolVersion) || p.protocolVersion < 1) {
+      this.sendError(req.id, INVALID_PARAMS, 'protocolVersion must be a positive integer');
+      return;
+    }
     // Spec: respond with same version if supported, else latest we support.
     this.negotiatedVersion = p.protocolVersion <= PROTOCOL_VERSION ? p.protocolVersion : PROTOCOL_VERSION;
     this.initialized = true;
@@ -156,11 +164,17 @@ export class AcpAgent {
       this.sendError(req.id, INVALID_PARAMS, 'session/prompt requires sessionId + prompt');
       return;
     }
-    const ctrl = this.sessions.get(p.sessionId);
-    if (!ctrl) {
+    if (!this.sessions.has(p.sessionId)) {
       this.sendError(req.id, INVALID_PARAMS, `unknown sessionId ${p.sessionId}`);
       return;
     }
+    // CORRECTNESS 2026-06-04 vuln-test #B1: fresh AbortController per
+    // prompt. Previously a cancelled session retained its aborted
+    // controller, so subsequent prompts immediately fired the abort
+    // path and returned user_cancel without running the handler.
+    // Sessions persist; cancellation scope is per-turn.
+    const ctrl = new AbortController();
+    this.sessions.set(p.sessionId, ctrl);
     const ctx: AcpPromptContext = {
       sessionId: p.sessionId,
       signal: ctrl.signal,
@@ -187,17 +201,22 @@ export class AcpAgent {
   private handleSessionCancel(req: JsonRpcRequest): void {
     const p = req.params as SessionCancelParams | undefined;
     if (!p || typeof p.sessionId !== 'string') {
-      this.sendError(req.id, INVALID_PARAMS, 'session/cancel requires sessionId');
+      // CORRECTNESS 2026-06-04 vuln-test #B3: tolerate notification form
+      // (no id). Per JSON-RPC, a notification gets no response.
+      if (req.id !== undefined) {
+        this.sendError(req.id, INVALID_PARAMS, 'session/cancel requires sessionId');
+      }
       return;
     }
     const ctrl = this.sessions.get(p.sessionId);
     if (!ctrl) {
-      this.sendError(req.id, INVALID_PARAMS, `unknown sessionId ${p.sessionId}`);
+      if (req.id !== undefined) {
+        this.sendError(req.id, INVALID_PARAMS, `unknown sessionId ${p.sessionId}`);
+      }
       return;
     }
     ctrl.abort();
-    // session/cancel is a request per the spec; ack with empty result.
-    this.sendSuccess(req.id, {});
+    if (req.id !== undefined) this.sendSuccess(req.id, {});
   }
 
   // ── outbound helpers ────────────────────────────────────────────────
@@ -219,7 +238,12 @@ export class AcpAgent {
   // ── id mint ─────────────────────────────────────────────────────────
 
   private mintSessionId(): string {
-    const t = this.opts.now ? this.opts.now() : Date.now();
-    return `sess_${t.toString(36)}_${(this.sessionCounter++).toString(36)}`;
+    // SECURITY 2026-06-04 vuln-test #A5: cryptographically-random session
+    // ids. Previous Date.now()+counter was fully predictable — over HTTP/WS
+    // transport (spec-defined remote profile) a connected client could
+    // guess another client's session id and call session/cancel on it.
+    // 128 bits is the standard floor.
+    void this.sessionCounter;
+    return `sess_${randomBytes(16).toString('hex')}`;
   }
 }

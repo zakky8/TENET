@@ -76,12 +76,19 @@ ${params}
 }
 
 function xmlEscape(s: string): string {
+  // SECURITY 2026-06-04 vuln-test #A11: numeric-entity-escape every
+  // control character (<0x20 or DEL). Without this, an attacker-
+  // controlled parameter value containing 0x0A / 0x0D can inject XML
+  // attributes ("foo\ntrack=inbound\nvalue=" → attribute spoofing).
+  // XML 1.0 forbids most control chars; numeric-entity for the few
+  // it does allow (tab/LF/CR) is also safe.
   return s
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/'/g, '&apos;')
+    .replace(/[\x00-\x1f\x7f]/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
 // ── Surface implementation ────────────────────────────────────────────

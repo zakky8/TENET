@@ -184,4 +184,26 @@ describe('redactSensitiveUrlsDeep', () => {
     const out = redactSensitiveUrlsDeep({ a: null, b: undefined, c: 'safe' });
     expect(out).toEqual({ a: null, b: undefined, c: 'safe' });
   });
+
+  // SECURITY 2026-06-04 vuln-test #A2: prototype-pollution guard.
+  it('drops __proto__ + constructor + prototype keys (no proto pollution)', () => {
+    const before = ({} as { polluted?: boolean }).polluted;
+    const input = JSON.parse('{"safe":"ok","__proto__":{"polluted":true},"constructor":{"polluted":true},"prototype":{"polluted":true}}');
+    const out = redactSensitiveUrlsDeep(input);
+    expect(({} as { polluted?: boolean }).polluted).toBe(before);
+    expect(out).toEqual({ safe: 'ok' });
+  });
+});
+
+describe('SSRF leading-zero IPv4 octet (vuln-test #A12)', () => {
+  it('rejects leading-zero octets in parseIpv4', () => {
+    expect(parseIpv4('0177.0.0.1')).toBeNull();    // octal evaluator hits 127.0.0.1
+    expect(parseIpv4('010.0.0.1')).toBeNull();
+    expect(parseIpv4('00.0.0.0')).toBeNull();
+    expect(parseIpv4('1.2.3.4')).not.toBeNull();   // canonical still works
+  });
+
+  it('shouldAllowHttpFetch denies octal-disguised loopback', () => {
+    expect(shouldAllowHttpFetch('http://0177.0.0.1/')).toBe(false); // resolves loopback
+  });
 });

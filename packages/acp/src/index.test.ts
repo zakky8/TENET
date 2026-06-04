@@ -259,4 +259,84 @@ describe('isRequest predicate', () => {
   it('is false for a notification (no id)', () => {
     expect(isRequest({ jsonrpc: '2.0', method: 'x' } as JsonRpcMessage)).toBe(false);
   });
+  // CORRECTNESS 2026-06-04 vuln-test #B6
+  it('is false for id:null (JSON-RPC error responses + tolerant notifications)', () => {
+    expect(isRequest({ jsonrpc: '2.0', id: null, method: 'x' } as unknown as JsonRpcMessage)).toBe(false);
+  });
+});
+
+describe('vuln-test follow-ups (P14)', () => {
+  // SECURITY 2026-06-04 vuln-test #A5: random session ids
+  it('mints cryptographically-random 32-hex sessionIds (not predictable)', async () => {
+    const { sink, sent } = capturingSink();
+    const agent = makeAgent(NOOP_HANDLER, sink);
+    await agent.dispatch({ jsonrpc: '2.0', id: 0, method: ACP_METHODS.initialize, params: { protocolVersion: 1, clientCapabilities: {}, clientInfo: { name: 'c', version: '1' } } });
+    sent.length = 0;
+    await agent.dispatch({ jsonrpc: '2.0', id: 1, method: ACP_METHODS.sessionNew });
+    await agent.dispatch({ jsonrpc: '2.0', id: 2, method: ACP_METHODS.sessionNew });
+    const id1 = (sent[0] as JsonRpcSuccess<{ sessionId: string }>).result.sessionId;
+    const id2 = (sent[1] as JsonRpcSuccess<{ sessionId: string }>).result.sessionId;
+    expect(id1).toMatch(/^sess_[0-9a-f]{32}$/);
+    expect(id2).toMatch(/^sess_[0-9a-f]{32}$/);
+    expect(id1).not.toBe(id2);
+  });
+
+  // CORRECTNESS 2026-06-04 vuln-test #B1
+  it('subsequent prompt after cancel uses a fresh AbortController (no sticky abort)', async () => {
+    const { sink, sent } = capturingSink();
+    let abortedFirst = false;
+    let abortedSecond: boolean | null = null;
+    const handler: AcpHandler = {
+      async handlePrompt(_, ctx) {
+        if (!abortedFirst) {
+          abortedFirst = true;
+          // Yield until signal aborts to simulate a long turn cancelled by client.
+          await new Promise((resolve, reject) => {
+            ctx.signal.addEventListener('abort', () => reject(new Error('aborted')));
+            setTimeout(resolve, 100);
+          });
+        } else {
+          abortedSecond = ctx.signal.aborted; // should be false now
+        }
+        return { stopReason: 'end_turn' };
+      },
+    };
+    const agent = makeAgent(handler, sink);
+    await agent.dispatch({ jsonrpc: '2.0', id: 0, method: ACP_METHODS.initialize, params: { protocolVersion: 1, clientCapabilities: {}, clientInfo: { name: 'c', version: '1' } } });
+    await agent.dispatch({ jsonrpc: '2.0', id: 1, method: ACP_METHODS.sessionNew });
+    const sid = (sent[1] as JsonRpcSuccess<{ sessionId: string }>).result.sessionId;
+    const p1 = agent.dispatch({ jsonrpc: '2.0', id: 2, method: ACP_METHODS.sessionPrompt, params: { sessionId: sid, prompt: [{ type: 'text', text: 'hi' }] } });
+    await agent.dispatch({ jsonrpc: '2.0', id: 3, method: ACP_METHODS.sessionCancel, params: { sessionId: sid } });
+    await p1;
+    // Second prompt — the fix means signal is FRESH (not pre-aborted).
+    await agent.dispatch({ jsonrpc: '2.0', id: 4, method: ACP_METHODS.sessionPrompt, params: { sessionId: sid, prompt: [{ type: 'text', text: 'hi-again' }] } });
+    expect(abortedSecond).toBe(false);
+  });
+
+  // SECURITY 2026-06-04 vuln-test #B2
+  it('rejects protocolVersion 0 / negative / non-integer', async () => {
+    const { sink, sent } = capturingSink();
+    const agent = makeAgent(NOOP_HANDLER, sink);
+    await agent.dispatch({ jsonrpc: '2.0', id: 0, method: ACP_METHODS.initialize, params: { protocolVersion: 0, clientCapabilities: {}, clientInfo: { name: 'c', version: '1' } } });
+    expect((sent[0] as JsonRpcError).error.code).toBe(INVALID_PARAMS);
+    sent.length = 0;
+    await agent.dispatch({ jsonrpc: '2.0', id: 1, method: ACP_METHODS.initialize, params: { protocolVersion: -1, clientCapabilities: {}, clientInfo: { name: 'c', version: '1' } } });
+    expect((sent[0] as JsonRpcError).error.code).toBe(INVALID_PARAMS);
+    sent.length = 0;
+    await agent.dispatch({ jsonrpc: '2.0', id: 2, method: ACP_METHODS.initialize, params: { protocolVersion: 1.5 as any, clientCapabilities: {}, clientInfo: { name: 'c', version: '1' } } });
+    expect((sent[0] as JsonRpcError).error.code).toBe(INVALID_PARAMS);
+  });
+
+  // CORRECTNESS 2026-06-04 vuln-test #B3
+  it('session/cancel without id (notification form) emits no response', async () => {
+    const { sink, sent } = capturingSink();
+    const agent = makeAgent(NOOP_HANDLER, sink);
+    await agent.dispatch({ jsonrpc: '2.0', id: 0, method: ACP_METHODS.initialize, params: { protocolVersion: 1, clientCapabilities: {}, clientInfo: { name: 'c', version: '1' } } });
+    await agent.dispatch({ jsonrpc: '2.0', id: 1, method: ACP_METHODS.sessionNew });
+    const sid = (sent[1] as JsonRpcSuccess<{ sessionId: string }>).result.sessionId;
+    sent.length = 0;
+    // No id → notification form. Should silently cancel.
+    await agent.dispatch({ jsonrpc: '2.0', method: ACP_METHODS.sessionCancel, params: { sessionId: sid } } as any);
+    expect(sent).toEqual([]);
+  });
 });

@@ -74,6 +74,26 @@ describe('parseFrontmatter', () => {
   it('throws on line without colon', () => {
     expect(() => parseFrontmatter('---\nname: x\ndescription: "y"\nbroken-line\n---\n')).toThrow(SkillError);
   });
+
+  // SECURITY 2026-06-04 vuln-test #A1: proto pollution guard
+  it('rejects __proto__ as a top-level key (prototype-pollution guard)', () => {
+    expect(() => parseFrontmatter('---\nname: x\ndescription: "y"\n__proto__: polluted\n---\n'))
+      .toThrow(/forbidden key/);
+  });
+
+  it('rejects constructor + prototype keys', () => {
+    expect(() => parseFrontmatter('---\nname: x\ndescription: "y"\nconstructor: x\n---\n'))
+      .toThrow(/forbidden key/);
+    expect(() => parseFrontmatter('---\nname: x\ndescription: "y"\nprototype: x\n---\n'))
+      .toThrow(/forbidden key/);
+  });
+
+  it('strips __proto__ from inline metadata object', () => {
+    const text = '---\nname: x\ndescription: "y"\nmetadata: { __proto__: bad, safe: 1 }\n---\n';
+    const { frontmatter } = parseFrontmatter(text);
+    expect(frontmatter.metadata).toEqual({ safe: 1 });
+    expect(({} as { polluted?: unknown }).polluted).toBeUndefined();
+  });
 });
 
 describe('SkillRegistry', () => {

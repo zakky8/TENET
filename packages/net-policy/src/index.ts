@@ -20,11 +20,22 @@
 
 // ── IPv4 utilities ────────────────────────────────────────────────────
 
-/** Parse a dotted-quad IPv4 string into a 32-bit unsigned integer. */
+/**
+ * Parse a dotted-quad IPv4 string into a 32-bit unsigned integer.
+ *
+ * SECURITY 2026-06-04 vuln-test #A12: reject leading-zero octets.
+ * `0177.0.0.1` previously parsed as `177.0.0.1` (public) but Node's
+ * resolver interprets `0177` as octal = 127, hitting loopback — an
+ * SSRF bypass against `isPrivateIp`. Strict decimal-only digits.
+ */
 export function parseIpv4(s: string): number | null {
   const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
   if (!m) return null;
-  const parts = m.slice(1).map(Number);
+  const raw = m.slice(1);
+  for (const r of raw) {
+    if (r.length > 1 && r.startsWith('0')) return null; // reject leading-zero octets
+  }
+  const parts = raw.map(Number);
   if (parts.some((p) => p < 0 || p > 255 || Number.isNaN(p))) return null;
   return ((parts[0]! << 24) | (parts[1]! << 16) | (parts[2]! << 8) | parts[3]!) >>> 0;
 }
@@ -159,6 +170,15 @@ export function redactSensitiveUrl(input: string): string {
  *
  * Returns a NEW object — does not mutate the input.
  */
+// SECURITY 2026-06-04 vuln-test #A2: prototype-pollution guard for
+// audit-payload deep walk. Audit payloads cross the untrusted boundary
+// per the package docs ("operator pipes audit-event payloads through
+// this before emit"); an attacker-controlled key `__proto__` /
+// `constructor` / `prototype` would mutate Object.prototype across the
+// runtime. Skip dangerous keys + use Object.create(null) so the output
+// object has no inherited keys at all.
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 export function redactSensitiveUrlsDeep<T>(value: T): T {
   if (typeof value === 'string') {
     return redactSensitiveUrl(value) as unknown as T;
@@ -167,8 +187,9 @@ export function redactSensitiveUrlsDeep<T>(value: T): T {
     return value.map((v) => redactSensitiveUrlsDeep(v)) as unknown as T;
   }
   if (value !== null && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
+    const out = Object.create(null) as Record<string, unknown>;
     for (const [k, v] of Object.entries(value)) {
+      if (DANGEROUS_KEYS.has(k)) continue;
       out[k] = redactSensitiveUrlsDeep(v);
     }
     return out as unknown as T;

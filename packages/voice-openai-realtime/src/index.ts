@@ -205,6 +205,11 @@ export async function openRealtimeSession(opts: RealtimeOptions): Promise<{
                 return Promise.resolve({ value: eventQueue.shift()!, done: false });
               }
               if (done) return Promise.resolve({ value: undefined as unknown as RealtimeEvent, done: true });
+              // CORRECTNESS 2026-06-04 vuln-test #B7: throw on re-entrant
+              // next() instead of silently dropping the prior resolver.
+              if (resolveNext !== undefined) {
+                return Promise.reject(new Error('Realtime events iterator does not support concurrent next()'));
+              }
               return new Promise<IteratorResult<RealtimeEvent>>((resolve) => {
                 resolveNext = resolve;
               });

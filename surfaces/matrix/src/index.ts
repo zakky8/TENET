@@ -52,9 +52,27 @@ export interface MatrixMessageEvent {
   originServerTs: number;
 }
 
+/**
+ * Scrub the kind of secret patterns Synapse / Dendrite / Conduit error
+ * bodies occasionally echo back. Same posture as @tenet/models-openai
+ * OpenAiApiError after the P8 review.
+ */
+function scrubMatrixSecrets(s: string): string {
+  return s
+    .replace(/Bearer\s+[A-Za-z0-9._\-+/=]+/gi, 'Bearer [redacted]')
+    .replace(/syt_[A-Za-z0-9_-]+/g, 'syt_[redacted]')              // Synapse access tokens
+    .replace(/(access_token=)[^&\s"]+/gi, '$1[redacted]')
+    .replace(/(authorization\s*:\s*)[^\s,"]+/gi, '$1[redacted]');
+}
+
 export class MatrixApiError extends Error {
-  constructor(public readonly status: number, public readonly body: string) {
-    super(`Matrix ${status}: ${body.slice(0, 200)}`);
+  /** Scrubbed + bounded body — no raw access tokens, length-capped. */
+  public readonly body: string;
+  constructor(public readonly status: number, body: string) {
+    // SECURITY 2026-06-04 vuln-test #A7: bounded + secret-scrubbed body.
+    const scrubbed = scrubMatrixSecrets(body).slice(0, 200);
+    super(`Matrix ${status}: ${scrubbed}`);
+    this.body = scrubbed;
     this.name = 'MatrixApiError';
   }
 }

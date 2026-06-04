@@ -68,8 +68,12 @@ export function createNdjsonParser(): {
  * (has an id + a method, no result/error/sole-method-notification).
  */
 export function isRequest(msg: JsonRpcMessage): msg is JsonRpcRequest {
+  // CORRECTNESS 2026-06-04 vuln-test #B6: exclude id:null. JSON-RPC
+  // error responses always carry id:null; some clients send notifications
+  // with id:null too. Neither should be routed as a request.
+  const id = (msg as { id?: unknown }).id;
   return (
     typeof (msg as { method?: unknown }).method === 'string' &&
-    (msg as { id?: unknown }).id !== undefined
+    id !== undefined && id !== null
   );
 }

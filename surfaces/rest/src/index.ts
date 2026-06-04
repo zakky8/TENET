@@ -52,9 +52,31 @@ export function hs256RestVerifier(secret: string, opts: { now?: () => number } =
       const parts = token.split('.');
       if (parts.length !== 3) throw new Error('malformed JWT');
       const [hdr, pld, sig] = parts as [string, string, string];
+      // SECURITY 2026-06-04 vuln-test: assert alg=HS256 BEFORE verifying
+      // — prevents the alg=none + alg-confusion (RS256→HS256-with-RSA-
+      // public-key) classes. Standard JWT discipline.
+      let header: unknown;
+      try {
+        header = JSON.parse(Buffer.from(b64UrlDecode(hdr), 'base64').toString('utf8'));
+      } catch {
+        throw new Error('malformed JWT header');
+      }
+      if (
+        header === null ||
+        typeof header !== 'object' ||
+        (header as { alg?: unknown }).alg !== 'HS256'
+      ) {
+        throw new Error('JWT alg must be HS256');
+      }
       const expected = createHmac('sha256', secret).update(`${hdr}.${pld}`).digest();
-      const actual = Buffer.from(b64UrlDecode(sig), 'base64');
-      if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+      const decoded = Buffer.from(b64UrlDecode(sig), 'base64');
+      // SECURITY 2026-06-04 vuln-test: length-equalise before timingSafeEqual
+      // so the same code path runs regardless of attacker-controlled sig
+      // length (timing-uniformity). Mismatched length still fails the equal.
+      const actual = decoded.length === expected.length
+        ? decoded
+        : Buffer.alloc(expected.length);
+      if (!timingSafeEqual(actual, expected) || decoded.length !== expected.length) {
         throw new Error('signature mismatch');
       }
       const payload = JSON.parse(Buffer.from(b64UrlDecode(pld), 'base64').toString('utf8'));
@@ -66,6 +88,10 @@ export function hs256RestVerifier(secret: string, opts: { now?: () => number } =
         typeof payload.exp !== 'number'
       ) {
         throw new Error('claims missing sub/tnt/exp');
+      }
+      // Optional nbf (not-before) check when present.
+      if (typeof payload.nbf === 'number' && payload.nbf > now()) {
+        throw new Error('token not yet valid');
       }
       if (payload.exp < now()) throw new Error('token expired');
       return payload as RestJwtClaims;
