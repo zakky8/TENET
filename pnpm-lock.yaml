@@ -35,6 +35,8 @@ importers:
 
   eval/harness: {}
 
+  models/anthropic: {}
+
   models/bedrock: {}
 
   packages/core: {}
