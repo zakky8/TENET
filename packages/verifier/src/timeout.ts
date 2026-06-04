@@ -19,16 +19,17 @@ export async function withTimeoutAndSignal<T>(
   label: string,
 ): Promise<T> {
   const ctrl = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      ctrl.abort();
-      reject(new Error(`${label} timeout after ${timeoutMs}ms`));
-    }, timeoutMs);
-  });
+  // ES2024 Promise.withResolvers() replaces the hand-rolled executor:
+  // no closure-over-timer pattern, no `let timer` outside the Promise body,
+  // and the reject handle is held cleanly for the setTimeout callback.
+  const { promise: timeoutPromise, reject } = Promise.withResolvers<never>();
+  const timer = setTimeout(() => {
+    ctrl.abort();
+    reject(new Error(`${label} timeout after ${timeoutMs}ms`));
+  }, timeoutMs);
   try {
     return await Promise.race([build(ctrl.signal), timeoutPromise]);
   } finally {
-    if (timer) clearTimeout(timer);
+    clearTimeout(timer);
   }
 }
