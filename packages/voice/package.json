@@ -1,0 +1,22 @@
+{
+  "name": "@tenet/voice",
+  "version": "0.0.0",
+  "description": "Voice surface core — Asr / Tts / VoiceSurface contracts + mulaw<->PCM16 helpers + barge-in detector. The OSS voice gap nobody else fills.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "keywords": [
+    "agent-framework", "ai", "ai-agents", "asr", "barge-in", "langchain-alternative",
+    "llm", "mulaw", "pcm16", "speech-to-text", "telephony", "tenet", "text-to-speech",
+    "tts", "twilio", "typescript", "voice", "voice-agent", "webrtc"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

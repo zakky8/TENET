@@ -186,6 +186,14 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/voice: {}
+
+  packages/voice-openai-realtime:
+    dependencies:
+      '@tenet/voice':
+        specifier: workspace:*
+        version: link:../voice
+
   packages/workflow: {}
 
   stores/state/redis: {}
@@ -237,6 +245,12 @@ importers:
       '@tenet/core':
         specifier: workspace:*
         version: link:../../packages/core
+
+  surfaces/twilio:
+    dependencies:
+      '@tenet/voice':
+        specifier: workspace:*
+        version: link:../../packages/voice
 
   surfaces/web-widget:
     dependencies:

@@ -1,0 +1,23 @@
+{
+  "name": "@tenet/surface-twilio",
+  "version": "0.0.0",
+  "description": "Twilio Programmable Voice surface — Media Streams WebSocket handler + TwiML response helpers. PSTN telephony for TENET agents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "dependencies": { "@tenet/voice": "workspace:*" },
+  "keywords": [
+    "agent-framework", "ai", "ai-agents", "langchain-alternative", "llm",
+    "media-streams", "pstn", "telephony", "tenet", "twilio", "twiml",
+    "typescript", "voice", "voice-agent"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

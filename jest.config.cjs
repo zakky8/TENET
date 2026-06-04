@@ -13,6 +13,8 @@ module.exports = {
     '^@tenet/app-(.*)$': '<rootDir>/apps/$1/src',
     '^@tenet/rerank-(.*)$': '<rootDir>/packages/rerank-$1/src',
     '^@tenet/judge-(.*)$': '<rootDir>/packages/judge-$1/src',
+    '^@tenet/voice-(.*)$': '<rootDir>/packages/voice-$1/src',
+    '^@tenet/voice$': '<rootDir>/packages/voice/src',
     '^@tenet/(.*)$': '<rootDir>/packages/$1/src',
   },
   transform: {
