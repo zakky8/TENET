@@ -49,6 +49,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/memory-adapters:
+    dependencies:
+      '@tenet/memory':
+        specifier: workspace:*
+        version: link:../memory
+
   packages/policy: {}
 
   packages/rate-limit: {}
