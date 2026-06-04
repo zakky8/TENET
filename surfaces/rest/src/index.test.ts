@@ -47,6 +47,57 @@ describe('OPENAPI_SPEC', () => {
   });
 });
 
+describe('RestSurface — health endpoints', () => {
+  it('/healthz returns 200 with status + uptime, no auth needed', async () => {
+    const r = await makeSurface().handle({ method: 'GET', path: '/healthz', headers: {} });
+    expect(r.status).toBe(200);
+    const body = JSON.parse(await readBody(r.body));
+    expect(body.status).toBe('ok');
+    expect(typeof body.uptime).toBe('number');
+  });
+
+  it('/readyz returns 200 when no probes configured', async () => {
+    const r = await makeSurface().handle({ method: 'GET', path: '/readyz', headers: {} });
+    expect(r.status).toBe(200);
+    const body = JSON.parse(await readBody(r.body));
+    expect(body.ready).toBe(true);
+    expect(body.probes).toEqual([]);
+  });
+
+  it('/readyz returns 200 when ALL probes pass', async () => {
+    const r = await makeSurface({
+      readinessProbes: [
+        { name: 'redis', ready: () => true },
+        { name: 'pgvector', ready: async () => true },
+      ],
+    }).handle({ method: 'GET', path: '/readyz', headers: {} });
+    expect(r.status).toBe(200);
+    const body = JSON.parse(await readBody(r.body));
+    expect(body.ready).toBe(true);
+    expect(body.probes).toHaveLength(2);
+  });
+
+  it('/readyz returns 503 when any probe fails', async () => {
+    const r = await makeSurface({
+      readinessProbes: [
+        { name: 'redis', ready: () => true },
+        { name: 'pgvector', ready: () => false },
+      ],
+    }).handle({ method: 'GET', path: '/readyz', headers: {} });
+    expect(r.status).toBe(503);
+    const body = JSON.parse(await readBody(r.body));
+    expect(body.ready).toBe(false);
+    expect(body.probes.find((p: { name: string }) => p.name === 'pgvector').ready).toBe(false);
+  });
+
+  it('/readyz treats probe throw as not-ready (no crash)', async () => {
+    const r = await makeSurface({
+      readinessProbes: [{ name: 'broken', ready: () => { throw new Error('boom'); } }],
+    }).handle({ method: 'GET', path: '/readyz', headers: {} });
+    expect(r.status).toBe(503);
+  });
+});
+
 describe('RestSurface — routing', () => {
   it('rejects non-POST with 405', async () => {
     const r = await makeSurface().handle({ method: 'GET', path: '/v1/converse', headers: {} });

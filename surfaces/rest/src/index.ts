@@ -89,6 +89,13 @@ export interface RestRateLimitGate {
   }): Promise<void>;
 }
 
+export interface ReadinessCheck {
+  /** True when the dependency is ready to serve. */
+  ready(): Promise<boolean> | boolean;
+  /** Stable id for the /readyz body. */
+  name: string;
+}
+
 export interface RestSurfaceOptions {
   jwt: RestJwtVerifier;
   rateLimit?: RestRateLimitGate;
@@ -96,6 +103,11 @@ export interface RestSurfaceOptions {
   handle: (event: NormalizedEvent, signal?: AbortSignal) => Promise<NormalizedReply>;
   /** Optional streaming handler — yields text chunks for /converse/stream. */
   stream?: (event: NormalizedEvent, signal?: AbortSignal) => AsyncIterable<string>;
+  /**
+   * Optional readiness probes. Each runs on /readyz; ALL must report ready
+   * for /readyz to return 200. Empty/absent → always ready.
+   */
+  readinessProbes?: ReadonlyArray<ReadinessCheck>;
 }
 
 export class RestSurface {
@@ -107,6 +119,17 @@ export class RestSurface {
   }
 
   async handle(req: RestRequest): Promise<RestResponse> {
+    // Health endpoints — no JWT, no body, no method restriction beyond GET.
+    // /healthz: liveness (process is up).
+    // /readyz : readiness (dependencies wired and ready to serve).
+    if (req.path === '/healthz') {
+      return jsonResponse(200, { status: 'ok', uptime: process.uptime() });
+    }
+    if (req.path === '/readyz') {
+      const ready = await this.checkReadiness();
+      return jsonResponse(ready.ready ? 200 : 503, ready);
+    }
+
     if (req.method.toUpperCase() !== 'POST') {
       return jsonResponse(405, { error: 'POST only' });
     }
@@ -180,6 +203,24 @@ export class RestSurface {
     } catch (e) {
       return jsonResponse(500, { error: `handler: ${(e as Error).message}` });
     }
+  }
+
+  /**
+   * Check every readinessProbe in parallel. /readyz returns 200 iff
+   * ALL probes report ready. Operators wire probes for: vector store,
+   * Redis state store, model providers (Anthropic, Bedrock, OpenAI…).
+   * On Kubernetes the result drives liveness vs readiness routing.
+   */
+  private async checkReadiness(): Promise<{ ready: boolean; probes: ReadonlyArray<{ name: string; ready: boolean }> }> {
+    const probes = this.opts.readinessProbes ?? [];
+    if (probes.length === 0) return { ready: true, probes: [] };
+    const results = await Promise.all(
+      probes.map(async (p) => {
+        try { return { name: p.name, ready: !!(await p.ready()) }; }
+        catch { return { name: p.name, ready: false }; }
+      }),
+    );
+    return { ready: results.every((r) => r.ready), probes: results };
   }
 
   private async *streamSse(event: NormalizedEvent, signal?: AbortSignal): AsyncIterable<string> {

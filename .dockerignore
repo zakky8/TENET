@@ -1,0 +1,21 @@
+# Speed up build context — drop everything the build doesn't need.
+**/node_modules
+**/dist
+**/.turbo
+**/.cache
+**/coverage
+**/*.log
+.git
+.github/workflows/measure-real.yml
+docs/marketing
+docs/_config.yml
+scripts
+qa
+Dockerfile
+.dockerignore
+.gitignore
+*.md
+!README.md
+!CHANGELOG.md
+!LICENSE
+**/*.test.ts

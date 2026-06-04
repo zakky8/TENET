@@ -1,0 +1,68 @@
+# Pre-commit hooks — shift-left checks (run on dev's machine before push).
+# Install: pip install pre-commit && pre-commit install
+# Run on full tree: pre-commit run --all-files
+#
+# Pattern borrowed from OpenClaw audit + adjusted for TENET's stack
+# (TypeScript-first, no Swift/Python skill payloads).
+
+repos:
+  # ── File hygiene ──────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-json
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # ── Secret detection (shifts secret scanning left of CI) ──────────────
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.0
+    hooks:
+      - id: gitleaks
+
+  # ── GitHub Actions ────────────────────────────────────────────────────
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.7
+    hooks:
+      - id: actionlint
+        # Validates GitHub Actions YAML — catches shellcheck errors in
+        # `run` blocks, expression typos, missing permissions blocks.
+
+  # ── Zizmor — supply-chain audit of GitHub Actions workflows ───────────
+  - repo: https://github.com/woodruffw/zizmor-pre-commit
+    rev: v1.4.0
+    hooks:
+      - id: zizmor
+        args: ["--persona=regular", "--min-severity=medium", "--min-confidence=medium"]
+        # Catches: dangerous-triggers (pull_request_target), unpinned
+        # third-party uses, untrusted-checkout, cache-poisoning,
+        # template-injection in `${{ }}` expressions.
+
+  # ── Repo-local hooks ──────────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: pnpm-typecheck-changed
+        name: pnpm typecheck (changed packages)
+        # We use `tsc --noEmit` per-package via pnpm filter. The hook
+        # runs the same command as CI's typecheck step but only for
+        # packages whose .ts files changed.
+        entry: bash -c 'pnpm -r typecheck'
+        language: system
+        types: [ts]
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: pnpm-audit-prod
+        name: pnpm audit (production deps)
+        entry: bash -c 'pnpm audit --prod --audit-level=high'
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
