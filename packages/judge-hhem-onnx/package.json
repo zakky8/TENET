@@ -1,0 +1,18 @@
+{
+  "name": "@tenet/judge-hhem-onnx",
+  "version": "0.0.0",
+  "description": "ONNX / transformers.js HhemScorer adapter — wraps any local or hosted HHEM-2.1 pipeline behind the HhemScorer contract.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "dependencies": { "@tenet/judge-hhem": "workspace:*" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}
