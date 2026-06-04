@@ -1,0 +1,21 @@
+{
+  "name": "@tenet/tool-call-repair",
+  "version": "0.0.0",
+  "description": "Repair malformed LLM tool-call JSON — grammar fixups, stream normalization, payload promotion. Recovers from model output drift without throwing.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "keywords": [
+    "agent-framework", "ai", "ai-agents", "json-repair", "langchain-alternative",
+    "llm", "reliability", "tenet", "tool-call", "tool-call-repair", "typescript"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

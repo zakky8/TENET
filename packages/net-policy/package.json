@@ -1,0 +1,21 @@
+{
+  "name": "@tenet/net-policy",
+  "version": "0.0.0",
+  "description": "Network policy primitives — SSRF prevention (block private IPs), URL userinfo redaction (credential leak prevention), IPv4 range validation. Pure functions, no deps.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "keywords": [
+    "agent-framework", "ai", "ai-agents", "credential-redaction", "ipv4",
+    "langchain-alternative", "llm", "net-policy", "security", "ssrf", "tenet", "typescript"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

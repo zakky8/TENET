@@ -133,6 +133,8 @@ importers:
         specifier: workspace:*
         version: link:../memory
 
+  packages/net-policy: {}
+
   packages/policy: {}
 
   packages/rate-limit: {}
@@ -165,6 +167,8 @@ importers:
       '@tenet/telemetry':
         specifier: workspace:*
         version: link:../telemetry
+
+  packages/tool-call-repair: {}
 
   packages/tools-mcp: {}
 
