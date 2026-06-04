@@ -1,0 +1,18 @@
+{
+  "name": "@tenet/app-enterprise-support",
+  "version": "0.0.0",
+  "description": "Reference enterprise-support composition — multi-surface + multi-connector + outcome telemetry dispatcher.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "dependencies": { "@tenet/core": "workspace:*" }
+}

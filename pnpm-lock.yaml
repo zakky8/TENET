@@ -33,6 +33,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
+  apps/enterprise-support:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+
   connectors/ticketing: {}
 
   eval/harness: {}
