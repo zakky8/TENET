@@ -155,29 +155,27 @@ export class WasmtimeRuntime implements WasmRuntime {
     _store: WasmtimeStore,
     _policy: Required<WasmExecutionPolicy>,
   ): Record<string, Record<string, unknown>> {
+    void caps;
     return {
       env: {
         host_args_len: () => argsJson.length,
         host_log: (_ptr: number, _len: number) => {},
-        // Capability gates — fail closed by default. Production impls
-        // implement the actual fetch / fs read here, gated by `caps`.
+        // SECURITY: fail CLOSED until per-target matching is wired.
+        // Returning 0 for any caller in the non-empty branch was a
+        // fail-OPEN bug — a guest could request any URL once the
+        // allow-list contained one entry. Operators wiring real
+        // network/fs/env access MUST subclass and override
+        // buildImports to perform per-target allow-list matching
+        // (URL host vs networkAllowList, path-prefix vs readPaths,
+        // key vs envKeys). Default behaviour: deny everything.
         host_http_request: (_hostPtr: number, _hostLen: number) => {
-          if (caps.networkAllowList.length === 0) {
-            throw new WasmPolicyError('capability_denied', 'network not granted');
-          }
-          return 0;
+          throw new WasmPolicyError('capability_denied', 'host_http_request not implemented; override buildImports to enforce per-target match');
         },
         host_fs_read: (_pathPtr: number, _pathLen: number) => {
-          if (caps.readPaths.length === 0) {
-            throw new WasmPolicyError('capability_denied', 'fs read not granted');
-          }
-          return 0;
+          throw new WasmPolicyError('capability_denied', 'host_fs_read not implemented; override buildImports to enforce per-path match');
         },
         host_env_get: (_keyPtr: number, _keyLen: number) => {
-          if (caps.envKeys.length === 0) {
-            throw new WasmPolicyError('capability_denied', 'env read not granted');
-          }
-          return 0;
+          throw new WasmPolicyError('capability_denied', 'host_env_get not implemented; override buildImports to enforce per-key match');
         },
       },
     };

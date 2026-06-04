@@ -1,0 +1,18 @@
+{
+  "name": "@tenet/telemetry-otlp",
+  "version": "0.0.0",
+  "description": "OTLP/HTTP exporter wiring — converts TENET OutcomeEvents and GenAI semconv spans into OTLP-shape JSON the operator's collector accepts. No @opentelemetry SDK hard dep.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "dependencies": { "@tenet/telemetry": "workspace:*" },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

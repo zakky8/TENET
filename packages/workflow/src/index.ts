@@ -113,7 +113,18 @@ export function parallel(...steps: ReadonlyArray<Step<unknown, unknown>>): Step<
       );
       return results;
     } catch (e) {
-      throw new WorkflowError('parallel_failed', ctx.stepId, `parallel step failed: ${(e as Error).message}`);
+      // CORRECTNESS 2026-06-04: distinguish parent-abort from genuine
+      // child failure. If the caller's signal aborted, surface the
+      // abort intent rather than wrapping it as parallel_failed.
+      if (ctx.signal.aborted) {
+        throw new WorkflowError('aborted', ctx.stepId, 'parallel aborted by caller');
+      }
+      // SECURITY 2026-06-04: don't interpolate the child error's
+      // message — it may contain a leaked bearer token from an
+      // upstream API error. Stash the cause; consumers inspect it.
+      const err = new WorkflowError('parallel_failed', ctx.stepId, 'parallel step failed');
+      (err as Error & { cause?: unknown }).cause = e;
+      throw err;
     } finally {
       ctx.signal.removeEventListener('abort', onParentAbort);
     }
@@ -165,16 +176,21 @@ export function retry<I, O>(step: Step<I, O>, policy: RetryPolicy): Step<I, O> {
         if (attempt === policy.maxAttempts || !filter(e)) break;
         ctx.trace?.({ kind: 'step.retry', runId: ctx.runId, stepId: ctx.stepId, tMs: Date.now(), attempt });
         const delay = Math.min(cap, initial * factor ** (attempt - 1));
+        // CORRECTNESS 2026-06-04: remove the abort listener when the
+        // timer resolves normally — previously the listener stayed on
+        // ctx.signal across every retry, leaking N listeners per call.
         await new Promise<void>((resolve, reject) => {
-          const t = setTimeout(resolve, delay);
-          ctx.signal.addEventListener(
-            'abort',
-            () => {
-              clearTimeout(t);
-              reject(new WorkflowError('aborted', ctx.stepId, 'retry aborted'));
-            },
-            { once: true },
-          );
+          let t: ReturnType<typeof setTimeout> | undefined;
+          const onAbort = (): void => {
+            if (t) clearTimeout(t);
+            ctx.signal.removeEventListener('abort', onAbort);
+            reject(new WorkflowError('aborted', ctx.stepId, 'retry aborted'));
+          };
+          t = setTimeout(() => {
+            ctx.signal.removeEventListener('abort', onAbort);
+            resolve();
+          }, delay);
+          ctx.signal.addEventListener('abort', onAbort, { once: true });
         });
       }
     }

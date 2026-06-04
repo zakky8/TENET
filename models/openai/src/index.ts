@@ -53,9 +53,21 @@ export interface OpenAiChatModelOptions {
   organization?: string;
 }
 
+/** Strip Bearer tokens / Authorization headers from echoed error bodies. */
+function scrubSecrets(s: string): string {
+  return s
+    .replace(/Bearer\s+[A-Za-z0-9._\-+/=]+/gi, 'Bearer [redacted]')
+    .replace(/sk-[A-Za-z0-9_-]+/g, 'sk-[redacted]')
+    .replace(/(authorization\s*:\s*)[^\s,"]+/gi, '$1[redacted]');
+}
+
 export class OpenAiApiError extends Error {
-  constructor(public readonly status: number, public readonly body: string) {
-    super(`OpenAI returned ${status}: ${body.slice(0, 200)}`);
+  /** Scrubbed body — Bearer tokens / sk- keys / Authorization values removed. */
+  public readonly body: string;
+  constructor(public readonly status: number, body: string) {
+    const scrubbed = scrubSecrets(body).slice(0, 200);
+    super(`OpenAI returned ${status}: ${scrubbed}`);
+    this.body = scrubbed;
     this.name = 'OpenAiApiError';
   }
 }

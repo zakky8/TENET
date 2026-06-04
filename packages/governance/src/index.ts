@@ -98,12 +98,18 @@ export function denyArgPatternRule(argName: string, forbidden: RegExp): PolicyRu
   };
 }
 
-/** Deny when arg value is numerically above a threshold. */
+/**
+ * Deny when arg value is numerically above a threshold.
+ * SECURITY 2026-06-04: reason no longer interpolates the value (was a
+ * secret-leakage path when an operator wired the audit sink to Slack /
+ * Teams / log forwarder). Operators retain the bound; the value lives
+ * in the (redacted) args, not in the reason string.
+ */
 export function numericLimitRule(argName: string, max: number): PolicyRule {
   return (ctx) => {
     const v = ctx.args[argName];
     if (typeof v === 'number' && v > max) {
-      return { kind: 'deny', reason: `${argName}=${v} exceeds limit ${max}` };
+      return { kind: 'deny', reason: `${argName} exceeds limit ${max}` };
     }
     return { kind: 'allow' };
   };
@@ -124,13 +130,22 @@ export class InMemoryApprovalStore implements ApprovalStore {
   async set(key: string, rec: ApprovalRecord): Promise<void> { this.store.set(key, rec); }
 }
 
-/** Deterministic key for ToolCallContext (idempotent approvals). */
+/**
+ * Deterministic key for ToolCallContext (idempotent approvals).
+ * SECURITY 2026-06-04: recursively canonicalise nested objects/arrays
+ * so an attacker who controls JSON parse order cannot force a fresh
+ * approval prompt to bypass a prior rejection.
+ */
 export function stableApprovalKey(ctx: ToolCallContext): string {
-  // Sort arg keys so {a:1,b:2} === {b:2,a:1}
-  const sortedArgs = Object.fromEntries(
-    Object.entries(ctx.args).toSorted(([a], [b]) => a.localeCompare(b)),
-  );
-  return `${ctx.tenantId}|${ctx.principalId}|${ctx.toolName}|${JSON.stringify(sortedArgs)}`;
+  return `${ctx.tenantId}|${ctx.principalId}|${ctx.toolName}|${canonicalJson(ctx.args)}`;
+}
+
+/** Recursive key-sorted JSON for deterministic equality on object args. */
+function canonicalJson(v: unknown): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  const keys = Object.keys(v as Record<string, unknown>).toSorted();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`).join(',')}}`;
 }
 
 // ── Approval gate ─────────────────────────────────────────────────────
@@ -198,12 +213,45 @@ export class GovernanceError extends Error {
   }
 }
 
+/**
+ * Redactor — applied to ToolCallContext.args before emission to the
+ * AuditSink. Operators ship the strictest redactor their compliance
+ * posture allows. Default: redact every arg value (audit logs become
+ * shape-only). For tools that need value visibility, wire a per-arg
+ * allow-list.
+ *
+ * SECURITY 2026-06-04: audit events previously embedded full args,
+ * leaking secrets (API keys, PII, card numbers) to any operator who
+ * routed the sink to S3 / SIEM / Slack. The default redactor is now
+ * fail-CLOSED.
+ */
+export type ArgsRedactor = (ctx: ToolCallContext) => ToolCallContext;
+
+/** Default — redact every arg value; preserve keys for diagnostic shape. */
+export const REDACT_ALL_ARGS: ArgsRedactor = (ctx) => ({
+  ...ctx,
+  args: Object.fromEntries(Object.keys(ctx.args).map((k) => [k, '[redacted]'])),
+});
+
+/** Identity — emit args verbatim. Use only when tool args are non-sensitive. */
+export const NO_REDACTION: ArgsRedactor = (ctx) => ctx;
+
+/** Per-arg allow-list — keys listed are emitted as-is, others redacted. */
+export function allowListRedactor(allowedKeys: ReadonlyArray<string>): ArgsRedactor {
+  const allow = new Set(allowedKeys);
+  return (ctx) => ({
+    ...ctx,
+    args: Object.fromEntries(Object.entries(ctx.args).map(([k, v]) => [k, allow.has(k) ? v : '[redacted]'])),
+  });
+}
+
 export class Governance {
   constructor(
     private readonly policy: PolicyEvaluator,
     private readonly gate: ApprovalGate,
     private readonly audit: AuditSink,
     private readonly clock: () => number = () => Date.now(),
+    private readonly redactor: ArgsRedactor = REDACT_ALL_ARGS,
   ) {}
 
   /**
@@ -216,16 +264,16 @@ export class Governance {
     const tMs = this.clock();
     switch (decision.kind) {
       case 'allow':
-        await this.audit.emit({ kind: 'policy.allow', tMs, ctx });
+        await this.audit.emit({ kind: 'policy.allow', tMs, ctx: this.redactor(ctx) });
         return;
       case 'deny':
-        await this.audit.emit({ kind: 'policy.deny', tMs, ctx, reason: decision.reason });
+        await this.audit.emit({ kind: 'policy.deny', tMs, ctx: this.redactor(ctx), reason: decision.reason });
         throw new GovernanceError('denied', decision.reason);
       case 'require_approval': {
         await this.audit.emit({
           kind: 'policy.require_approval',
           tMs,
-          ctx,
+          ctx: this.redactor(ctx),
           reason: decision.reason,
           approvalKey: decision.approvalKey,
         });
@@ -238,7 +286,7 @@ export class Governance {
         await this.audit.emit({
           kind: 'approval.decision',
           tMs: this.clock(),
-          ctx,
+          ctx: this.redactor(ctx),
           approvalKey: decision.approvalKey,
           decision: rec.decision,
           by: rec.by,
@@ -264,7 +312,7 @@ export class Governance {
       await this.audit.emit({
         kind: 'tool.invoked',
         tMs: this.clock(),
-        ctx,
+        ctx: this.redactor(ctx),
         outcome: 'ok',
         durationMs: this.clock() - start,
       });
@@ -273,7 +321,7 @@ export class Governance {
       await this.audit.emit({
         kind: 'tool.invoked',
         tMs: this.clock(),
-        ctx,
+        ctx: this.redactor(ctx),
         outcome: 'error',
         durationMs: this.clock() - start,
       });
@@ -283,7 +331,7 @@ export class Governance {
 
   /** Operator-stamped override — bypasses approval; emits override event for the audit log. */
   async override(ctx: ToolCallContext, by: string, reason: string): Promise<void> {
-    await this.audit.emit({ kind: 'override', tMs: this.clock(), ctx, by, reason });
+    await this.audit.emit({ kind: 'override', tMs: this.clock(), ctx: this.redactor(ctx), by, reason });
   }
 }
 

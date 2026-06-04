@@ -77,6 +77,24 @@ importers:
 
   models/bedrock: {}
 
+  models/google:
+    dependencies:
+      '@tenet/streaming':
+        specifier: workspace:*
+        version: link:../../packages/streaming
+
+  models/mistral:
+    dependencies:
+      '@tenet/streaming':
+        specifier: workspace:*
+        version: link:../../packages/streaming
+
+  models/ollama:
+    dependencies:
+      '@tenet/streaming':
+        specifier: workspace:*
+        version: link:../../packages/streaming
+
   models/openai:
     dependencies:
       '@tenet/streaming':
@@ -136,6 +154,12 @@ importers:
       '@tenet/core':
         specifier: workspace:*
         version: link:../core
+
+  packages/telemetry-otlp:
+    dependencies:
+      '@tenet/telemetry':
+        specifier: workspace:*
+        version: link:../telemetry
 
   packages/tools-mcp: {}
 

@@ -49,6 +49,9 @@ export interface SseEvent {
   id?: string;
 }
 
+/** DoS guard — max bytes per buffered line / per data field. */
+export const SSE_MAX_LINE_BYTES = 1_048_576; // 1 MiB
+
 /** Parse a ReadableStream<Uint8Array> into SseEvents. */
 export async function* parseSseStream(
   stream: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>,
@@ -93,6 +96,11 @@ export async function* parseSseStream(
   for await (const chunk of iterable) {
     if (signal?.aborted) throw new Error('SSE stream aborted');
     buf += decoder.decode(chunk, { stream: true });
+    // SECURITY 2026-06-04: cap line buffer to prevent unbounded growth
+    // from an upstream that never emits a newline (DoS class).
+    if (buf.length > SSE_MAX_LINE_BYTES) {
+      throw new Error(`SSE line exceeded ${SSE_MAX_LINE_BYTES} bytes`);
+    }
     let nl: number;
     while ((nl = buf.indexOf('\n')) !== -1) {
       const line = buf.slice(0, nl).replace(/\r$/, '');
@@ -148,6 +156,9 @@ export interface StructuredStreamParser<T> {
  * This is the Pydantic-AI "structured output as it arrives" pattern
  * generalised — no Pydantic, no schema; the caller validates shape.
  */
+/** DoS guard — max bytes the running JSON buffer may grow to. */
+export const JSON_STREAM_MAX_BUFFER_BYTES = 1_048_576; // 1 MiB
+
 export function jsonStreamParser<T>(): StructuredStreamParser<T> {
   let buf = '';
   let depth = 0;
@@ -168,6 +179,12 @@ export function jsonStreamParser<T>(): StructuredStreamParser<T> {
     feed(chunk) {
       for (const ch of chunk) {
         buf += ch;
+        // SECURITY 2026-06-04: cap running buffer to prevent attacker
+        // (or buggy upstream) from inflating memory with unterminated
+        // strings / objects (DoS class).
+        if (buf.length > JSON_STREAM_MAX_BUFFER_BYTES) {
+          throw new Error(`JSON stream buffer exceeded ${JSON_STREAM_MAX_BUFFER_BYTES} bytes`);
+        }
         if (escape) { escape = false; continue; }
         if (inString) {
           if (ch === '\\') escape = true;

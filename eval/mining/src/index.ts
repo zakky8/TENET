@@ -150,6 +150,11 @@ export async function dedupAssertions(
 
 // ── EvalCase emission ─────────────────────────────────────────────────
 
+/** Escape user-supplied string for safe regex interpolation. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function predicateFor(a: MinedAssertion): Assertion {
   switch (a.kind) {
     case 'must_contain':
@@ -174,7 +179,10 @@ function predicateFor(a: MinedAssertion): Assertion {
       return {
         id: a.assertionId,
         async check({ output }: AssertContext): Promise<AssertionResult> {
-          return new RegExp(`[\\[(]${a.value}[\\])]`).test(String(output))
+          // CORRECTNESS 2026-06-04: escape regex metachars in citation id
+          // (e.g. 's.1+' would break the regex or match wrong text).
+          const v = escapeRegex(a.value);
+          return new RegExp(`[\\[(]${v}[\\])]`).test(String(output))
             ? { kind: 'pass' }
             : { kind: 'fail', reason: `missing citation ${a.value}` };
         },
@@ -183,7 +191,8 @@ function predicateFor(a: MinedAssertion): Assertion {
       return {
         id: a.assertionId,
         async check({ output }: AssertContext): Promise<AssertionResult> {
-          return !new RegExp(`[\\[(]${a.value}[\\])]`).test(String(output))
+          const v = escapeRegex(a.value);
+          return !new RegExp(`[\\[(]${v}[\\])]`).test(String(output))
             ? { kind: 'pass' }
             : { kind: 'fail', reason: `forbidden citation ${a.value}` };
         },

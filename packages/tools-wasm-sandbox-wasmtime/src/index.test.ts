@@ -80,7 +80,7 @@ describe('WasmtimeRuntime', () => {
     ).rejects.toMatchObject({ code: 'instantiation_failed' });
   });
 
-  it('host_http_request denied when networkAllowList empty', async () => {
+  it('host_http_request fails CLOSED regardless of allow-list (default impl)', async () => {
     let importsCaptured: any;
     const binding: WasmtimeBinding = {
       createStore: () => makeStore(POLICY.fuel),
@@ -90,11 +90,21 @@ describe('WasmtimeRuntime', () => {
       },
     };
     const rt = new WasmtimeRuntime({ binding });
+    // Empty allow-list → denied
     await rt.execute({ module: EMPTY_MODULE, capabilities: CAPS_EMPTY, policy: POLICY, args: {} });
+    expect(() => importsCaptured.env.host_http_request(0, 0)).toThrow(WasmPolicyError);
+    // Non-empty allow-list → STILL denied (per-target match not implemented).
+    // Operators wanting real network access MUST override buildImports.
+    await rt.execute({
+      module: EMPTY_MODULE,
+      capabilities: { networkAllowList: ['api.example.com'], readPaths: [], envKeys: [] },
+      policy: POLICY,
+      args: {},
+    });
     expect(() => importsCaptured.env.host_http_request(0, 0)).toThrow(WasmPolicyError);
   });
 
-  it('host_http_request allowed when networkAllowList non-empty', async () => {
+  it('host_fs_read and host_env_get fail CLOSED', async () => {
     let importsCaptured: any;
     const binding: WasmtimeBinding = {
       createStore: () => makeStore(POLICY.fuel),
@@ -106,11 +116,12 @@ describe('WasmtimeRuntime', () => {
     const rt = new WasmtimeRuntime({ binding });
     await rt.execute({
       module: EMPTY_MODULE,
-      capabilities: { networkAllowList: ['api.example.com'], readPaths: [], envKeys: [] },
+      capabilities: { networkAllowList: [], readPaths: ['/data'], envKeys: ['X'] },
       policy: POLICY,
       args: {},
     });
-    expect(importsCaptured.env.host_http_request(0, 0)).toBe(0);
+    expect(() => importsCaptured.env.host_fs_read(0, 0)).toThrow(WasmPolicyError);
+    expect(() => importsCaptured.env.host_env_get(0, 0)).toThrow(WasmPolicyError);
   });
 
   it('fuelUsed = policy.fuel - store.fuelRemaining() after invoke', async () => {
