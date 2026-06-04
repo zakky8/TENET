@@ -1,0 +1,22 @@
+{
+  "name": "@tenet/acp",
+  "version": "0.0.0",
+  "description": "Agent Client Protocol adapter — JSON-RPC 2.0 protocol-v1 over stdio + WebSocket. Makes TENET interoperate with any ACP-aware editor or terminal (Zed, Cursor, Helix, Aider).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" } },
+  "files": ["dist", "README.md"],
+  "keywords": [
+    "acp", "agent-client-protocol", "agent-framework", "ai", "ai-agents", "aider",
+    "cursor", "editor-integration", "helix", "jsonrpc", "langchain-alternative", "llm",
+    "tenet", "typescript", "zed"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  }
+}

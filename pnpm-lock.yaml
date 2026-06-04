@@ -101,6 +101,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/streaming
 
+  packages/acp: {}
+
   packages/core: {}
 
   packages/distillation: {}
