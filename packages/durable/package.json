@@ -1,0 +1,39 @@
+{
+  "name": "@tenet/durable",
+  "version": "0.0.0",
+  "description": "Step-level durable execution for agents — journaled deterministic replay, suspend/resume across process restarts, interrupt() human-in-the-loop. No infra dep: journals persist through any StateStore (in-memory, Redis, Postgres).",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "durable-execution",
+    "deterministic-replay",
+    "human-in-the-loop",
+    "langchain-alternative",
+    "llm",
+    "temporal-alternative",
+    "tenet",
+    "typescript",
+    "workflow"
+  ]
+}
