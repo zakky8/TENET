@@ -6,6 +6,46 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — Phase 15 (top-0.01% market gaps, 2026-06-10)
+A fresh A-to-Z repo audit (3 parallel reviewers) + live market research over the
+June-2026 framework landscape (LangGraph 1.0, OpenAI Agents SDK 2026-04, Vercel
+AI SDK 6 + WDK, Mastra 1.x, Pydantic-AI v1.107, MS Agent Framework 1.0, Google
+ADK 2.x, A2A v1.0, AG-UI, MCP 2026-07-28 RC) identified the three TypeScript
+open lanes. All three shipped, plus the audit's DX + truth findings:
+- **`@tenet/durable`** — step-level durable execution: name-keyed journal
+  memoization (Promise.all-safe), `interrupt()` human-in-the-loop that survives
+  process restarts, durable `sleep()`, `NondeterminismError` replay-drift
+  guard, `StateStoreJournal` over Redis/Postgres state stores. 16 tests.
+- **`@tenet/a2a`** — Agent2Agent protocol v1 server (AgentCard, task
+  lifecycle, tasks/cancel aborts in-flight handlers) + fetch-injected client
+  (well-known card discovery, sendMessage/getTask/cancelTask). 15 tests.
+- **`@tenet/ag-ui`** — AG-UI event protocol: typed event union,
+  lifecycle-enforcing `AgUiRunEmitter`, `streamChunksToAgUi` bridge so all 6
+  streaming model adapters drive AG-UI frontends, SSE encoder. 16 tests.
+- **`@tenet/harness`** — long-horizon layer: token-budget `ContextCompactor`
+  (pinned system prompts, verbatim recent window), `TodoLedger` with JSON
+  round-trip, `spawnSubagents` bounded-concurrency fan-out with error
+  isolation + `Handoff` descriptor. 15 tests.
+- **`apps/quickstart`** — `pnpm quickstart`: full retrieve→draft→verify REPL
+  with ZERO keys (deterministic stub routes on the verifier's own prompt
+  contract) or `ANTHROPIC_API_KEY` for a real model. 4 tests.
+- **`@tenet/stores-state-postgres`** — the dir existed empty; now a real
+  package: single-table KV, lazy TTL, atomic one-round-trip `incr()` with
+  Redis-compatible expiry semantics, table-name injection guard. 8 tests.
+- **Bedrock streaming** — `chatStream()` via injected
+  `InvokeModelWithResponseStream`; task #83 had claimed this shipped in P8 and
+  it had not (caught by the audit, fixed under the truth-restoration rule).
+  6 tests.
+
+### Fixed — Phase 15
+- Removed the empty `surfaces/webhook/` directory (ticketing connectors live
+  in `connectors/ticketing`).
+- README drift: "3 model adapters" → 6 (all streaming), test counts
+  916/736/611 → 996 across 81 suites, surface arithmetic corrected to
+  9 surfaces + 4 ticketing connectors, stale competitor-table HITL marks
+  updated against June-2026 reality (LangGraph interrupt(), Mastra
+  suspend/resume, OpenAI harness approvals).
+
 ### Added — Phase 7 (competitor weakness exploit, 2026-06-04)
 Web-verified competitor research (LangChain, LangGraph, AutoGen, CrewAI, LlamaIndex, Semantic Kernel, Mastra, Pydantic-AI, OpenAI Agents, mem0, Letta, Zep) surfaced specific weaknesses. We shipped fixes for the ones we can exploit.
 - **`@tenet/governance`** — the unfilled OSS gap. 2026 research: *"None evaluates a tool call against a policy before it executes, none requires approval gates by default, none ships a structured audit trail without custom integration."* We ship all three: `PolicyEvaluator` with deny/allow/require_approval, `ApprovalGate` with idempotency cache, `AuditSink` with 6 typed event kinds, built-in rules (`allowListRule`, `tagRequiresApprovalRule`, `denyArgPatternRule`, `numericLimitRule`), stable approval keys (argument-order independent). 17 tests.

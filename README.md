@@ -6,12 +6,12 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node 22+](https://img.shields.io/badge/node-22+-43853d.svg)](.nvmrc)
 [![TypeScript Strict](https://img.shields.io/badge/typescript-strict-3178c6.svg)](tsconfig.base.json)
-[![Tests](https://img.shields.io/badge/tests-916%20passing-success)](packages)
+[![Tests](https://img.shields.io/badge/tests-996%20passing-success)](packages)
 [![BENCHMARKS gated](https://img.shields.io/badge/BENCHMARKS-gated_in_CI-success)](docs/BENCHMARKS.md)
 [![ES2024](https://img.shields.io/badge/target-ES2024-yellow.svg)](tsconfig.base.json)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-purple.svg)](CODE_OF_CONDUCT.md)
 
-> **Status:** Phases 0 → 7 substantially complete. **736 tests across 63 suites, all green.** Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`. 10 surfaces, 3 model adapters with streaming (Anthropic-direct, Bedrock, OpenAI), 2 vector stores, MCP client + OAuth gateway + WASM sandbox + production wasmtime adapter, on-prem Helm. Plus the OSS gap nobody else fills: **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). APIs may change before v1.0.
+> **Status:** 16 shipped phases (P0–P15). **996 tests across 81 suites, all green.** Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming. 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus the OSS gap nobody else fills: **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). Pre-1.0; APIs may change.
 
 ---
 
@@ -30,8 +30,12 @@ Web-fetched competitor research surfaced the gap nobody fills:
 | Capability | TENET | LangChain | Mastra | CrewAI | Pydantic-AI | OpenAI Agents | AutoGen | LlamaIndex |
 |---|---|---|---|---|---|---|---|---|
 | Pre-tool-call policy | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Approval gates (HITL) | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Approval gates (HITL) | **✅** | ✅ interrupt() | ✅ suspend/resume | partial | partial | ✅ (2026-04) | maintenance | ✗ |
 | Structured audit trail | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Durable execution (step-level replay) | **✅** `@tenet/durable` | partial (workflow checkpoints) | ✅ | partial | ✅ via Temporal | ✗ | maintenance | ✗ |
+| A2A protocol v1 (server + client) | **✅** | tbd | tbd | enterprise | tbd | ✗ | maintenance | tbd |
+| AG-UI streaming frontend protocol | **✅** | ✅ | tbd | ✅ | ✅ | ✗ | maintenance | tbd |
+| Agent harness (compaction · todos · subagents) | **✅** | ✅ Deep Agents | tbd | tbd | tbd | ✅ (2026-04) | maintenance | tbd |
 | Multi-judge verifier | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Independent hallucination judge (HHEM-2.1) | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | BENCHMARKS gated in CI on every PR | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
@@ -120,7 +124,7 @@ Method-of-attack per dimension + the honest stub-vs-real target split: [`docs/BE
 4. **CVE-class mistakes prevented by construction.** No `pickle`-style deserialization. Parameterized queries. Regex-validated filter keys. Path-allowlist on every file I/O via `PathHandle` + `openPath()`. `Secret<T>` opaque type refuses `JSON.stringify`. SBOM + Trivy + audit in CI.
 5. **WASM-sandboxed tools with capability tokens.** Tools declare `networkAllowList` / `readPaths` / `envKeys`; the gateway checks subset against tenant policy; the runtime enforces fuel + memory + wall-clock. Reference Node 22 runtime + production `@tenet/tools-wasm-sandbox-wasmtime` adapter. Per-call fresh instance.
 6. **MCP-native tools with OAuth gateway.** RFC 9207 `iss` validation per the 2026-07-28 spec RC; per-tenant policy with `allowedTools` wildcard, `trustedIssuers` allow-list, per-tool rate-limit; audit sink emits `allow`/`deny`/`error` per call.
-7. **All surfaces, one config.** Discord · Slack · Telegram · MS Teams · web widget (SSE + JWT) · REST (OpenAPI 3.1) · gRPC (.proto + handlers) · Zendesk · Intercom · Freshdesk · ServiceNow — 10 surfaces, one composition.
+7. **All surfaces, one config.** Discord · Slack · Telegram · MS Teams · web widget (SSE + JWT) · REST (OpenAPI 3.1) · gRPC (.proto + handlers) · Matrix · voice (Twilio Media Streams) — 9 surfaces — plus 4 ticketing connectors (Zendesk · Intercom · Freshdesk · ServiceNow), one composition.
 8. **Rate-limit as scheduling primitive.** Per-platform token buckets + circuit breakers (Telegram 1/s/chat, Discord 10k-invalid IP-ban floor, Slack 4-tier, Teams 50 RPS/tenant, Zendesk 200–2500 rpm + endpoint sub-caps).
 9. **Outcome events as first-class telemetry.** `resolved` / `handed_off` / `disqualified` / `qualified` emitted per conversation; OutcomeEmitter has re-entrancy guard + swallowed-error reporter.
 10. **Hybrid contextual retrieval.** BM25 + dense + RRF fusion + Anthropic-style contextual chunk prepending; pluggable reranker.
@@ -144,28 +148,33 @@ Method-of-attack per dimension + the honest stub-vs-real target split: [`docs/BE
 
 | Area | Packages |
 |---|---|
-| **Core** | `@tenet/core` · `@tenet/verifier` · `@tenet/policy` · `@tenet/telemetry` |
+| **Core** | `@tenet/core` · `@tenet/verifier` · `@tenet/policy` · `@tenet/telemetry` · `@tenet/governance` |
 | **Pipeline** | `@tenet/rate-limit` · `@tenet/retrieval` · `@tenet/router` · `@tenet/memory` · `@tenet/guardrails` · `@tenet/memory-adapters` |
-| **Surfaces** | `@tenet/surface-telegram` · `@tenet/surface-discord` · `@tenet/surface-slack` · `@tenet/surface-teams` · `@tenet/surface-web-widget` · `@tenet/surface-rest` · `@tenet/surface-grpc` |
+| **Execution** | `@tenet/durable` (step-level replay + interrupt() HITL) · `@tenet/workflow` · `@tenet/harness` (compaction · todos · subagents) |
+| **Interop** | `@tenet/a2a` (A2A v1 server + client) · `@tenet/ag-ui` · `@tenet/acp` · `@tenet/streaming` · `@tenet/tool-call-repair` · `@tenet/net-policy` |
+| **Surfaces** | `@tenet/surface-telegram` · `@tenet/surface-discord` · `@tenet/surface-slack` · `@tenet/surface-teams` · `@tenet/surface-web-widget` · `@tenet/surface-rest` · `@tenet/surface-grpc` · `@tenet/surface-matrix` · `@tenet/surface-twilio` |
 | **Connectors** | `@tenet/connectors-ticketing` (Zendesk · Intercom · Freshdesk · ServiceNow) |
-| **Models** | `@tenet/models-anthropic` · `@tenet/models-bedrock` |
-| **Stores** | `@tenet/stores-vector-pgvector` · `@tenet/stores-vector-qdrant` · `@tenet/stores-state-redis` |
+| **Models** | `@tenet/models-anthropic` · `@tenet/models-openai` · `@tenet/models-google` · `@tenet/models-mistral` · `@tenet/models-ollama` · `@tenet/models-bedrock` — all streaming |
+| **Stores** | `@tenet/stores-vector-pgvector` · `@tenet/stores-vector-qdrant` · `@tenet/stores-state-redis` · `@tenet/stores-state-postgres` |
 | **Tools** | `@tenet/tools-mcp` · `@tenet/tools-mcp-gateway` · `@tenet/tools-wasm-sandbox` · `@tenet/tools-wasm-sandbox-wasmtime` |
 | **Eval** | `@tenet/eval-harness` · `@tenet/eval-metrics` · `@tenet/eval-measure` |
 | **Judges** | `@tenet/judge-hhem` · `@tenet/judge-hhem-onnx` |
-| **Apps** | `@tenet/app-community-bot` · `@tenet/app-enterprise-support` · `@tenet/app-measure-real` |
+| **Apps** | `@tenet/app-quickstart` (pnpm quickstart) · `@tenet/app-community-bot` · `@tenet/app-enterprise-support` · `@tenet/app-measure-real` |
 | **Infra** | `infra/helm/tenet` (on-prem Helm chart with security defaults) |
 
 ## Repo layout
 
 ```
-packages/    core · verifier · policy · telemetry · rate-limit · retrieval · router · memory ·
-             guardrails · memory-adapters · tools-mcp · tools-mcp-gateway · tools-wasm-sandbox ·
-             tools-wasm-sandbox-wasmtime · judge-hhem · judge-hhem-onnx
-surfaces/    telegram · discord · slack · teams · web-widget · rest · grpc
+packages/    core · verifier · policy · telemetry · governance · rate-limit · retrieval ·
+             router · memory · guardrails · memory-adapters · durable · workflow · harness ·
+             a2a · ag-ui · acp · streaming · tool-call-repair · net-policy · skills · voice ·
+             voice-openai-realtime · distillation · eval-mining · rerank-cohere · tools-mcp ·
+             tools-mcp-gateway · tools-wasm-sandbox · tools-wasm-sandbox-wasmtime ·
+             judge-hhem · judge-hhem-onnx · telemetry-otlp
+surfaces/    telegram · discord · slack · teams · web-widget · rest · grpc · matrix · twilio
 connectors/  ticketing (4 vendors)
-models/      anthropic · bedrock
-stores/      vector/{pgvector,qdrant} · state/redis
+models/      anthropic · openai · google · mistral · ollama · bedrock
+stores/      vector/{pgvector,qdrant} · state/{redis,postgres}
 apps/        community-bot · enterprise-support · measure-real
 eval/        harness · metrics · measure
 infra/       helm/tenet
@@ -174,12 +183,30 @@ docs/        ARCHITECTURE · BENCHMARKS · ROADMAP · CHANGELOG · PENDING · RE
 
 ## Quick start
 
+Your first agent in 5 minutes — **zero API keys required**:
+
 ```bash
 git clone https://github.com/zakky8/TENET.git
 cd TENET
 pnpm install
+pnpm quickstart             # REPL: retrieve → draft → verify → cited answer
+```
+
+```
+you > what is the verifier?
+agent > The TENET verifier extracts atomic claims from a draft, then runs a
+        strict judge and a permissive judge over each claim...
+        sources: docs/ARCHITECTURE.md#verifier
+        [verified=true abstained=false 5ms]
+```
+
+The quickstart runs the FULL pipeline (claim extraction + strict/permissive
+judging) against a deterministic offline stub. Set `ANTHROPIC_API_KEY` and the
+identical composition runs against a real model. Then:
+
+```bash
 pnpm typecheck              # builds all packages in topological order
-pnpm test                   # 611 tests across 53 suites
+pnpm test                   # 996 tests across 81 suites
 pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL)
 ```
 
@@ -244,4 +271,4 @@ PRs welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md). The project values
 
 ---
 
-**Keywords for discovery:** open source AI agent framework · TypeScript agent SDK · LangChain alternative · hallucination-resistant LLM agent · RAG with citations · multi-channel chatbot framework · enterprise customer support agent · IT helpdesk AI · Telegram bot AI · Discord bot AI · Slack bot AI · Microsoft Teams AI · AWS Bedrock agent · Anthropic Claude agent · self-hosted agent · on-prem AI · OpenTelemetry GenAI · Model Context Protocol (MCP) · MCP OAuth gateway · WASM tool sandbox · capability tokens · Vectara HHEM-2.1 · source-grounded LLM · verification-first agent · adversarial-reviewed agent framework · BENCHMARKS-gated CI · OSS agent monorepo
+**Keywords for discovery:** open source AI agent framework · TypeScript agent SDK · LangChain alternative · hallucination-resistant LLM agent · RAG with citations · multi-channel chatbot framework · enterprise customer support agent · IT helpdesk AI · Telegram bot AI · Discord bot AI · Slack bot AI · Microsoft Teams AI · AWS Bedrock agent · Anthropic Claude agent · self-hosted agent · on-prem AI · OpenTelemetry GenAI · Model Context Protocol (MCP) · MCP OAuth gateway · A2A protocol · Agent2Agent · AG-UI · durable agent execution · human-in-the-loop interrupt · agent harness · WASM tool sandbox · capability tokens · Vectara HHEM-2.1 · source-grounded LLM · verification-first agent · adversarial-reviewed agent framework · BENCHMARKS-gated CI · OSS agent monorepo
