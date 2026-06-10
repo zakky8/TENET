@@ -6,6 +6,25 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — Phase 16 (answer-quality engine, 2026-06-11)
+Model-agnostic hallucination reduction + smarter/faster responses from
+ANY ChatModel:
+- **Deterministic pre-check tier in `@tenet/verifier`** — three-way
+  `ClaimPreCheck` (pass/fail/judge) before the LLM judges:
+  `numericFabricationCheck` fails claims with numbers absent from every
+  source (the wrong-number hallucination LLM judges wave through —
+  proven by the backwards-compat test), `quoteGroundingCheck` passes
+  verbatim-quote claims without a judge call. Every settled claim saves
+  1–2 judge calls. Opt-in via `claimPreChecks: defaultPreChecks()`.
+- **`@tenet/refine`** — answer-quality orchestration:
+  `knowledgeBoundaryGate` (abstain BEFORE drafting on weak retrieval
+  coverage — cheapest point to stop wrong info), `repairDraft` (rewrite
+  only the unsupported claims and re-verify, bounded rounds, full
+  verifier still gates), `bestOfN` (parallel drafts ranked by
+  supported-claim ratio — buys quality from small/local models),
+  `selfConsistency` (claims that flip across samples = confabulation
+  signal, SelfCheckGPT applied at claim level).
+
 ### Added — Phase 15 (top-0.01% market gaps, 2026-06-10)
 A fresh A-to-Z repo audit (3 parallel reviewers) + live market research over the
 June-2026 framework landscape (LangGraph 1.0, OpenAI Agents SDK 2026-04, Vercel

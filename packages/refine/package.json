@@ -1,0 +1,39 @@
+{
+  "name": "@tenet/refine",
+  "version": "0.0.0",
+  "description": "Answer-quality orchestration — knowledge-boundary gate (abstain before drafting when retrieval coverage is weak), claim repair loop (rewrite only unsupported claims instead of wholesale abstain), best-of-N verifier-ranked selection, and self-consistency scoring across samples. Model-agnostic.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "best-of-n",
+    "hallucination",
+    "langchain-alternative",
+    "llm",
+    "self-consistency",
+    "self-refine",
+    "tenet",
+    "typescript",
+    "verification"
+  ]
+}
