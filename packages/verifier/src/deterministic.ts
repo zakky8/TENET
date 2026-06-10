@@ -35,28 +35,74 @@ export interface ClaimPreCheck {
 
 // ── Numeric fabrication ───────────────────────────────────────────────
 
+interface NumericToken {
+  value: number;
+  /** True if the number carried a currency symbol or trailing %. */
+  marked: boolean;
+}
+
+const MAGNITUDE: Record<string, number> = {
+  k: 1e3, thousand: 1e3,
+  m: 1e6, mn: 1e6, million: 1e6,
+  b: 1e9, bn: 1e9, billion: 1e9,
+  t: 1e12, tn: 1e12, trillion: 1e12,
+};
+
 /**
- * Extract comparable numeric values from text. Handles thousands
- * separators (1,000), decimals, percent signs, currency prefixes, and
- * magnitude suffixes (5k / 1.2M / 3B). Returns canonical values so
- * "1,000" in a claim matches "1000" in sources and "1.2M" matches
- * "1200000" / "1,200,000".
+ * Mask spans that look like dates, clock times, or numeric ranges so
+ * they are NOT extracted as plain values. These need structural
+ * comparison the sources routinely phrase differently ("2025-01-15"
+ * vs "January 15, 2025", "3:30pm" vs "15:30", "$1-2M" vs "between $1M
+ * and $2M"), and treating their component digits as standalone facts
+ * is the dominant source of numeric FALSE FAILS (Fable audit H2).
  */
-export function extractNumericValues(text: string): number[] {
-  const out: number[] = [];
-  const re = /(?<![\w.])[$€£]?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*(k|K|m|M|b|B|%)?(?![\w])/g;
-  for (const m of text.matchAll(re)) {
-    const intPart = m[1]!.replaceAll(',', '');
-    const frac = m[2] ?? '';
+function maskStructuralNumerics(text: string): string {
+  return text
+    // ISO-ish dates
+    .replace(/\d{4}-\d{1,2}-\d{1,2}/g, ' ')
+    .replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, ' ')
+    // clock times (optionally with am/pm)
+    .replace(/\d{1,2}:\d{2}(?::\d{2})?\s*(?:[ap]\.?m\.?)?/gi, ' ')
+    // numeric ranges
+    .replace(/\d[\d.,]*\s*[-–—]\s*\d[\d.,]*\s*(?:k|m|b|t|bn|mn|tn|thousand|million|billion|trillion|%)?/gi, ' ');
+}
+
+/**
+ * Extract comparable numeric tokens from text. Handles thousands
+ * separators, decimals, percent, currency prefixes, suffix magnitudes
+ * (5k / 1.2M / 3B / 3.5bn) AND spelled magnitudes ("1.2 million"), so
+ * a claim's "$1.2M" matches a source's "$1.2 million". Date/time/range
+ * spans are masked out first.
+ */
+function extractNumericTokens(text: string): NumericToken[] {
+  const masked = maskStructuralNumerics(text);
+  const out: NumericToken[] = [];
+  // value, optional decimal, optional space, optional word/suffix magnitude.
+  const re = /([$€£])?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?\s*(thousand|million|billion|trillion|bn|mn|tn|[kmbt])?\b(%)?/gi;
+  for (const m of masked.matchAll(re)) {
+    const currency = m[1];
+    const intPart = m[2]!.replaceAll(',', '');
+    const frac = m[3] ?? '';
     let value = Number.parseFloat(intPart + frac);
-    const suffix = m[3];
-    if (suffix === 'k' || suffix === 'K') value *= 1_000;
-    else if (suffix === 'm' || suffix === 'M') value *= 1_000_000;
-    else if (suffix === 'b' || suffix === 'B') value *= 1_000_000_000;
-    // '%' is not a magnitude — the bare value is what must match.
-    if (Number.isFinite(value)) out.push(value);
+    const mag = m[4]?.toLowerCase();
+    const pct = m[5];
+    if (mag !== undefined && mag !== '') {
+      const factor = MAGNITUDE[mag];
+      if (factor !== undefined) value *= factor;
+    }
+    if (Number.isFinite(value)) {
+      out.push({ value, marked: currency !== undefined || pct !== undefined });
+    }
   }
   return out;
+}
+
+/**
+ * Backwards-compatible value list (drops the marked flag). "1,000"
+ * matches "1000"; "1.2M" / "1.2 million" both yield 1_200_000.
+ */
+export function extractNumericValues(text: string): number[] {
+  return extractNumericTokens(text).map((t) => t.value);
 }
 
 export interface NumericFabricationOptions {
@@ -65,22 +111,43 @@ export interface NumericFabricationOptions {
    * Default 0 (exact). Set e.g. 0.005 to let "3.14" match "3.14159".
    */
   relativeTolerance?: number;
+  /**
+   * Also fail on bare (unmarked) numbers absent from sources. Default
+   * false — bare integers collide with counts, IDs, versions and years
+   * and produced most of the false-fail families in the Fable audit.
+   * Leaving this off restricts deterministic FAILs to currency- and
+   * percent-marked values, where wrong numbers do real damage and
+   * paraphrase-to-words is rare. Bare numbers defer to the judges.
+   */
+  failBareNumbers?: boolean;
 }
 
 /**
- * Fail any claim containing a numeric value that appears NOWHERE in
- * the sources. Claims without numbers, or whose numbers all appear,
- * defer to the judges.
+ * Fail a claim that asserts a CURRENCY- or PERCENT-marked number which
+ * appears nowhere in the sources — the high-confidence fabrication
+ * signal ("$499" when the price is "$299", "87%" when uptime is
+ * "99%"). This verdict is FINAL (no permissive rescue), so it is
+ * deliberately conservative:
+ *
+ *   - only marked numbers fail by default (failBareNumbers opts in);
+ *   - date / time / range spans are masked out (structural, not facts);
+ *   - source extraction understands spelled magnitudes, so "$1.2M" in a
+ *     claim matches "$1.2 million" in a source and does NOT false-fail.
+ *
+ * A number being PRESENT never PASSES the claim (it could be
+ * misattributed) — presence only defers to the judges.
  */
 export function numericFabricationCheck(
   opts: NumericFabricationOptions = {},
 ): ClaimPreCheck {
   const tol = opts.relativeTolerance ?? 0;
   if (tol < 0) throw new Error('relativeTolerance must be >= 0');
+  const failBare = opts.failBareNumbers ?? false;
   return {
     check(claim, sources) {
-      const claimValues = extractNumericValues(claim);
-      if (claimValues.length === 0) return { verdict: 'judge' };
+      const claimTokens = extractNumericTokens(claim);
+      const candidates = failBare ? claimTokens : claimTokens.filter((t) => t.marked);
+      if (candidates.length === 0) return { verdict: 'judge' };
       const sourceValues = extractNumericValues(sources);
       const matches = (v: number): boolean =>
         sourceValues.some((s) => {
@@ -89,7 +156,7 @@ export function numericFabricationCheck(
           const denom = Math.max(Math.abs(s), Math.abs(v));
           return denom > 0 && Math.abs(s - v) / denom <= tol;
         });
-      const missing = claimValues.filter((v) => !matches(v));
+      const missing = candidates.filter((t) => !matches(t.value)).map((t) => t.value);
       if (missing.length === 0) return { verdict: 'judge' };
       return {
         verdict: 'fail',
@@ -105,39 +172,55 @@ export interface QuoteGroundingOptions {
   /** Minimum quoted-span length (chars) to consider. Default 20. */
   minQuoteChars?: number;
   /**
-   * The quote must cover at least this fraction of the claim's length
-   * for an auto-pass — prevents passing a long fabricated claim that
-   * embeds one short real quote. Default 0.6.
+   * Max characters allowed in the claim OUTSIDE the matched quote (after
+   * stripping quote marks, whitespace, and terminal punctuation) for an
+   * auto-pass. Default 4 — effectively "the claim IS the quote".
+   *
+   * Why so strict (Fable audit H1): any non-trivial residue can negate
+   * ("It is false that \"...\""), misattribute ("CompetitorX says
+   * \"...\""), or extend ("\"...\" for 99% of users") the quote while
+   * the span itself still matches a source verbatim. Attribution
+   * clauses assert something only a judge can check — so we defer them
+   * rather than auto-pass.
    */
-  minCoverage?: number;
+  maxResidueChars?: number;
 }
 
-/** Collapse whitespace + normalize curly quotes for span comparison. */
+/** Collapse whitespace + normalize double curly quotes. Apostrophes are
+ *  intentionally NOT normalized here — doing so let possessives bracket
+ *  a fake "quote" (Fable audit M3). */
 function normalizeForMatch(s: string): string {
-  return s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+  return s.replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Pass claims that are essentially a verbatim quote of the sources:
- * the claim contains a quoted span ("...", '...', or curly equivalents)
- * that (a) is long enough, (b) appears verbatim in the sources after
- * whitespace normalization, and (c) covers most of the claim.
+ * Pass claims that ARE a verbatim quote of the sources: the claim is a
+ * double-quoted span that (a) is long enough, (b) appears verbatim in
+ * the sources (whitespace-normalized), and (c) has only inert residue
+ * outside the quote (≤ maxResidueChars of punctuation). Single quotes
+ * are not treated as delimiters — too ambiguous with apostrophes.
  */
 export function quoteGroundingCheck(opts: QuoteGroundingOptions = {}): ClaimPreCheck {
   const minQuoteChars = opts.minQuoteChars ?? 20;
-  const minCoverage = opts.minCoverage ?? 0.6;
+  const maxResidueChars = opts.maxResidueChars ?? 4;
   if (minQuoteChars <= 0) throw new Error('minQuoteChars must be > 0');
-  if (minCoverage <= 0 || minCoverage > 1) throw new Error('minCoverage must be in (0,1]');
+  if (maxResidueChars < 0) throw new Error('maxResidueChars must be >= 0');
   return {
     check(claim, sources) {
       const normClaim = normalizeForMatch(claim);
       const normSources = normalizeForMatch(sources);
-      const quoteRe = /["“]([^"“”]{1,2000})["”]|['‘]([^'‘’]{1,2000})['’]/g;
+      const quoteRe = /"([^"]{1,2000})"/g;
       for (const m of normClaim.matchAll(quoteRe)) {
-        const quote = (m[1] ?? m[2] ?? '').trim();
+        // Trim terminal sentence punctuation the author put INSIDE the
+        // quote marks but the source span doesn't carry.
+        const quote = m[1]!.trim().replace(/[.,;:!?]+$/, '');
         if (quote.length < minQuoteChars) continue;
-        if (quote.length / normClaim.length < minCoverage) continue;
-        if (normSources.includes(quote)) return { verdict: 'pass' };
+        if (!normSources.includes(quote)) continue;
+        // Residue = claim minus this quoted span (incl. its marks),
+        // stripped of whitespace and terminal punctuation. Must be inert.
+        const residue = (normClaim.slice(0, m.index) + normClaim.slice(m.index + m[0].length))
+          .replace(/[\s.,;:!?—–-]/g, '');
+        if (residue.length <= maxResidueChars) return { verdict: 'pass' };
       }
       return { verdict: 'judge' };
     },

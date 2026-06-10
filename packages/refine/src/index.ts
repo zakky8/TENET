@@ -92,9 +92,17 @@ export function knowledgeBoundaryGate(
   if (hits.length < minHits) {
     return { proceed: false, reason: `retrieved ${hits.length} source(s), need ${minHits}` };
   }
+  // Fail CLOSED: when a top-score floor is set, zero hits cannot clear
+  // it (Fable audit M1 — the old `hits.length > 0` guard let an empty
+  // hit list bypass the floor when minHits was 0).
   const top = hits.reduce((m, h) => Math.max(m, h.score), -Infinity);
-  if (hits.length > 0 && top < minTopScore) {
-    return { proceed: false, reason: `top retrieval score ${top} below ${minTopScore}` };
+  if (minTopScore > 0 && top < minTopScore) {
+    return {
+      proceed: false,
+      reason: hits.length === 0
+        ? `no sources; top-score floor ${minTopScore} unmet`
+        : `top retrieval score ${top} below ${minTopScore}`,
+    };
   }
   const total = hits.reduce((sum, h) => sum + h.score, 0);
   if (total < minTotalScore) {
@@ -223,17 +231,30 @@ export interface ConsistencyReport {
   fractions: Map<string, number>;
 }
 
-/** Normalize claims for cross-sample matching. */
+/**
+ * Normalize claims for cross-sample matching. Number tokens are
+ * PRESERVED (digits, decimal points, and % kept) — stripping them
+ * collapsed "1.2%" and "12%" to the same key and hid exactly the
+ * numeric confabulation flips this function exists to detect (Fable
+ * audit H3).
+ */
 function claimKey(claim: string): string {
-  return claim.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim();
+  return claim
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}%. ]/gu, ' ') // keep letters, digits, %, decimal point
+    .replace(/(?<!\d)\.(?!\d)/g, ' ')    // drop non-decimal dots (sentence periods)
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
- * Compare claim verdicts across N independently sampled drafts. A
- * claim supported in every sample it appears in (fraction >= threshold)
- * is stable; one that flips is the classic confabulation signature —
- * facts the model KNOWS are sampled consistently, facts it INVENTS
- * vary run to run (the SelfCheckGPT observation).
+ * Compare claim verdicts across N independently sampled drafts. The
+ * support fraction is over ALL samples (not just the samples a claim
+ * appeared in — Fable audit M2), so a claim present in only 1 of N
+ * samples scores 1/N: low cross-sample frequency IS the confabulation
+ * signature (facts the model KNOWS recur across samples; facts it
+ * INVENTS vary run to run — the SelfCheckGPT observation). A claim at
+ * or above `threshold` is stable; the rest are flagged.
  */
 export function selfConsistency(
   verdictSets: ReadonlyArray<ReadonlyArray<ClaimVerdictLike>>,
@@ -242,23 +263,28 @@ export function selfConsistency(
   const threshold = opts.threshold ?? 1;
   if (threshold <= 0 || threshold > 1) throw new Error('threshold must be in (0,1]');
 
-  const seen = new Map<string, { claim: string; supported: number; total: number }>();
+  const totalSamples = verdictSets.length;
+  const seen = new Map<string, { claim: string; supportedSamples: number }>();
   for (const set of verdictSets) {
+    // De-dupe within a sample: a claim repeated in one draft counts once,
+    // and counts as supported only if every occurrence in that sample is.
+    const present = new Map<string, boolean>();
     for (const v of set) {
       const key = claimKey(v.claim);
       if (key === '') continue;
-      const entry = seen.get(key) ?? { claim: v.claim, supported: 0, total: 0 };
-      entry.total++;
-      if (v.supported) entry.supported++;
-      seen.set(key, entry);
+      present.set(key, (present.get(key) ?? true) && v.supported);
+      if (!seen.has(key)) seen.set(key, { claim: v.claim, supportedSamples: 0 });
+    }
+    for (const [key, supported] of present) {
+      if (supported) seen.get(key)!.supportedSamples++;
     }
   }
 
   const stable: string[] = [];
   const unstable: string[] = [];
   const fractions = new Map<string, number>();
-  for (const { claim, supported, total } of seen.values()) {
-    const fraction = supported / total;
+  for (const { claim, supportedSamples } of seen.values()) {
+    const fraction = totalSamples === 0 ? 0 : supportedSamples / totalSamples;
     fractions.set(claim, fraction);
     if (fraction >= threshold) stable.push(claim);
     else unstable.push(claim);

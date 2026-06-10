@@ -21,11 +21,15 @@ describe('extractNumericValues', () => {
     expect(extractNumericValues('growth was 12%')).toEqual([12]);
   });
 
-  it('ignores numbers embedded in identifiers', () => {
-    // sha256's digits are glued to letters → rejected by the lookbehind;
-    // HHEM-2.1's version number follows a hyphen → extracted (it IS a
-    // number a claim could fabricate).
-    expect(extractNumericValues('see HHEM-2.1 and sha256 digests')).toEqual([2.1]);
+  it('expands spelled magnitudes so 1.2M matches 1.2 million', () => {
+    expect(extractNumericValues('raised $1.2 million last year')).toEqual([1_200_000]);
+    expect(extractNumericValues('a 3.5bn valuation')).toEqual([3_500_000_000]);
+  });
+
+  it('masks dates, times, and ranges (structural, not standalone facts)', () => {
+    expect(extractNumericValues('released 2025-01-15')).toEqual([]);
+    expect(extractNumericValues('opens at 3:30pm')).toEqual([]);
+    expect(extractNumericValues('priced $1-2M')).toEqual([]);
   });
 
   it('returns empty for no numbers', () => {
@@ -46,21 +50,39 @@ describe('numericFabricationCheck', () => {
     expect(c.check('Revenue grew 12% in 2025', sources).verdict).toBe('judge');
   });
 
-  it('fails when a claim number appears nowhere in sources', () => {
+  it('fails a marked (%) number absent from sources', () => {
     const c = numericFabricationCheck();
     const r = c.check('Revenue grew 47% in 2025', sources);
     expect(r.verdict).toBe('fail');
     expect(r.reason).toContain('47');
   });
 
-  it('matches across formats: 1.2M claim vs 1,200,000 source', () => {
+  it('DEFERS bare numbers by default — kills the false-fail families (audit H2)', () => {
     const c = numericFabricationCheck();
-    expect(c.check('about 1,200,000 dollars', 'we raised $1.2M').verdict).toBe('judge');
+    // word-number paraphrase, dates, ranges, version numbers, counts:
+    expect(c.check('refunds take 14 days', 'refunds take two weeks').verdict).toBe('judge');
+    expect(c.check('released 2025-01-15', 'released January 15, 2025').verdict).toBe('judge');
+    expect(c.check('we have 9 regions', 'nine regions worldwide').verdict).toBe('judge');
   });
 
-  it('relativeTolerance lets rounded values match', () => {
-    const exact = numericFabricationCheck();
-    const loose = numericFabricationCheck({ relativeTolerance: 0.005 });
+  it('does NOT false-fail $1.2M against "$1.2 million" (spelled magnitude)', () => {
+    const c = numericFabricationCheck();
+    expect(c.check('we raised $1.2M', 'we raised $1.2 million in funding').verdict).toBe('judge');
+  });
+
+  it('matches across formats: $1,200,000 claim vs $1.2M source', () => {
+    const c = numericFabricationCheck();
+    expect(c.check('costs $1,200,000', 'priced at $1.2M').verdict).toBe('judge');
+  });
+
+  it('failBareNumbers opts into failing unmarked values', () => {
+    const c = numericFabricationCheck({ failBareNumbers: true });
+    expect(c.check('exactly 7 steps', 'there are 4 steps').verdict).toBe('fail');
+  });
+
+  it('relativeTolerance lets rounded marked values match', () => {
+    const exact = numericFabricationCheck({ failBareNumbers: true });
+    const loose = numericFabricationCheck({ relativeTolerance: 0.005, failBareNumbers: true });
     expect(exact.check('pi is 3.14', 'pi is 3.14159').verdict).toBe('fail');
     expect(loose.check('pi is 3.14', 'pi is 3.14159').verdict).toBe('judge');
   });
@@ -71,18 +93,34 @@ describe('numericFabricationCheck', () => {
 });
 
 describe('quoteGroundingCheck', () => {
-  const sources = 'The policy states: refunds are processed within 14 business days of approval.';
+  const QUOTE = 'refunds are processed within 14 business days of approval';
+  const sources = `The policy states: "${QUOTE}". Contact support for exceptions.`;
 
-  it('passes a claim that is essentially a verbatim source quote', () => {
+  it('passes a claim that IS the verbatim quote (inert residue)', () => {
     const c = quoteGroundingCheck();
-    const r = c.check('The policy says "refunds are processed within 14 business days of approval."', sources);
-    expect(r.verdict).toBe('pass');
+    expect(c.check(`"${QUOTE}."`, sources).verdict).toBe('pass');
   });
 
-  it('normalizes curly quotes and whitespace', () => {
+  it('normalizes curly double-quotes and whitespace', () => {
     const c = quoteGroundingCheck();
-    const r = c.check('Per docs: “refunds are  processed within 14 business days of approval”', sources);
-    expect(r.verdict).toBe('pass');
+    expect(c.check(`“refunds are  processed within 14 business days of approval”`, sources).verdict).toBe('pass');
+  });
+
+  // Fable audit H1 — the residue outside the quote must be inert; any
+  // negation / misattribution / extension defers to the judges.
+  it('DEFERS a negated quote (audit H1)', () => {
+    const c = quoteGroundingCheck();
+    expect(c.check(`It is false that "${QUOTE}"`, sources).verdict).toBe('judge');
+  });
+
+  it('DEFERS a misattributed quote (audit H1)', () => {
+    const c = quoteGroundingCheck();
+    expect(c.check(`CompetitorX says "${QUOTE}"`, sources).verdict).toBe('judge');
+  });
+
+  it('DEFERS a quote extended with a fabricated clause (audit H1)', () => {
+    const c = quoteGroundingCheck();
+    expect(c.check(`"${QUOTE}" for 99% of enterprise users`, sources).verdict).toBe('judge');
   });
 
   it('defers when the quote is not in sources', () => {
@@ -90,18 +128,21 @@ describe('quoteGroundingCheck', () => {
     expect(c.check('"refunds are instant and unconditional for everyone"', sources).verdict).toBe('judge');
   });
 
-  it('defers when the quote is too short or low-coverage', () => {
+  it('defers a too-short quote', () => {
     const c = quoteGroundingCheck();
-    // short quote
-    expect(c.check('"refunds" happen sometimes maybe', sources).verdict).toBe('judge');
-    // real quote buried in a long fabricated claim (coverage < 0.6)
-    const padded = `Because our CEO personally guarantees same-day payouts to every user worldwide regardless of status, and "refunds are processed within 14 business days of approval" only applies to enterprise contracts signed before 2020`;
-    expect(c.check(padded, sources).verdict).toBe('judge');
+    expect(c.check('"refunds"', sources).verdict).toBe('judge');
+  });
+
+  // Fable audit M3 — apostrophes must not be treated as quote delimiters.
+  it('does not manufacture a quote span from apostrophes (audit M3)', () => {
+    const c = quoteGroundingCheck();
+    const claim = `Acme's refunds are processed within 14 business days of approval per policy's terms`;
+    expect(c.check(claim, sources).verdict).toBe('judge');
   });
 
   it('validates options', () => {
     expect(() => quoteGroundingCheck({ minQuoteChars: 0 })).toThrow();
-    expect(() => quoteGroundingCheck({ minCoverage: 1.5 })).toThrow();
+    expect(() => quoteGroundingCheck({ maxResidueChars: -1 })).toThrow();
   });
 });
 
