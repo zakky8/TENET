@@ -215,6 +215,15 @@ export interface DurableRunnerOptions {
 
 export class DurableRunner {
   private readonly now: () => number;
+  /**
+   * Per-runId in-process mutex (Fable audit D2). Serializes run() and
+   * resolveInterrupt() for the same runId so a concurrent double-resolve
+   * can't both pass the "already resolved" check and silently overwrite
+   * an approval decision. NOTE: this is in-process only — running
+   * multiple executors against one runId across processes still needs an
+   * atomic store; that remains out of scope (one executor per runId).
+   */
+  private readonly locks = new Map<string, Promise<void>>();
 
   constructor(
     private readonly journal: JournalStore,
@@ -223,18 +232,57 @@ export class DurableRunner {
     this.now = opts.now ?? (() => Date.now());
   }
 
+  private async withLock<R>(runId: string, op: () => Promise<R>): Promise<R> {
+    const prev = this.locks.get(runId) ?? Promise.resolve();
+    let release!: () => void;
+    const next = new Promise<void>((r) => { release = r; });
+    const chained = prev.then(() => next);
+    this.locks.set(runId, chained);
+    await prev;
+    try {
+      return await op();
+    } finally {
+      release();
+      // Drop the entry if nothing newer is queued behind us (best-effort GC).
+      if (this.locks.get(runId) === chained) this.locks.delete(runId);
+    }
+  }
+
   /**
    * Execute (or resume — same call) a durable run. Re-invoke after a
    * suspension to continue; completed steps replay from the journal.
    */
   async run<T>(runId: string, fn: (ctx: DurableCtx) => Promise<T>): Promise<RunResult<T>> {
     if (!runId) throw new Error('DurableRunner.run: runId required');
+    return this.withLock(runId, () => this.runLocked(runId, fn));
+  }
+
+  private async runLocked<T>(runId: string, fn: (ctx: DurableCtx) => Promise<T>): Promise<RunResult<T>> {
     const entries = await this.journal.load(runId);
     const byName = new Map<string, JournalEntry>();
     for (const e of entries) byName.set(e.name, e);
     const seenThisReplay = new Set<string>();
     const journal = this.journal;
     const now = this.now;
+
+    // Audit D1: track every step/sleep/interrupt promise so that when one
+    // branch of a Promise.all suspends (throws RunSuspended), we can drain
+    // the still-in-flight siblings BEFORE returning — otherwise an
+    // orphaned step appends to the journal after run() returned (duplicate
+    // entries, double execution) or rejects unobserved (unhandled
+    // rejection). track() also swallows the settled rejection so siblings
+    // can't crash the process.
+    const inFlight = new Set<Promise<unknown>>();
+    const track = <S>(p: Promise<S>): Promise<S> => {
+      inFlight.add(p);
+      void p.catch(() => undefined).finally(() => inFlight.delete(p));
+      return p;
+    };
+    const drain = async (): Promise<void> => {
+      while (inFlight.size > 0) {
+        await Promise.allSettled([...inFlight]);
+      }
+    };
 
     const guard = (name: string, kind: EntryKind): JournalEntry | undefined => {
       if (seenThisReplay.has(name)) {
@@ -254,56 +302,73 @@ export class DurableRunner {
 
     const ctx: DurableCtx = {
       runId,
-      async step<S>(name: string, stepFn: () => Promise<S> | S): Promise<S> {
-        const existing = guard(name, 'step');
-        if (existing?.status === 'ok') return JSON.parse(existing.data) as S;
-        const value = await stepFn();
-        const entry: JournalEntry = { name, kind: 'step', status: 'ok', data: JSON.stringify(value ?? null) };
-        await journal.append(runId, entry);
-        byName.set(name, entry);
-        return value;
+      step<S>(name: string, stepFn: () => Promise<S> | S): Promise<S> {
+        return track((async () => {
+          const existing = guard(name, 'step');
+          if (existing?.status === 'ok') return JSON.parse(existing.data) as S;
+          const value = await stepFn();
+          const entry: JournalEntry = { name, kind: 'step', status: 'ok', data: JSON.stringify(value ?? null) };
+          await journal.append(runId, entry);
+          byName.set(name, entry);
+          return value;
+        })());
       },
 
-      async sleep(name: string, ms: number): Promise<void> {
-        if (ms < 0) throw new Error('sleep: ms must be >= 0');
-        const existing = guard(name, 'sleep');
-        if (existing?.status === 'ok') return;
-        if (existing?.status === 'pending') {
-          const { wakeAt } = JSON.parse(existing.data) as { wakeAt: number };
-          if (now() >= wakeAt) {
+      sleep(name: string, ms: number): Promise<void> {
+        return track((async () => {
+          if (!Number.isFinite(ms) || ms < 0) throw new Error('sleep: ms must be a finite number >= 0');
+          const existing = guard(name, 'sleep');
+          if (existing?.status === 'ok') return;
+          if (existing?.status === 'pending') {
+            const { wakeAt } = JSON.parse(existing.data) as { wakeAt: number };
+            if (now() >= wakeAt) {
+              const done: JournalEntry = { name, kind: 'sleep', status: 'ok', data: 'null' };
+              await journal.update(runId, name, done);
+              byName.set(name, done);
+              return;
+            }
+            throw new RunSuspended(runId, 'sleep', name, { wakeAt });
+          }
+          const wakeAt = now() + ms;
+          // Already-due (incl. 0ms): journal as done, don't waste a cycle.
+          if (ms === 0) {
             const done: JournalEntry = { name, kind: 'sleep', status: 'ok', data: 'null' };
-            await journal.update(runId, name, done);
+            await journal.append(runId, done);
             byName.set(name, done);
             return;
           }
+          const entry: JournalEntry = { name, kind: 'sleep', status: 'pending', data: JSON.stringify({ wakeAt }) };
+          await journal.append(runId, entry);
+          byName.set(name, entry);
           throw new RunSuspended(runId, 'sleep', name, { wakeAt });
-        }
-        const wakeAt = now() + ms;
-        const entry: JournalEntry = { name, kind: 'sleep', status: 'pending', data: JSON.stringify({ wakeAt }) };
-        await journal.append(runId, entry);
-        byName.set(name, entry);
-        throw new RunSuspended(runId, 'sleep', name, { wakeAt });
+        })());
       },
 
-      async interrupt<S>(name: string, payload?: unknown): Promise<S> {
-        const existing = guard(name, 'interrupt');
-        if (existing?.status === 'ok') return JSON.parse(existing.data) as S;
-        if (existing?.status === 'pending') {
-          throw new RunSuspended(runId, 'interrupt', name, JSON.parse(existing.data));
-        }
-        const entry: JournalEntry = {
-          name, kind: 'interrupt', status: 'pending', data: JSON.stringify(payload ?? null),
-        };
-        await journal.append(runId, entry);
-        byName.set(name, entry);
-        throw new RunSuspended(runId, 'interrupt', name, payload);
+      interrupt<S>(name: string, payload?: unknown): Promise<S> {
+        return track((async () => {
+          const existing = guard(name, 'interrupt');
+          if (existing?.status === 'ok') return JSON.parse(existing.data) as S;
+          if (existing?.status === 'pending') {
+            throw new RunSuspended(runId, 'interrupt', name, JSON.parse(existing.data));
+          }
+          const entry: JournalEntry = {
+            name, kind: 'interrupt', status: 'pending', data: JSON.stringify(payload ?? null),
+          };
+          await journal.append(runId, entry);
+          byName.set(name, entry);
+          throw new RunSuspended(runId, 'interrupt', name, payload);
+        })());
       },
     };
 
     try {
       const value = await fn(ctx);
+      await drain();
       return { status: 'completed', value };
     } catch (err) {
+      // Drain orphaned siblings so the journal is quiescent before we
+      // report a result (audit D1).
+      await drain();
       if (err instanceof RunSuspended) {
         const result: RunResult<T> = {
           status: 'suspended', reason: err.reason, stepName: err.stepName,
@@ -318,19 +383,23 @@ export class DurableRunner {
 
   /** Supply the value for a pending interrupt; then re-invoke run(). */
   async resolveInterrupt(runId: string, name: string, value: unknown): Promise<void> {
-    const entries = await this.journal.load(runId);
-    const existing = entries.find((e) => e.name === name);
-    if (existing === undefined) {
-      throw new Error(`resolveInterrupt: no interrupt named '${name}' in run '${runId}'`);
-    }
-    if (existing.kind !== 'interrupt') {
-      throw new Error(`resolveInterrupt: '${name}' is a ${existing.kind}, not an interrupt`);
-    }
-    if (existing.status === 'ok') {
-      throw new Error(`resolveInterrupt: '${name}' already resolved`);
-    }
-    await this.journal.update(runId, name, {
-      name, kind: 'interrupt', status: 'ok', data: JSON.stringify(value ?? null),
+    // Audit D2: take the per-runId lock so the load → check → update is
+    // not interleaved with a concurrent resolve or an in-process run().
+    return this.withLock(runId, async () => {
+      const entries = await this.journal.load(runId);
+      const existing = entries.find((e) => e.name === name);
+      if (existing === undefined) {
+        throw new Error(`resolveInterrupt: no interrupt named '${name}' in run '${runId}'`);
+      }
+      if (existing.kind !== 'interrupt') {
+        throw new Error(`resolveInterrupt: '${name}' is a ${existing.kind}, not an interrupt`);
+      }
+      if (existing.status === 'ok') {
+        throw new Error(`resolveInterrupt: '${name}' already resolved`);
+      }
+      await this.journal.update(runId, name, {
+        name, kind: 'interrupt', status: 'ok', data: JSON.stringify(value ?? null),
+      });
     });
   }
 

@@ -169,6 +169,14 @@ export class A2AServer {
         return this.failure(req.id, A2A_ERRORS.INVALID_PARAMS,
           `task '${msg.taskId}' is ${found.status.state}; start a new task`);
       }
+      // Audit S2: reject a second send while a handler is still running
+      // for this task — otherwise the inflight AbortController gets
+      // overwritten (first handler becomes un-cancelable) and both
+      // requests mutate the same live history array.
+      if (found.status.state === 'working' || this.inflight.has(found.id)) {
+        return this.failure(req.id, A2A_ERRORS.INVALID_PARAMS,
+          `task '${msg.taskId}' is already processing a message`);
+      }
       task = found;
     } else {
       task = {
@@ -189,6 +197,13 @@ export class A2AServer {
     this.inflight.set(task.id, ctrl);
     try {
       const reply = await this.handler.handle({ message: userMsg, task, signal: ctrl.signal });
+      // Audit S1: tasks/cancel may have won the race while the handler
+      // was resolving. A canceled (terminal) task must NOT be resurrected
+      // to completed — return the canceled task the canceler already saw.
+      if (ctrl.signal.aborted) {
+        const latest = await this.store.get(task.id);
+        return { jsonrpc: '2.0', id: req.id, result: latest ?? task };
+      }
       const agentMsg: Message = {
         role: 'agent',
         parts: reply.parts,
@@ -207,16 +222,18 @@ export class A2AServer {
       return { jsonrpc: '2.0', id: req.id, result: task };
     } catch (err) {
       const aborted = ctrl.signal.aborted;
-      task.status = {
-        state: aborted ? 'canceled' : 'failed',
-        timestamp: new Date().toISOString(),
-      };
+      if (aborted) {
+        // Cancel path already wrote 'canceled'; don't overwrite it.
+        const latest = await this.store.get(task.id);
+        return { jsonrpc: '2.0', id: req.id, result: latest ?? task };
+      }
+      task.status = { state: 'failed', timestamp: new Date().toISOString() };
       await this.store.put(task);
-      if (aborted) return { jsonrpc: '2.0', id: req.id, result: task };
       return this.failure(req.id, A2A_ERRORS.INTERNAL_ERROR,
         err instanceof Error ? err.message : 'agent error');
     } finally {
-      this.inflight.delete(task.id);
+      // Audit S2: only delete the map entry if it's still ours.
+      if (this.inflight.get(task.id) === ctrl) this.inflight.delete(task.id);
     }
   }
 
@@ -229,9 +246,17 @@ export class A2AServer {
     if (task === undefined) {
       return this.failure(req.id, A2A_ERRORS.TASK_NOT_FOUND, `task '${p.id}' not found`);
     }
-    const result: Task = p.historyLength !== undefined && p.historyLength >= 0
-      ? { ...task, history: task.history.slice(-p.historyLength) }
-      : task;
+    // Audit S3: historyLength must be a real non-negative integer, and
+    // 0 means NO history (slice(-0) === slice(0) returned everything).
+    const hl = p.historyLength;
+    let result: Task = task;
+    if (hl !== undefined) {
+      if (typeof hl !== 'number' || !Number.isInteger(hl) || hl < 0) {
+        return this.failure(req.id, A2A_ERRORS.INVALID_PARAMS,
+          'historyLength must be a non-negative integer');
+      }
+      result = { ...task, history: hl === 0 ? [] : task.history.slice(-hl) };
+    }
     return { jsonrpc: '2.0', id: req.id, result };
   }
 

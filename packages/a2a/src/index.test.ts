@@ -229,3 +229,67 @@ describe('A2AClient — against an in-process server', () => {
     await expect(client.sendText('x', { messageId: 'm' })).rejects.toMatchObject({ code: 503 });
   });
 });
+
+// ── P17 audit regressions ─────────────────────────────────────────────
+
+describe('A2AServer — audit S1/S2/S3 regressions', () => {
+  it('S2: a second message/send to a working task is rejected', async () => {
+    const store = new InMemoryTaskStore();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const handler: A2AAgentHandler = {
+      async handle() { await gate; return { parts: [{ kind: 'text', text: 'ok' }] }; },
+    };
+    const server = new A2AServer({ card: CARD, handler, store });
+    const first = send(server, 'message/send', {
+      message: { role: 'user', parts: [{ kind: 'text', text: 'a' }], messageId: 'm1' },
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    const id = store.list()[0]!.id;
+    const second = JSON.parse(await send(server, 'message/send', {
+      message: { role: 'user', parts: [{ kind: 'text', text: 'b' }], messageId: 'm2', taskId: id },
+    }, 2));
+    expect(second.error.code).toBe(A2A_ERRORS.INVALID_PARAMS);
+    expect(second.error.message).toMatch(/already processing/);
+    release();
+    await first;
+  });
+
+  it('S1: cancel wins the race — a resolving handler cannot resurrect a canceled task', async () => {
+    const store = new InMemoryTaskStore();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const handler: A2AAgentHandler = {
+      async handle() {
+        await gate;
+        // Handler ignores the abort signal and returns successfully.
+        return { parts: [{ kind: 'text', text: 'late success' }] };
+      },
+    };
+    const server = new A2AServer({ card: CARD, handler, store });
+    const sendP = send(server, 'message/send', {
+      message: { role: 'user', parts: [{ kind: 'text', text: 'a' }], messageId: 'm1' },
+    });
+    await new Promise((r) => setTimeout(r, 10));
+    const id = store.list()[0]!.id;
+    const cancel = JSON.parse(await send(server, 'tasks/cancel', { id }, 2));
+    expect((cancel.result as Task).status.state).toBe('canceled');
+    release();
+    const sendRes = JSON.parse(await sendP);
+    // The send response reflects the canceled state, NOT completed.
+    expect((sendRes.result as Task).status.state).toBe('canceled');
+    expect((await store.get(id))!.status.state).toBe('canceled');
+  });
+
+  it('S3: historyLength 0 returns NO history; non-integer rejected', async () => {
+    const server = new A2AServer({ card: CARD, handler: echoHandler });
+    const r1 = JSON.parse(await send(server, 'message/send', {
+      message: { role: 'user', parts: [{ kind: 'text', text: 'x' }], messageId: 'm1' },
+    }));
+    const id = (r1.result as Task).id;
+    const zero = JSON.parse(await send(server, 'tasks/get', { id, historyLength: 0 }, 2));
+    expect((zero.result as Task).history).toEqual([]);
+    const bad = JSON.parse(await send(server, 'tasks/get', { id, historyLength: 1.5 }, 3));
+    expect(bad.error.code).toBe(A2A_ERRORS.INVALID_PARAMS);
+  });
+});

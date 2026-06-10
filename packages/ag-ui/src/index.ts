@@ -254,6 +254,14 @@ export async function* streamChunksToAgUi(
 
   let stopReason: string | undefined;
   let messageOpen = false;
+  // Audit G1: track tool-call state IN THE BRIDGE so malformed upstream
+  // chunks (a stray tool_use_delta with no start, a duplicate start, an
+  // out-of-order end — all routine with real providers) are repaired or
+  // skipped here, instead of making the emitter throw an
+  // AgUiProtocolError that the catch below would mis-classify as a bridge
+  // bug and re-raise as an unhandled rejection. The bridge's contract is:
+  // always RUN_ERROR on bad data, never reject.
+  const openTools = new Set<string>();
   try {
     for await (const chunk of chunks) {
       switch (chunk.kind) {
@@ -269,13 +277,24 @@ export async function* streamChunksToAgUi(
           break;
         }
         case 'tool_use_start':
-          emitter.startToolCall(chunk.id, chunk.name);
+          if (!openTools.has(chunk.id)) {
+            emitter.startToolCall(chunk.id, chunk.name);
+            openTools.add(chunk.id);
+          }
           break;
         case 'tool_use_delta':
+          // Synthesize a start if the provider dropped/reordered it.
+          if (!openTools.has(chunk.id)) {
+            emitter.startToolCall(chunk.id, chunk.id);
+            openTools.add(chunk.id);
+          }
           emitter.toolCallArgs(chunk.id, chunk.partial);
           break;
         case 'tool_use_end':
-          emitter.endToolCall(chunk.id);
+          if (openTools.has(chunk.id)) {
+            emitter.endToolCall(chunk.id);
+            openTools.delete(chunk.id);
+          }
           break;
         case 'usage':
           emitter.custom('tenet.usage', {
@@ -291,8 +310,13 @@ export async function* streamChunksToAgUi(
     emitter.finish(stopReason !== undefined ? { stopReason } : undefined);
     yield* flush();
   } catch (err) {
-    if (err instanceof AgUiProtocolError) throw err;
-    emitter.error(err instanceof Error ? err.message : String(err));
+    // Any error — upstream OR a residual protocol error — becomes a
+    // RUN_ERROR event. The generator never rejects.
+    try {
+      emitter.error(err instanceof Error ? err.message : String(err));
+    } catch {
+      // emitter already finished; nothing more we can emit.
+    }
     yield* flush();
   }
 }

@@ -229,3 +229,41 @@ describe('StateStoreJournal — persistence through a StateStore', () => {
     expect([...store.data.keys()]).toEqual(['custom:r1']);
   });
 });
+
+// ── P17 audit D1/D2 regressions ───────────────────────────────────────
+
+describe('DurableRunner — audit D1 (Promise.all suspension orphans)', () => {
+  it('draining siblings: a step racing an interrupt runs exactly once across replays', async () => {
+    const runner = new DurableRunner(new InMemoryJournalStore());
+    let charges = 0;
+    const fn = async (ctx: DurableCtx): Promise<string> => {
+      const [, approved] = await Promise.all([
+        ctx.step('charge', async () => { charges++; return 'charged'; }),
+        ctx.interrupt<boolean>('approval'),
+      ]);
+      return approved ? 'done' : 'refunded';
+    };
+    const first = await runner.run('r1', fn);
+    expect(first.status).toBe('suspended');
+    await runner.resolveInterrupt('r1', 'approval', true);
+    const second = await runner.run('r1', fn);
+    expect(second).toEqual({ status: 'completed', value: 'done' });
+    expect(charges).toBe(1); // NOT 2 — the orphaned step was drained, not re-run
+  });
+});
+
+describe('DurableRunner — audit D2 (resolveInterrupt TOCTOU)', () => {
+  it('concurrent double-resolve: exactly one wins, the other throws', async () => {
+    const runner = new DurableRunner(new InMemoryJournalStore());
+    const fn = async (ctx: DurableCtx): Promise<boolean> => ctx.interrupt<boolean>('gate');
+    await runner.run('r1', fn);
+    const results = await Promise.allSettled([
+      runner.resolveInterrupt('r1', 'gate', true),
+      runner.resolveInterrupt('r1', 'gate', false),
+    ]);
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1); // the loser hits "already resolved"
+  });
+});

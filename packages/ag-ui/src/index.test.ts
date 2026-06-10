@@ -198,3 +198,39 @@ describe('streamChunksToAgUi — StreamChunk bridge', () => {
     expect(events.map((e) => e.type)).toEqual(['RUN_STARTED', 'RUN_FINISHED']);
   });
 });
+
+// ── P17 audit G1 regression ───────────────────────────────────────────
+
+describe('streamChunksToAgUi — malformed upstream (audit G1)', () => {
+  async function* chunks(list: StreamChunkLike[]): AsyncIterable<StreamChunkLike> {
+    for (const c of list) yield c;
+  }
+  async function drain(it: AsyncIterable<AgUiEvent>): Promise<AgUiEvent[]> {
+    const out: AgUiEvent[] = [];
+    for await (const e of it) out.push(e);
+    return out;
+  }
+
+  it('stray tool_use_delta without a start is repaired, not an unhandled rejection', async () => {
+    const events = await drain(streamChunksToAgUi(chunks([
+      { kind: 'tool_use_delta', id: 'tc1', partial: '{"q":1}' },
+      { kind: 'tool_use_end', id: 'tc1' },
+      { kind: 'message_stop', stopReason: 'tool_use' },
+    ]), IDS));
+    const types = events.map((e) => e.type);
+    expect(types).toContain('TOOL_CALL_START'); // synthesized
+    expect(types).toContain('TOOL_CALL_END');
+    expect(types.at(-1)).toBe('RUN_FINISHED'); // no throw, clean finish
+  });
+
+  it('duplicate tool_use_start is de-duplicated', async () => {
+    const events = await drain(streamChunksToAgUi(chunks([
+      { kind: 'tool_use_start', id: 'tc1', name: 'search' },
+      { kind: 'tool_use_start', id: 'tc1', name: 'search' },
+      { kind: 'tool_use_end', id: 'tc1' },
+      { kind: 'message_stop', stopReason: 'tool_use' },
+    ]), IDS));
+    expect(events.filter((e) => e.type === 'TOOL_CALL_START')).toHaveLength(1);
+    expect(events.at(-1)!.type).toBe('RUN_FINISHED');
+  });
+});
