@@ -2,6 +2,7 @@ import type { Citation, SourcePicker } from '@tenet/core';
 import { extractClaims } from './claimExtractor.js';
 import { defaultSourcePicker } from './defaultSourcePicker.js';
 import { judgeBatched } from './judge.js';
+import { runPreChecks } from './deterministic.js';
 import { effectivePreFilters } from './strategies.js';
 import {
   DEFAULT_VERIFIER_CONFIG,
@@ -43,10 +44,10 @@ export async function verifyDraft(
   const claimPasses = (claim: string): boolean =>
     preFilters.some((f) => f.passesWithoutJudging(claim));
   const urlClaims: string[] = [];
-  const claimsToJudge: string[] = [];
+  const afterFilters: string[] = [];
   for (const c of allClaims) {
     if (claimPasses(c)) urlClaims.push(c);
-    else claimsToJudge.push(c);
+    else afterFilters.push(c);
   }
   const urlVerdicts: ClaimVerdict[] = urlClaims.map((claim) => ({
     claim,
@@ -54,12 +55,33 @@ export async function verifyDraft(
     reason: '',
   }));
 
+  // Deterministic pre-check tier (P16): settle claims by string/numeric
+  // evidence before spending judge calls. 'fail' here is FINAL — the
+  // permissive judge never sees it (a fabricated number is hard
+  // evidence, and LLM judges are exactly the layer that misses it).
+  const preChecks = config.claimPreChecks ?? [];
+  const deterministicVerdicts: ClaimVerdict[] = [];
+  const claimsToJudge: string[] = [];
+  for (const claim of afterFilters) {
+    const r = runPreChecks(preChecks, claim, input.sources);
+    if (r.verdict === 'pass') {
+      deterministicVerdicts.push({ claim, supported: true, reason: 'deterministic: verbatim-grounded' });
+    } else if (r.verdict === 'fail') {
+      deterministicVerdicts.push({ claim, supported: false, reason: `deterministic: ${r.reason ?? 'fabrication evidence'}` });
+    } else {
+      claimsToJudge.push(claim);
+    }
+  }
+  const deterministicFails = deterministicVerdicts.filter((v) => !v.supported);
+
   if (claimsToJudge.length === 0) {
+    const merged = [...deterministicVerdicts, ...urlVerdicts];
+    const pass = deterministicFails.length === 0;
     return {
-      pass: true,
-      critique: '',
-      verdicts: urlVerdicts,
-      approvedCitations: buildCitations(input, urlVerdicts),
+      pass,
+      critique: pass ? '' : critiqueFrom(deterministicFails),
+      verdicts: merged,
+      approvedCitations: pass ? buildCitations(input, merged) : [],
     };
   }
 
@@ -74,12 +96,13 @@ export async function verifyDraft(
   const strictFails = strictVerdicts.filter((v) => !v.supported);
 
   if (strictFails.length === 0) {
-    const merged = [...strictVerdicts, ...urlVerdicts];
+    const merged = [...strictVerdicts, ...deterministicVerdicts, ...urlVerdicts];
+    const pass = deterministicFails.length === 0;
     return {
-      pass: true,
-      critique: '',
+      pass,
+      critique: pass ? '' : critiqueFrom(deterministicFails),
       verdicts: merged,
-      approvedCitations: buildCitations(input, merged),
+      approvedCitations: pass ? buildCitations(input, merged) : [],
     };
   }
 
@@ -113,7 +136,7 @@ export async function verifyDraft(
     }
     return strict;
   });
-  merged.push(...urlVerdicts);
+  merged.push(...deterministicVerdicts, ...urlVerdicts);
 
   const stillFailed = merged.filter((v) => !v.supported);
   if (stillFailed.length === 0) {
@@ -125,14 +148,15 @@ export async function verifyDraft(
     };
   }
 
-  const critique =
-    stillFailed.length === 1
-      ? `Unsupported claim: "${stillFailed[0]!.claim}". Either remove it or rewrite using only what's in the knowledge.`
-      : `Unsupported claims: ${stillFailed
-          .map((v) => `"${v.claim}"`)
-          .join('; ')}. Either remove them or rewrite using only what's in the knowledge.`;
+  return { pass: false, critique: critiqueFrom(stillFailed), verdicts: merged, approvedCitations: [] };
+}
 
-  return { pass: false, critique, verdicts: merged, approvedCitations: [] };
+function critiqueFrom(failed: ReadonlyArray<ClaimVerdict>): string {
+  return failed.length === 1
+    ? `Unsupported claim: "${failed[0]!.claim}". Either remove it or rewrite using only what's in the knowledge.`
+    : `Unsupported claims: ${failed
+        .map((v) => `"${v.claim}"`)
+        .join('; ')}. Either remove them or rewrite using only what's in the knowledge.`;
 }
 
 function buildCitations(

@@ -66,6 +66,15 @@ export interface VerifierConfig {
    * app-specific trap patterns.
    */
   judgePromptDecorators?: ReadonlyArray<JudgePromptDecorator>;
+  /**
+   * Deterministic pre-check tier (P16): three-way checks run BEFORE the
+   * LLM judges. 'pass' trusts the claim without judging; 'fail' rejects
+   * it with NO permissive rescue (hard fabrication evidence, e.g. a
+   * number absent from every source); 'judge' defers to the LLM path.
+   * Use defaultPreChecks() for quote-grounding + numeric-fabrication.
+   * Default: none — opt-in, fully backwards compatible.
+   */
+  claimPreChecks?: ReadonlyArray<import('./deterministic.js').ClaimPreCheck>;
 }
 
 export const DEFAULT_VERIFIER_CONFIG: VerifierConfig = {
