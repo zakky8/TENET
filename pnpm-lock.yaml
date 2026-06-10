@@ -109,6 +109,12 @@ importers:
 
   packages/acp: {}
 
+  packages/ag-ui:
+    dependencies:
+      '@tenet/streaming':
+        specifier: workspace:*
+        version: link:../streaming
+
   packages/core: {}
 
   packages/distillation: {}

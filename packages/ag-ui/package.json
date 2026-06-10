@@ -1,0 +1,42 @@
+{
+  "name": "@tenet/ag-ui",
+  "version": "0.0.0",
+  "description": "AG-UI protocol adapter — typed agent↔frontend event stream (RUN_*, TEXT_MESSAGE_*, TOOL_CALL_*, STATE_*), SSE encoder, lifecycle-enforcing emitter, and a bridge from @tenet/streaming StreamChunk so any streaming ChatModel drives an AG-UI frontend.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "dependencies": {
+    "@tenet/streaming": "workspace:*"
+  },
+  "keywords": [
+    "ag-ui",
+    "agent-framework",
+    "agent-ui",
+    "ai",
+    "ai-agents",
+    "generative-ui",
+    "langchain-alternative",
+    "llm",
+    "sse",
+    "streaming",
+    "tenet",
+    "typescript"
+  ]
+}
