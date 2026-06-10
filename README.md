@@ -6,12 +6,12 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node 22+](https://img.shields.io/badge/node-22+-43853d.svg)](.nvmrc)
 [![TypeScript Strict](https://img.shields.io/badge/typescript-strict-3178c6.svg)](tsconfig.base.json)
-[![Tests](https://img.shields.io/badge/tests-996%20passing-success)](packages)
+[![Tests](https://img.shields.io/badge/tests-1036%20passing-success)](packages)
 [![BENCHMARKS gated](https://img.shields.io/badge/BENCHMARKS-gated_in_CI-success)](docs/BENCHMARKS.md)
 [![ES2024](https://img.shields.io/badge/target-ES2024-yellow.svg)](tsconfig.base.json)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-purple.svg)](CODE_OF_CONDUCT.md)
 
-> **Status:** 16 shipped phases (P0–P15). **996 tests across 81 suites, all green.** Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming. 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus the OSS gap nobody else fills: **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). Pre-1.0; APIs may change.
+> **Status:** 16 shipped phases (P0–P15). **1036 tests across 83 suites, all green.** Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming. 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus the OSS gap nobody else fills: **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). Pre-1.0; APIs may change.
 
 ---
 
@@ -37,6 +37,8 @@ Web-fetched competitor research surfaced the gap nobody fills:
 | AG-UI streaming frontend protocol | **✅** | ✅ | tbd | ✅ | ✅ | ✗ | maintenance | tbd |
 | Agent harness (compaction · todos · subagents) | **✅** | ✅ Deep Agents | tbd | tbd | tbd | ✅ (2026-04) | maintenance | tbd |
 | Multi-judge verifier | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Deterministic claim pre-checks (numeric fabrication · quote grounding) | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Claim repair loop + best-of-N verifier-ranked | **✅** `@tenet/refine` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Independent hallucination judge (HHEM-2.1) | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | BENCHMARKS gated in CI on every PR | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | WASM sandbox + capability tokens | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
@@ -150,7 +152,7 @@ Method-of-attack per dimension + the honest stub-vs-real target split: [`docs/BE
 |---|---|
 | **Core** | `@tenet/core` · `@tenet/verifier` · `@tenet/policy` · `@tenet/telemetry` · `@tenet/governance` |
 | **Pipeline** | `@tenet/rate-limit` · `@tenet/retrieval` · `@tenet/router` · `@tenet/memory` · `@tenet/guardrails` · `@tenet/memory-adapters` |
-| **Execution** | `@tenet/durable` (step-level replay + interrupt() HITL) · `@tenet/workflow` · `@tenet/harness` (compaction · todos · subagents) |
+| **Execution** | `@tenet/durable` (step-level replay + interrupt() HITL) · `@tenet/workflow` · `@tenet/harness` (compaction · todos · subagents) · `@tenet/refine` (boundary gate · repair loop · best-of-N · self-consistency) |
 | **Interop** | `@tenet/a2a` (A2A v1 server + client) · `@tenet/ag-ui` · `@tenet/acp` · `@tenet/streaming` · `@tenet/tool-call-repair` · `@tenet/net-policy` |
 | **Surfaces** | `@tenet/surface-telegram` · `@tenet/surface-discord` · `@tenet/surface-slack` · `@tenet/surface-teams` · `@tenet/surface-web-widget` · `@tenet/surface-rest` · `@tenet/surface-grpc` · `@tenet/surface-matrix` · `@tenet/surface-twilio` |
 | **Connectors** | `@tenet/connectors-ticketing` (Zendesk · Intercom · Freshdesk · ServiceNow) |
@@ -206,7 +208,7 @@ identical composition runs against a real model. Then:
 
 ```bash
 pnpm typecheck              # builds all packages in topological order
-pnpm test                   # 996 tests across 81 suites
+pnpm test                   # 1036 tests across 83 suites
 pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL)
 ```
 

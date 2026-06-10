@@ -10,7 +10,7 @@
 
 import type { Source } from '@tenet/core';
 import { Bm25Index } from '@tenet/retrieval';
-import { verifyDraft, type ChatModel } from '@tenet/verifier';
+import { defaultPreChecks, verifyDraft, type ChatModel } from '@tenet/verifier';
 
 // ── Bundled knowledge base (the agent answers questions about TENET) ──
 
@@ -132,11 +132,13 @@ export class QuickstartAgent {
     });
 
     // 3. Verify every atomic claim in the draft against the sources.
+    // The deterministic tier (P16) settles verbatim quotes and
+    // fabricated numbers before any LLM judge call.
     const verdict = await verifyDraft(this.model, {
       sources: knowledge,
       sourceRecords: sources,
       draft,
-    });
+    }, { claimPreChecks: defaultPreChecks() });
 
     if (!verdict.pass) {
       return { answer: ABSTAIN_REPLY, verified: false, citations: [], abstained: true };
