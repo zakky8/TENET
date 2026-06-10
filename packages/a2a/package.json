@@ -1,0 +1,39 @@
+{
+  "name": "@tenet/a2a",
+  "version": "0.0.0",
+  "description": "Agent2Agent (A2A) protocol v1 adapter — AgentCard, task lifecycle, JSON-RPC message/send + tasks/get + tasks/cancel. Server side exposes a TENET agent to the A2A ecosystem; client side calls remote A2A agents. Transport-injected, no SDK dep.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "keywords": [
+    "a2a",
+    "a2a-protocol",
+    "agent-framework",
+    "agent-interop",
+    "agent2agent",
+    "ai",
+    "ai-agents",
+    "json-rpc",
+    "langchain-alternative",
+    "llm",
+    "tenet",
+    "typescript"
+  ]
+}
