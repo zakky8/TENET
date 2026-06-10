@@ -1,7 +1,7 @@
 {
-  "name": "@tenet/models-bedrock",
+  "name": "@tenet/stores-state-postgres",
   "version": "0.0.0",
-  "description": "AWS Bedrock ChatModel adapter (Anthropic Claude family). Accepts an injected invoker so callers wire their own AWS SDK or gateway.",
+  "description": "Conversation-state store on PostgreSQL — single-table KV with TTL, atomic INCR, and prefix support. Injected client (pg / postgres.js / Neon), no driver hard dep.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,19 +22,15 @@
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
   },
-  "dependencies": {
-    "@tenet/streaming": "workspace:*"
-  },
   "keywords": [
     "agent-framework",
     "ai",
     "ai-agents",
-    "anthropic",
-    "aws-bedrock",
-    "chat-model",
-    "claude",
     "langchain-alternative",
     "llm",
+    "postgres",
+    "postgresql",
+    "state-store",
     "tenet",
     "typescript"
   ]

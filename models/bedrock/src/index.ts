@@ -24,6 +24,30 @@ export interface BedrockInvoker {
   }): Promise<{ body: string }>;
 }
 
+/**
+ * Streaming Bedrock invoker — wire to InvokeModelWithResponseStream.
+ * Each yielded item is ONE decoded event payload: the UTF-8 string (or
+ * raw bytes) of `chunk.bytes` from the AWS eventstream. With the AWS
+ * SDK that wiring is:
+ *
+ *   async *invokeModelWithResponseStream(args) {
+ *     const res = await client.send(new InvokeModelWithResponseStreamCommand({
+ *       modelId: args.modelId, body: args.body,
+ *       contentType: 'application/json', accept: 'application/json',
+ *     }), { abortSignal: args.signal });
+ *     for await (const ev of res.body!) {
+ *       if (ev.chunk?.bytes) yield ev.chunk.bytes;
+ *     }
+ *   }
+ */
+export interface BedrockStreamInvoker {
+  invokeModelWithResponseStream(args: {
+    modelId: string;
+    body: string;
+    signal?: AbortSignal;
+  }): AsyncIterable<Uint8Array | string>;
+}
+
 /** Verifier-compatible ChatModel. Imported as type-only to avoid a hard dep. */
 export interface ChatModel {
   chat(args: {
@@ -41,6 +65,11 @@ export interface AnthropicOnBedrockOptions {
   anthropicVersion?: string;
   /** Sampling temperature 0..1. Default 0.2 (verifier-friendly). */
   temperature?: number;
+  /**
+   * Optional streaming invoker. When provided, chatStream() is
+   * available; without it chatStream() throws with a wiring hint.
+   */
+  streamInvoker?: BedrockStreamInvoker;
 }
 
 /** Bedrock ChatModel for Anthropic Claude family. */
@@ -48,6 +77,7 @@ export class AnthropicOnBedrockChatModel implements ChatModel {
   private readonly modelId: string;
   private readonly anthropicVersion: string;
   private readonly temperature: number;
+  private readonly streamInvoker: BedrockStreamInvoker | undefined;
 
   constructor(
     private readonly invoker: BedrockInvoker,
@@ -59,6 +89,7 @@ export class AnthropicOnBedrockChatModel implements ChatModel {
     const t = opts.temperature ?? 0.2;
     if (t < 0 || t > 1) throw new Error('temperature must be in [0,1]');
     this.temperature = t;
+    this.streamInvoker = opts.streamInvoker;
   }
 
   async chat(args: {
@@ -85,6 +116,74 @@ export class AnthropicOnBedrockChatModel implements ChatModel {
     });
 
     return this.parseResponse(res.body);
+  }
+
+  /**
+   * Streaming chat via InvokeModelWithResponseStream. Bedrock's
+   * eventstream carries Anthropic-shaped events in each chunk's bytes
+   * (message_start, content_block_delta, message_delta, message_stop).
+   * Requires opts.streamInvoker; throws a wiring hint otherwise.
+   */
+  async *chatStream(args: {
+    system: string;
+    user: string;
+    maxTokens: number;
+    signal?: AbortSignal;
+  }): AsyncIterable<import('@tenet/streaming').StreamChunk> {
+    if (this.streamInvoker === undefined) {
+      throw new Error(
+        'AnthropicOnBedrockChatModel.chatStream: no streamInvoker wired. ' +
+        'Pass opts.streamInvoker (InvokeModelWithResponseStream) to enable streaming.',
+      );
+    }
+    if (args.maxTokens <= 0) throw new Error('maxTokens must be > 0');
+
+    const body = JSON.stringify({
+      anthropic_version: this.anthropicVersion,
+      max_tokens: args.maxTokens,
+      temperature: this.temperature,
+      system: args.system,
+      messages: [{ role: 'user', content: args.user }],
+    });
+
+    const decoder = new TextDecoder();
+    let inputTokens = 0;
+    const iter = this.streamInvoker.invokeModelWithResponseStream({
+      modelId: this.modelId,
+      body,
+      ...(args.signal !== undefined ? { signal: args.signal } : {}),
+    });
+
+    for await (const raw of iter) {
+      if (args.signal?.aborted) throw new Error('Bedrock stream aborted');
+      const text = typeof raw === 'string' ? raw : decoder.decode(raw);
+      let ev: unknown;
+      try { ev = JSON.parse(text); } catch { continue; } // tolerate partial frames
+      if (ev === null || typeof ev !== 'object') continue;
+      const type = (ev as { type?: unknown }).type;
+
+      if (type === 'message_start') {
+        const usage = (ev as { message?: { usage?: { input_tokens?: unknown } } }).message?.usage;
+        if (typeof usage?.input_tokens === 'number') inputTokens = usage.input_tokens;
+      } else if (type === 'content_block_delta') {
+        const delta = (ev as { delta?: { type?: unknown; text?: unknown } }).delta;
+        if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+          yield { kind: 'text', text: delta.text };
+        }
+      } else if (type === 'message_delta') {
+        const usage = (ev as { usage?: { output_tokens?: unknown } }).usage;
+        if (typeof usage?.output_tokens === 'number') {
+          yield { kind: 'usage', inputTokens, outputTokens: usage.output_tokens };
+        }
+        const stop = (ev as { delta?: { stop_reason?: unknown } }).delta?.stop_reason;
+        if (typeof stop === 'string') {
+          yield { kind: 'message_stop', stopReason: stop };
+        }
+      } else if (type === 'message_stop') {
+        // Bedrock emits a final message_stop with invocation metrics;
+        // stop_reason already surfaced via message_delta above.
+      }
+    }
   }
 
   /**

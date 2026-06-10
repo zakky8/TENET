@@ -75,7 +75,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/streaming
 
-  models/bedrock: {}
+  models/bedrock:
+    dependencies:
+      '@tenet/streaming':
+        specifier: workspace:*
+        version: link:../../packages/streaming
 
   models/google:
     dependencies:
@@ -203,6 +207,8 @@ importers:
         version: link:../voice
 
   packages/workflow: {}
+
+  stores/state/postgres: {}
 
   stores/state/redis: {}
 

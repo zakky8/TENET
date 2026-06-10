@@ -109,3 +109,105 @@ describe('AnthropicOnBedrockChatModel — response parsing', () => {
     );
   });
 });
+
+// ── chatStream (P15.1 — closing the falsely-claimed P8 gap) ───────────
+
+import type { BedrockStreamInvoker } from './index.js';
+
+function streamInvoker(events: string[]): BedrockStreamInvoker {
+  return {
+    async *invokeModelWithResponseStream() {
+      for (const e of events) yield e;
+    },
+  };
+}
+
+const STREAM_EVENTS = [
+  JSON.stringify({ type: 'message_start', message: { usage: { input_tokens: 12 } } }),
+  JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello ' } }),
+  JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'world' } }),
+  JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 5 } }),
+  JSON.stringify({ type: 'message_stop' }),
+];
+
+describe('AnthropicOnBedrockChatModel — chatStream', () => {
+  it('throws a wiring hint when no streamInvoker provided', async () => {
+    const model = new AnthropicOnBedrockChatModel(mockInvoker(VALID_RESPONSE), { modelId: 'm' });
+    const iter = model.chatStream({ system: '', user: 'q', maxTokens: 10 });
+    await expect(iter[Symbol.asyncIterator]().next()).rejects.toThrow(/streamInvoker/);
+  });
+
+  it('maps eventstream chunks to StreamChunk text + usage + stop', async () => {
+    const model = new AnthropicOnBedrockChatModel(mockInvoker(VALID_RESPONSE), {
+      modelId: 'm',
+      streamInvoker: streamInvoker(STREAM_EVENTS),
+    });
+    const chunks = [];
+    for await (const c of model.chatStream({ system: 's', user: 'q', maxTokens: 100 })) {
+      chunks.push(c);
+    }
+    expect(chunks).toEqual([
+      { kind: 'text', text: 'Hello ' },
+      { kind: 'text', text: 'world' },
+      { kind: 'usage', inputTokens: 12, outputTokens: 5 },
+      { kind: 'message_stop', stopReason: 'end_turn' },
+    ]);
+  });
+
+  it('accepts Uint8Array frames (raw chunk.bytes)', async () => {
+    const enc = new TextEncoder();
+    const inv: BedrockStreamInvoker = {
+      async *invokeModelWithResponseStream() {
+        yield enc.encode(JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'bytes ok' } }));
+      },
+    };
+    const model = new AnthropicOnBedrockChatModel(mockInvoker(VALID_RESPONSE), {
+      modelId: 'm', streamInvoker: inv,
+    });
+    const chunks = [];
+    for await (const c of model.chatStream({ system: '', user: 'q', maxTokens: 10 })) chunks.push(c);
+    expect(chunks).toEqual([{ kind: 'text', text: 'bytes ok' }]);
+  });
+
+  it('tolerates malformed frames without dying', async () => {
+    const model = new AnthropicOnBedrockChatModel(mockInvoker(VALID_RESPONSE), {
+      modelId: 'm',
+      streamInvoker: streamInvoker(['{{not json', ...STREAM_EVENTS.slice(1, 3)]),
+    });
+    const chunks = [];
+    for await (const c of model.chatStream({ system: '', user: 'q', maxTokens: 10 })) chunks.push(c);
+    expect(chunks).toEqual([
+      { kind: 'text', text: 'Hello ' },
+      { kind: 'text', text: 'world' },
+    ]);
+  });
+
+  it('rejects maxTokens <= 0', async () => {
+    const model = new AnthropicOnBedrockChatModel(mockInvoker(VALID_RESPONSE), {
+      modelId: 'm', streamInvoker: streamInvoker([]),
+    });
+    const iter = model.chatStream({ system: '', user: 'q', maxTokens: 0 });
+    await expect(iter[Symbol.asyncIterator]().next()).rejects.toThrow(/maxTokens/);
+  });
+
+  it('aborts mid-stream on signal', async () => {
+    const ctrl = new AbortController();
+    const inv: BedrockStreamInvoker = {
+      async *invokeModelWithResponseStream() {
+        yield JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'first' } });
+        ctrl.abort();
+        yield JSON.stringify({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'second' } });
+      },
+    };
+    const model = new AnthropicOnBedrockChatModel(mockInvoker(VALID_RESPONSE), {
+      modelId: 'm', streamInvoker: inv,
+    });
+    const seen: string[] = [];
+    await expect((async () => {
+      for await (const c of model.chatStream({ system: '', user: 'q', maxTokens: 10, signal: ctrl.signal })) {
+        if (c.kind === 'text') seen.push(c.text);
+      }
+    })()).rejects.toThrow(/aborted/);
+    expect(seen).toEqual(['first']);
+  });
+});
