@@ -99,6 +99,18 @@ Web-verified research (LangChain, AutoGen, CrewAI, LlamaIndex, Semantic Kernel, 
 - `@tenet/governance` — `PolicyEvaluator` + `ApprovalGate` + `AuditSink`. Idempotent approval keys; 6 typed audit event kinds; 4 built-in rule factories.
 - `@tenet/memory` consistency layer — fixes mem0 indexing-reliability + Zep read-after-write bug class. `mintToken` / `WriteAck.readableAtMs` / `waitUntilReadable` / `resolveConflict`.
 
+## Phases 7–14 — Breadth + protocols + security (DONE)
+Shipped 2026-06-04: Gemini/Mistral/Ollama adapters, Bedrock + Anthropic streaming, OTLP wiring, voice surface (@tenet/voice + OpenAI Realtime + Twilio Media Streams), SKILL.md loader, Matrix surface, Dockerfile + health endpoints + pre-commit, @tenet/tool-call-repair + @tenet/net-policy, @tenet/acp (Agent Client Protocol), and a 23-finding vuln-test triage (44 bugs caught cumulatively across three adversarial review passes).
+
+## Phase 15 — Top-0.01% market gaps (DONE, 2026-06-10)
+Fresh A-to-Z audit (3 parallel reviewers) + live June-2026 market research identified the three TypeScript open lanes; all shipped:
+- `@tenet/durable` — step-level durable execution: name-keyed journal replay, `interrupt()` HITL surviving process restarts, durable sleep, `StateStoreJournal` over Redis/Postgres.
+- `@tenet/a2a` — Agent2Agent v1 server + client (Linux Foundation spec; ADK/CrewAI/MS-AF interop).
+- `@tenet/ag-ui` — AG-UI event protocol + `streamChunksToAgUi` bridge from all 6 streaming model adapters.
+- `@tenet/harness` — context compaction + todo ledger + bounded-concurrency subagents + handoff.
+- `apps/quickstart` — `pnpm quickstart` zero-key REPL through the full retrieve→draft→verify pipeline.
+- Truth restoration: Bedrock streaming actually shipped (task #83 had claimed it falsely), `stores/state/postgres` filled (was an empty dir), empty `surfaces/webhook` removed, README counts reconciled (996 tests / 81 suites).
+
 ---
 
 ## Deferred from adversarial review — ALL LANDED
