@@ -1,0 +1,38 @@
+{
+  "name": "@tenet/harness",
+  "version": "0.0.0",
+  "description": "Agent harness layer — token-budget context compaction (summarize-over-budget with verbatim recent window), durable todo ledger, and bounded-concurrency subagent primitives with error isolation. The long-horizon layer above the tool loop.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "keywords": [
+    "agent-framework",
+    "agent-harness",
+    "ai",
+    "ai-agents",
+    "context-compaction",
+    "langchain-alternative",
+    "llm",
+    "long-horizon",
+    "subagents",
+    "tenet",
+    "typescript"
+  ]
+}
