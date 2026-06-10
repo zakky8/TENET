@@ -51,6 +51,21 @@ importers:
         specifier: workspace:*
         version: link:../../models/anthropic
 
+  apps/quickstart:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@tenet/models-anthropic':
+        specifier: workspace:*
+        version: link:../../models/anthropic
+      '@tenet/retrieval':
+        specifier: workspace:*
+        version: link:../../packages/retrieval
+      '@tenet/verifier':
+        specifier: workspace:*
+        version: link:../../packages/verifier
+
   connectors/ticketing: {}
 
   eval/harness: {}

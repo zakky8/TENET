@@ -22,6 +22,7 @@
     "lint": "pnpm -r lint",
     "benchmarks": "node eval/measure/dist/cli.js",
     "benchmarks:json": "node eval/measure/dist/cli.js --json",
+    "quickstart": "pnpm -r build && node apps/quickstart/dist/main.js",
     "audit": "pnpm audit --prod --audit-level high",
     "clean": "pnpm -r exec rimraf dist .turbo node_modules"
   },

@@ -1,0 +1,23 @@
+{
+  "name": "@tenet/app-quickstart",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Your first TENET agent in 5 minutes — runnable REPL with zero API keys (deterministic stub model) or ANTHROPIC_API_KEY for the real thing. Composes retrieval + draft + verification end to end.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "start": "node dist/main.js",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "dependencies": {
+    "@tenet/core": "workspace:*",
+    "@tenet/models-anthropic": "workspace:*",
+    "@tenet/retrieval": "workspace:*",
+    "@tenet/verifier": "workspace:*"
+  }
+}
