@@ -6,12 +6,12 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node 22+](https://img.shields.io/badge/node-22+-43853d.svg)](.nvmrc)
 [![TypeScript Strict](https://img.shields.io/badge/typescript-strict-3178c6.svg)](tsconfig.base.json)
-[![Tests](https://img.shields.io/badge/tests-1036%20passing-success)](packages)
+[![Tests](https://img.shields.io/badge/tests-1117%20passing-success)](packages)
 [![BENCHMARKS gated](https://img.shields.io/badge/BENCHMARKS-gated_in_CI-success)](docs/BENCHMARKS.md)
 [![ES2024](https://img.shields.io/badge/target-ES2024-yellow.svg)](tsconfig.base.json)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-purple.svg)](CODE_OF_CONDUCT.md)
 
-> **Status:** 16 shipped phases (P0–P15). **1036 tests across 83 suites, all green.** Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming. 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus the OSS gap nobody else fills: **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). Pre-1.0; APIs may change.
+> **Status:** **1117 tests across 85 suites, all green** (62 workspace packages). Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming, all on ONE canonical `ChatModel` contract (messages-array + required `AbortSignal` + tool round-trips; `@tenet/core/model.ts`). 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). The end-to-end orchestrator (`@tenet/agent`) is **in progress**: it ships the turn type contract + a fail-closed decides-and-drafts Reasoner (grounded-or-abstain); the `runAgent` workflow graph is the next increment. Pre-1.0; APIs may change.
 
 ---
 
@@ -19,13 +19,9 @@
 
 This is a *framework*, not a model. It does not train, fine-tune, or distill a frontier LLM. Nothing here "beats" Claude / GPT / Gemini at language tasks — it *calls* them. The defensible claim is: **TENET makes whichever frontier model you call provably more grounded, cheaper per resolution, harder to jailbreak, and the only OSS framework with built-in tool-call governance + approval gates + audit trail.** That is a systems claim, and it is measurable. The BENCHMARKS gate runs every PR; numbers are produced, not asserted.
 
-## Why this beats every OSS competitor (verified June 2026)
+## Where TENET focuses
 
-Web-fetched competitor research surfaced the gap nobody fills:
-
-> *"None evaluates a tool call against a policy before it executes, none requires approval gates by default, none ships a structured audit trail without custom integration."* — Comparison of LangChain, LlamaIndex, Semantic Kernel agent frameworks (2026)
-
-`@tenet/governance` ships all three: per-tool policy rules with deny/allow/require_approval, idempotent approval gate with cache, AuditSink emitting policy.allow / policy.deny / policy.require_approval / approval.decision / tool.invoked / override events. Plus we ship the things competitors miss individually:
+The differentiator is pre-tool-call governance. `@tenet/governance` ships three things together: per-tool policy rules with deny/allow/require_approval, an idempotent approval gate with cache, and an AuditSink emitting policy.allow / policy.deny / policy.require_approval / approval.decision / tool.invoked / override events. The table below maps capabilities against other OSS frameworks; treat competitor cells as a starting point for your own verification, not as audited claims.
 
 | Capability | TENET | LangChain | Mastra | CrewAI | Pydantic-AI | OpenAI Agents | AutoGen | LlamaIndex |
 |---|---|---|---|---|---|---|---|---|
@@ -46,7 +42,6 @@ Web-fetched competitor research surfaced the gap nobody fills:
 | Streaming (token + structured) | **✅** | partial | ✅ | partial | ✅ | ✅ | ✗ | ✗ |
 | Workflow DAG | **✅** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | partial |
 | Multi-surface (10) one config | **✅** | ✗ | partial | ✗ | ✗ | ✗ | ✗ | ✗ |
-| 2025-2026 high-severity CVEs | **0** | **3** | tbd | tbd | tbd | tbd | maintenance mode | tbd |
 | On-prem Helm with security defaults | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Pricing | free Apache-2.0 | free | free | free | free | free | free | free |
 
@@ -113,7 +108,6 @@ Method-of-attack per dimension + the honest stub-vs-real target split: [`docs/BE
 | WASM-sandboxed tool execution | ✅ shipped (reference + wasmtime adapter) | no | no | no | n/a | n/a |
 | MCP-native tools + OAuth gateway | ✅ shipped | partial | partial | no | no | no |
 | BENCHMARKS rows gated in CI | ✅ every PR | no | no | no | n/a (closed) | n/a (closed) |
-| 2025-2026 high-severity CVEs | **0** | 3 | tbd | tbd | n/a | n/a |
 | Self-host / on-prem | ✅ Helm chart ships | ✅ | ✅ | ✅ | no | enterprise add-on |
 | TypeScript-native | ✅ | partial | ✅ | python-first | n/a | n/a |
 | Pricing | free (Apache-2.0) | free | free | free | $0.99 / resolution | enterprise quote |
@@ -137,7 +131,7 @@ Method-of-attack per dimension + the honest stub-vs-real target split: [`docs/BE
 
 - **TypeScript** strict + `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`, target **ES2024**
 - **Node 22 LTS** (uses `Promise.withResolvers`, `Object.groupBy`, `Array.toSorted`, `AbortSignal.any`, native WebAssembly)
-- **pnpm workspaces** monorepo (31 workspace projects)
+- **pnpm workspaces** monorepo (62 workspace packages)
 - **OpenTelemetry GenAI** semantic conventions native
 - **Models**: Anthropic-direct · AWS Bedrock · wrappers, never lock-in
 - **Vector stores**: pgvector (≤50M vectors) · Qdrant (multi-tenant, 100M+)
@@ -146,11 +140,12 @@ Method-of-attack per dimension + the honest stub-vs-real target split: [`docs/BE
 - **Hallucination judge**: Vectara HHEM-2.1 (adapter + ONNX wrapper)
 - **WASM runtimes**: Node-22 reference + wasmtime adapter
 
-## What ships today (24 workspace packages, 611 tests)
+## What ships today (62 workspace packages, 1117 tests)
 
 | Area | Packages |
 |---|---|
-| **Core** | `@tenet/core` · `@tenet/verifier` · `@tenet/policy` · `@tenet/telemetry` · `@tenet/governance` |
+| **Core** | `@tenet/core` (canonical `ChatModel` contract) · `@tenet/verifier` · `@tenet/policy` · `@tenet/telemetry` · `@tenet/governance` |
+| **Orchestration** | `@tenet/agent` (in progress — turn type contract + fail-closed Reasoner; `runAgent` graph pending) |
 | **Pipeline** | `@tenet/rate-limit` · `@tenet/retrieval` · `@tenet/router` · `@tenet/memory` · `@tenet/guardrails` · `@tenet/memory-adapters` |
 | **Execution** | `@tenet/durable` (step-level replay + interrupt() HITL) · `@tenet/workflow` · `@tenet/harness` (compaction · todos · subagents) · `@tenet/refine` (boundary gate · repair loop · best-of-N · self-consistency) |
 | **Interop** | `@tenet/a2a` (A2A v1 server + client) · `@tenet/ag-ui` · `@tenet/acp` · `@tenet/streaming` · `@tenet/tool-call-repair` · `@tenet/net-policy` |
@@ -167,7 +162,7 @@ Method-of-attack per dimension + the honest stub-vs-real target split: [`docs/BE
 ## Repo layout
 
 ```
-packages/    core · verifier · policy · telemetry · governance · rate-limit · retrieval ·
+packages/    core · agent · verifier · policy · telemetry · governance · rate-limit · retrieval ·
              router · memory · guardrails · memory-adapters · durable · workflow · harness ·
              a2a · ag-ui · acp · streaming · tool-call-repair · net-policy · skills · voice ·
              voice-openai-realtime · distillation · eval-mining · rerank-cohere · tools-mcp ·
@@ -208,7 +203,7 @@ identical composition runs against a real model. Then:
 
 ```bash
 pnpm typecheck              # builds all packages in topological order
-pnpm test                   # 1036 tests across 83 suites
+pnpm test                   # 1117 tests across 85 suites
 pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL)
 ```
 
@@ -235,16 +230,20 @@ pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL)
 | 2 — Surfaces + adapters | Discord, Slack, web widget, Anthropic-direct, Qdrant, mem0/Letta/Zep, MCP-native | ✅ done |
 | 3 — Enterprise | Teams, REST, gRPC, 4 ticketing connectors, enterprise-support, Helm, MCP gateway, WASM sandbox | ✅ done |
 | 4 — Beat the benchmarks | eval-metrics scorers · eval-measure runner + CI gate · HHEM judge adapter + ONNX wrapper · wasmtime runtime adapter · real-model measure runner · BENCHMARKS measured column | ✅ done |
+| Model-contract unification | ONE canonical `ChatModel` (messages-array + required `AbortSignal` + tool round-trips + lossless `StopReason`) replacing four single-string `chat({system,user})` interfaces; all 6 adapters migrated; 3 provider "abnormal stop" bugs fixed (Anthropic truncation, Mistral `model_length`, Google content-block reasons); `${role}: ${content}` turn-spoof killed in community-bot; legacy migration bridges deleted | ✅ done |
+| End-to-end orchestrator (`@tenet/agent`) | turn type contract (`OrchestratorState`, discriminated `ReasonerOutput`) + fail-closed decides-and-drafts Reasoner (grounded-or-abstain, 33 tests) | 🚧 in progress — `runAgent` graph pending |
 
 ## What's still pending
 
-Honest list. None of these block shipping; each is a real-model leverage rung.
+Honest list.
 
-1. **Real HHEM-2.1 model bytes** — `@tenet/judge-hhem-onnx` wraps any HF / ONNX pipeline; the operator brings the model weights (license / install choice is theirs).
-2. **Real-fetch integration job in CI** — secret-gated workflow that runs `apps/measure-real/examples/anthropic-sonnet.ts` when `ANTHROPIC_API_KEY` is set. Never blocks PRs from forks.
-3. **Self-distillation loop** — BENCHMARKS Dim 2 ("cost < $0.01") depends on weekly LoRA fine-tunes of a cheap-path model on verified flagship traces. Trace capture ships; the fine-tune pipeline does not.
-4. **Auto-grown eval set** — Dim 7 (">1M assertions") needs the assertion-mining + dedup-via-embedding-clustering pipeline. Not shipped.
-5. **PENDING.md Bucket A + D research refresh** — Anthropic SDK feature surface (D1), MCP spec changelog (D2), reranker head-to-head (D6), closed-tool architecture (A1), vector-store cost-perf at 1B (A2).
+1. **`runAgent` orchestrator graph** — `@tenet/agent` ships the turn type contract + the fail-closed Reasoner (`packages/agent/src/reasoner.ts`), but the workflow graph that drives `AgentState` end-to-end (deterministic pre-handlers → retrieve → reasoner → fail-closed verify → critique-retry → emit/abstain/handoff) is the next increment. The orchestrator is **not** finished.
+2. **Verifier fail-closed changes** — moving the verifier's own path to fail-closed is a later phase.
+3. **Real HHEM-2.1 model bytes** — `@tenet/judge-hhem-onnx` wraps any HF / ONNX pipeline; the operator brings the model weights (license / install choice is theirs).
+4. **Real-fetch integration job in CI** — secret-gated workflow that runs `apps/measure-real/examples/anthropic-sonnet.ts` when `ANTHROPIC_API_KEY` is set. Never blocks PRs from forks.
+5. **Self-distillation loop** — BENCHMARKS Dim 2 ("cost < $0.01") depends on weekly LoRA fine-tunes of a cheap-path model on verified flagship traces. Trace capture ships; the fine-tune pipeline does not.
+6. **Auto-grown eval set** — Dim 7 (">1M assertions") needs the assertion-mining + dedup-via-embedding-clustering pipeline. Not shipped.
+7. **PENDING.md Bucket A + D research refresh** — Anthropic SDK feature surface (D1), MCP spec changelog (D2), reranker head-to-head (D6), closed-tool architecture (A1), vector-store cost-perf at 1B (A2).
 
 ## Contributing
 

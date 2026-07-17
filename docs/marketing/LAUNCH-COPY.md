@@ -25,10 +25,9 @@ Show HN: TENET – TypeScript agent framework with BENCHMARKS gated in CI
 **First comment** (post within 5 minutes):
 
 ```
-Author here. After watching LangChain ship three high-sev CVEs in six months
-(CVE-2026-34070 path traversal, CVE-2025-68664 deserialization leaking
-env-secrets, CVE-2025-67644 SQLi in LangGraph) I wanted a framework where
-the safety side was the default, not opt-in. Three things I'd point at:
+Author here. I wanted a framework where the safety side was the default,
+not opt-in — sandboxed tools, a pre-tool-call policy check, and a redacting
+audit sink you get without wiring anything up. Three things I'd point at:
 
 1. BENCHMARKS gated in CI. `pnpm benchmarks` runs 11 measured dimensions
    (hallucination, cost, TTFT p95, e2e p95, tool-call success, prompt-
@@ -43,8 +42,8 @@ the safety side was the default, not opt-in. Three things I'd point at:
    "none evaluates a tool call against a policy before it executes, none
    requires approval gates by default, none ships a structured audit
    trail without custom integration." TENET ships all three with a
-   redacting AuditSink default so secrets in tool args don't leak to
-   S3/SIEM sinks.
+   redacting audit sink (allow-list redactor) so secrets in tool args
+   don't leak to S3/SIEM sinks.
 
 3. The verification stack. Atomic-claim multi-judge verifier + a Vectara
    HHEM-2.1 adapter so the headline hallucination row isn't self-judging
@@ -52,10 +51,10 @@ the safety side was the default, not opt-in. Three things I'd point at:
    adapter for production). MCP OAuth gateway with RFC 9207 iss
    validation per the 2026-07-28 spec RC.
 
-10 surfaces (Discord/Slack/Telegram/Teams/web/REST/gRPC/Zendesk/Intercom/
-Freshdesk/ServiceNow), 6 model adapters (Anthropic, Bedrock, OpenAI,
-Google, Mistral, Ollama). 766 tests across 67 suites. 0 high-severity
-CVEs. Apache-2.0.
+9 channel surfaces (Discord/Slack/Telegram/Teams/Matrix/Twilio/web/REST/
+gRPC) + 4 ticketing connectors (Zendesk/Intercom/Freshdesk/ServiceNow),
+6 model adapters (Anthropic, Bedrock, OpenAI, Google, Mistral, Ollama).
+1117 tests across 85 suites, all green. Apache-2.0.
 
 Things I cut from the headline that someone will ask about:
 - It's a framework, not a model. It calls Claude/GPT/Gemini, it doesn't
@@ -67,7 +66,10 @@ Things I cut from the headline that someone will ask about:
   is compute infra (Modal/RunPod), not framework.
 
 Happy to answer questions about the BENCHMARKS gate design or the
-adversarial-review pattern that's caught 20 real bugs across two passes.
+adversarial-review pattern behind the recent canonical-contract migration
+— which caught three provider "abnormal stop" bugs in the model adapters
+(truncation and content-block refusals that had been reported as clean
+completions).
 ```
 
 ---
@@ -85,7 +87,7 @@ adversarial-review pattern that's caught 20 real bugs across two passes.
 **Body**:
 
 ```
-GitHub: https://github.com/zakky/TENET
+GitHub: https://github.com/zakky8/TENET
 
 TL;DR — I shipped a TypeScript agent framework where every BENCHMARKS row
 (hallucination rate, cost/resolution, TTFT p95, e2e p95, tool-call
@@ -97,21 +99,22 @@ BeIR shapes); a separate real-model harness (`@tenet/app-measure-real`)
 runs locally with operator keys against a checked-in public-shape slice
 or any swap-in dataset.
 
-What's measurably different from LangChain / Mastra / OpenAI Agents:
-- Multi-judge atomic-claim verifier (only OSS framework that ships one)
-- Vectara HHEM-2.1 hallucination judge adapter (no other OSS framework
-  ships independent hallucination judging)
+What's in the box (differentiators we built for — check them against
+whatever you're comparing to):
+- Multi-judge atomic-claim verifier (@tenet/verifier)
+- Vectara HHEM-2.1 hallucination judge adapter (@tenet/judge-hhem) —
+  independent hallucination judging, not self-judging LLM-as-judge
 - Pre-tool-call governance + approval gates + structured audit trail
-  (confirmed gap nobody else fills, per 2026 framework comparison)
+  (@tenet/governance: PolicyEvaluator, ApprovalGate, redacting AuditSink)
 - WASM tool sandbox with capability tokens + production wasmtime adapter
 - MCP OAuth gateway with RFC 9207 iss validation
-- 10 surfaces in one config (Discord/Slack/Telegram/Teams/web/REST/gRPC
-  + Zendesk/Intercom/Freshdesk/ServiceNow ticketing)
-- 0 high-severity CVEs (LangChain has 3 from the Mar-2026 disclosure)
+- 9 channel surfaces + 4 ticketing connectors in one config
+  (Discord/Slack/Telegram/Teams/Matrix/Twilio/web/REST/gRPC
+  + Zendesk/Intercom/Freshdesk/ServiceNow)
 
 Stack: TypeScript strict + exactOptionalPropertyTypes + ES2024 target,
 Node 22 LTS, pnpm workspaces, Jest, no SDK lock-in (every provider
-fetch-injected). 766 tests across 67 suites. Apache-2.0.
+fetch-injected). 1117 tests across 85 suites. Apache-2.0.
 
 The repo also ships @tenet/distillation (verified flagship trace capture
 → LoRA JSONL emit), @tenet/eval-mining (assertion miner + cosine dedup
@@ -125,8 +128,9 @@ Happy to answer questions on:
 - The atomic-claim verifier internals (CoVe + Reflexion + multi-judge
   consensus + URL allow-list constrained generation)
 - The adversarial-review pattern (3 parallel agents — security /
-  correctness / altitude — caught 14 real bugs in Phase 4-7 packages
-  this past week)
+  correctness / altitude — that surfaced three provider "abnormal stop"
+  bugs during the canonical model-contract migration: truncation and
+  content-block refusals reported as clean completions)
 ```
 
 ---
@@ -148,11 +152,12 @@ contract — same shape as the Anthropic/OpenAI/Bedrock adapters, so the
 verifier and the BENCHMARKS gate don't care which model is behind it.
 
 Why this might matter for LocalLLaMA:
-- 0 high-severity CVEs (vs LangChain's 3 in six months)
+- Safety-by-default posture: sandboxed tools, pre-tool-call policy, and a
+  redacting audit sink are on by default, not opt-in
 - WASM-sandboxed tool execution with capability tokens (operator declares
   networkAllowList / readPaths / envKeys per tool; runtime fails closed)
-- Pre-tool-call governance + approval gates + structured audit (the OSS
-  gap nobody else fills)
+- Pre-tool-call governance + approval gates + structured audit
+  (@tenet/governance, shipped by default)
 - Apache-2.0, Helm chart with security defaults (runAsNonRoot UID 10001,
   readOnlyRootFilesystem, NetworkPolicy)
 
@@ -180,19 +185,17 @@ groundedness, prompt-injection, …) is measured + CI-gated on every PR.
 
 **Tweet 2**:
 ```
-2/ Why this matters: LangChain shipped 3 high-sev CVEs in 6mo
-(CVE-2026-34070 path traversal, CVE-2025-68664 secret leak,
-CVE-2025-67644 SQLi). TENET is hardened-by-construction: 0 CVEs,
-WASM-sandboxed tools, capability tokens, MCP OAuth gateway with iss
-validation per RFC 9207.
+2/ Hardened-by-construction: WASM-sandboxed tools with capability tokens,
+a pre-tool-call policy check + approval gates, a redacting audit sink by
+default, and an MCP OAuth gateway with iss validation per RFC 9207.
 ```
 
 **Tweet 3**:
 ```
-3/ The OSS gap nobody else fills (verified by 2026 framework comparison):
-none of LangChain/LlamaIndex/Semantic Kernel/AutoGen/CrewAI ships
-pre-tool-call policy + approval gates + structured audit. TENET ships
-all three. Default ArgsRedactor so secrets in tool args don't leak.
+3/ The property we built for: pre-tool-call policy + approval gates +
+structured audit, all shipped by default (@tenet/governance). The audit
+sink runs an allow-list redactor, so secrets in tool args don't leak to
+your sink.
 ```
 
 **Tweet 4**:
@@ -200,15 +203,16 @@ all three. Default ArgsRedactor so secrets in tool args don't leak.
 4/ Multi-judge atomic-claim hallucination verifier + Vectara HHEM-2.1
 adapter — no self-judging LLM-as-judge bias on the headline row.
 
-10 surfaces from one config: Discord, Slack, Telegram, Teams, web
-widget, REST, gRPC, Zendesk, Intercom, Freshdesk, ServiceNow.
+9 channel surfaces + 4 ticketing connectors from one config: Discord,
+Slack, Telegram, Teams, Matrix, Twilio, web widget, REST, gRPC + Zendesk,
+Intercom, Freshdesk, ServiceNow.
 ```
 
 **Tweet 5**:
 ```
 5/ 6 model adapters (Anthropic-direct, Bedrock, OpenAI, Google, Mistral,
 Ollama). All fetch-injected, no SDK lock-in. Streaming on every one.
-766 tests, 67 suites, all green. CI runs the BENCHMARKS gate every PR.
+1117 tests, 85 suites, all green. CI runs the BENCHMARKS gate every PR.
 
 github.com/zakky8/TENET
 ```
@@ -237,9 +241,9 @@ sweep over LangChain, LlamaIndex, Semantic Kernel, AutoGen, CrewAI,
 Mastra, Pydantic-AI, OpenAI Agents SDK, mem0, Letta, Zep, and the
 closed enterprise players (Intercom Fin, Decagon, Sierra):
 
-→ The unfilled OSS gap nobody else ships: pre-tool-call governance
-+ approval gates + structured audit trail (with secret-redacting
-default sink).
+→ A property we built for that stays rare in OSS: pre-tool-call
+governance + approval gates + a structured audit trail (with a
+secret-redacting default sink).
 
 → A multi-judge atomic-claim hallucination verifier, with a Vectara
 HHEM-2.1 adapter so the headline hallucination row isn't self-judging
@@ -251,17 +255,18 @@ production wasmtime runtime adapter.
 → A Model Context Protocol OAuth gateway with RFC 9207 issuer
 validation per the 2026-07-28 spec RC.
 
-→ Ten channel surfaces (Discord, Slack, Telegram, Microsoft Teams,
-web widget, REST, gRPC, plus four ticketing connectors: Zendesk,
-Intercom, Freshdesk, ServiceNow) from one configuration.
+→ Nine channel surfaces (Discord, Slack, Telegram, Microsoft Teams,
+Matrix, Twilio, web widget, REST, gRPC) plus four ticketing connectors
+(Zendesk, Intercom, Freshdesk, ServiceNow) from one configuration.
 
 → Six model adapters, all injectable — Anthropic direct, AWS Bedrock,
 OpenAI, Google Gemini, Mistral, Ollama. Streaming everywhere.
 
-→ Zero high-severity CVEs across the 2025-2026 disclosure window
-(LangChain shipped three in the same period).
+→ Security defaults you don't have to wire up: sandboxed tool
+execution, a pre-tool-call policy check, and a redacting audit sink,
+all on by default rather than opt-in.
 
-Apache-2.0. 766 tests across 67 suites. CI green.
+Apache-2.0. 1117 tests across 85 suites. CI green.
 
 Repository: github.com/zakky8/TENET
 ```

@@ -1,6 +1,8 @@
 # Pending — Research + Architecture Triage
 
-**As of:** 2026-06-04 (revised after the "all" sweep). Lists what's queued, why, and how I'd rank it.
+**As of:** 2026-07-18 (revised after the canonical-ChatModel upgrade on `upgrade/top-1pct`). Lists what's queued, why, and how I'd rank it.
+
+> **Upgrade update (2026-07-18).** Phase 1 (canonical `ChatModel` migration) landed and Phase 2 is in progress. B2 and B3 are now RESOLVED (see bucket B); the single-string `ChatModel` schism is resolved by one messages-array contract (`packages/core/src/model.ts`); the model-adapter C-items are done (all 6 adapters exist). The new `@tenet/agent` package ships the orchestrator type contract plus the fail-closed decides-and-drafts Reasoner (`packages/agent/src/types.ts`, `packages/agent/src/reasoner.ts`). B1, B4, B5 remain open. Details inline below.
 
 > **All 26 original rows closed.** See [RESEARCH-PASS-2.md](RESEARCH-PASS-2.md) for buckets A + D (research), [CHANGELOG.md](CHANGELOG.md) for bucket B (5 adversarial fixes) + bucket C (11 MVP packages). This doc is preserved as the historical triage; future open items live in GitHub Issues.
 
@@ -21,33 +23,48 @@ Pass 1 of the deep-research workflow surfaced these as unverified after 3-vote a
 
 ## Bucket B — Adversarial review findings deferred from f88a343
 
-From the 6-agent adversarial pass on the c9c9fb0 implementation. Fix #1, #2, #3, #6, #7, #10 landed. These five remain.
+From the 6-agent adversarial pass on the c9c9fb0 implementation. Fix #1, #2, #3, #6, #7, #10 landed. B2 and B3 were resolved by the 2026-07-18 upgrade; B1, B4, B5 remain.
 
-| # | Finding | File | Severity | Cost to fix |
-|---|---|---|---|---|
-| B1 | `buildCitations` 30-char substring head-match drops citations for paraphrased claims. | `packages/verifier/src/verifier.ts:127` | medium | small — replace with swappable `pickBackingSource(claim, sources)` strategy in `@tenet/core` |
-| B2 | `PathHandle` brand type promises protection but no `openPath()` factory exists — vapor type safety. | `packages/core/src/types.ts:34` | medium-high (false confidence is worse than no type) | medium — ship `@tenet/core` `openPath()` with allow-list root + abs-path rejection, or delete the type |
-| B3 | `ChatModel.chat` lacks `AbortSignal` parameter — zombie HTTP after `withTimeout` reject. | `packages/verifier/src/types.ts:43` | high (real production cost: budget burn + rate-limit exhaustion) | medium — add `signal: AbortSignal` to ChatModel + propagate through `withTimeout` |
-| B4 | `OutcomeEmitter` sink-isolation `try/catch` swallows infinite recursion + all programmer mistakes silently. | `packages/telemetry/src/index.ts:76` | medium (operational opacity) | small — add re-entrancy guard + log swallowed errors at warn (without recursing back through emit) |
-| B5 | `VerifierConfig` bakes app-specific concepts (`allowedUrlPatterns`, `adversarialExamples`) into framework. | `packages/verifier/src/types.ts:28` | medium (architecture / altitude) | medium — replace with pluggable `ClaimPreFilter` + `JudgePromptDecorator` interfaces |
+| # | Status | Finding | File | Severity | Cost to fix |
+|---|---|---|---|---|---|
+| B1 | OPEN | `buildCitations` 30-char substring head-match drops citations for paraphrased claims. | `packages/verifier/src/verifier.ts:127` | medium | small — replace with swappable `pickBackingSource(claim, sources)` strategy in `@tenet/core` |
+| B2 | **RESOLVED** | `PathHandle` brand type now has a sanctioned `openPath()` factory (allow-list root via `configurePathRoot()`, absolute-path + `..`-traversal + root-escape rejection). No longer vapor type safety. | fixed in `packages/core/src/path.ts:58` (`openPath`); brand at `packages/core/src/types.ts:34` | — | done |
+| B3 | **RESOLVED** | The canonical `ChatModel` now takes a **required** `AbortSignal` (`ChatRequest.signal`, non-optional) — its presence is enforced by the type system, so a cancelled turn can release the in-flight call. | fixed in `packages/core/src/model.ts:57` (`readonly signal: AbortSignal`) | — | done |
+| B4 | OPEN | `OutcomeEmitter` sink-isolation `try/catch` swallows infinite recursion + all programmer mistakes silently. | `packages/telemetry/src/index.ts:76` | medium (operational opacity) | small — add re-entrancy guard + log swallowed errors at warn (without recursing back through emit) |
+| B5 | OPEN | `VerifierConfig` bakes app-specific concepts (`allowedUrlPatterns`, `adversarialExamples`) into framework. | `packages/verifier/src/types.ts:28` | medium (architecture / altitude) | medium — replace with pluggable `ClaimPreFilter` + `JudgePromptDecorator` interfaces |
 
 ## Bucket C — MVP packages not yet implemented
 
-Each is in [ROADMAP.md Phase 1](ROADMAP.md). Tracked here for scheduling.
+Each is in [ROADMAP.md Phase 1](ROADMAP.md). All 11 packages landed (see [CHANGELOG.md](CHANGELOG.md)); the model-adapter and community-bot rows below were re-verified against the code by the 2026-07-18 upgrade.
 
-| # | Package | Why it's blocking MVP | Estimated scope |
-|---|---|---|---|
-| C1 | `@tenet/retrieval` | RAG is the heart of grounded answers — no retrieval, no source-grounding to enforce. | large (chunker, contextualizer, BM25 + dense, RRF fusion, rerank, swappable vector-store adapter) |
-| C2 | `@tenet/rate-limit` | Without it any surface adapter has to roll its own; first PR breaks the architecture. | medium (token bucket per (platform, tenant, channel, user), circuit breaker on 401/403 streak) |
-| C3 | `@tenet/router` | Adaptive cost-aware routing is core to the cost-per-resolution 100× target. | medium-large (classifier, semantic answer cache, speculative streaming) |
-| C4 | `@tenet/memory` | Conversation history can use a stub initially; long-term episodic + semantic is phase 2. | medium (episodic + semantic + working interface; adapters can land later) |
-| C5 | `@tenet/guardrails` | PII redaction + input/output filters. Required before any prod traffic. | medium |
-| C6 | `surfaces/telegram` | First reference surface. Proves the adapter pattern. | medium (grammY adapter, formatter, rate-limit policy wiring) |
-| C7 | `models/bedrock` | First model adapter. Implements `ChatModel`. | small-medium |
-| C8 | `stores/vector/pgvector` | First vector store. Implements the swappable interface. | medium |
-| C9 | `stores/state/redis` | Session + cache state. | small |
-| C10 | `apps/community-bot` | First reference deployment. End-to-end MVP gate. | medium (Telegram + Bedrock + pgvector + Redis + community config) |
-| C11 | `eval/harness` | Eval-as-CI requires a runner before any eval-set growth makes sense. | medium-large (golden dataset loader, LLM-as-judge, regression gate) |
+| # | Status | Package | Why it's blocking MVP | Estimated scope |
+|---|---|---|---|---|
+| C1 | landed | `@tenet/retrieval` | RAG is the heart of grounded answers — no retrieval, no source-grounding to enforce. | large (chunker, contextualizer, BM25 + dense, RRF fusion, rerank, swappable vector-store adapter) |
+| C2 | landed | `@tenet/rate-limit` | Without it any surface adapter has to roll its own; first PR breaks the architecture. | medium (token bucket per (platform, tenant, channel, user), circuit breaker on 401/403 streak) |
+| C3 | landed | `@tenet/router` | Adaptive cost-aware routing is core to the cost-per-resolution target. | medium-large (classifier, semantic answer cache, speculative streaming) |
+| C4 | landed | `@tenet/memory` | Conversation history can use a stub initially; long-term episodic + semantic is phase 2. | medium (episodic + semantic + working interface; adapters can land later) |
+| C5 | landed | `@tenet/guardrails` | PII redaction + input/output filters. Required before any prod traffic. | medium |
+| C6 | landed | `surfaces/telegram` | First reference surface. Proves the adapter pattern. | medium (grammY adapter, formatter, rate-limit policy wiring) |
+| C7 | **DONE** | `models/bedrock` | First model adapter. Implements `ChatModel`. | done — all 6 adapters exist (`models/{anthropic,bedrock,google,mistral,ollama,openai}/src/index.ts`), migrated to the canonical `ChatModel` contract. |
+| C8 | landed | `stores/vector/pgvector` | First vector store. Implements the swappable interface. | medium |
+| C9 | landed | `stores/state/redis` | Session + cache state. | small |
+| C10 | **DONE** | `apps/community-bot` | First reference deployment. | `apps/community-bot/src/index.ts` exists and is on the canonical contract; history is now STRUCTURED `ModelMessage`s (`textMessage(m.role, m.content)` at `index.ts:114`), killing the `${role}: ${content}` turn-spoof. End-to-end orchestrator still in progress (see below). |
+| C11 | landed | `eval/harness` | Eval-as-CI requires a runner before any eval-set growth makes sense. | medium-large (golden dataset loader, LLM-as-judge, regression gate) |
+
+## Upgrade status — canonical `ChatModel` (Phase 1) + fail-closed Reasoner (Phase 2)
+
+*(2026-07-18, branch `upgrade/top-1pct`.)*
+
+**Landed:**
+
+- **Phase 1 — one canonical `ChatModel` contract in `@tenet/core`.** A messages array (`ModelMessage[]`), a required `AbortSignal`, tool round-trips (`ContentBlock`: `text` | `tool_use` | `tool_result`), and a lossless `StopReason` union (`packages/core/src/model.ts`). This replaced the duplicated single-string `chat({system, user}): Promise<string>` interfaces — the schism the recon flagged as the root of "no conversation memory." Role structure now reaches the model. All 6 adapters were migrated onto it, and the transitional bridges were deleted (no `fromLegacyModel`/`asLegacyModel`/`LegacySingleStringModel`/`LegacyChatArgs` remain in code — every consumer speaks the canonical contract).
+- **Phase 2 — new `@tenet/agent` package.** Ships the orchestrator TYPE contract (`OrchestratorState extends AgentState`; the discriminated `ReasonerOutput = answer | tool | handoff | abstain`, `packages/agent/src/types.ts`) plus the FAIL-CLOSED decides-and-drafts Reasoner (`modelReasoner` + `parseEnvelope`, `packages/agent/src/reasoner.ts`). Grounded-or-abstain: no path yields an `answer` without a non-blank citation, and every ambiguity (parse failure, unknown action, `tool_use` stop with no tool blocks, refusal, aborted, uncited answer) resolves to `abstain`.
+
+**Still pending (stated honestly):**
+
+- The orchestrator that DRIVES `AgentState` end-to-end is **in progress**. `@tenet/agent` ships the type contract + the fail-closed Reasoner; the `runAgent` workflow graph (deterministic pre-handlers → retrieve → reasoner → fail-closed verify → critique-retry → emit/abstain/handoff) is the next increment. Not finished.
+- The verifier's own fail-CLOSED changes are a later phase (Phase 3).
+- REAL-MODEL benchmark numbers still do not exist (no model access in this environment). The hermetic stub remains the only measured plane; keep the stub-vs-real split in the benchmark docs honest — no real-model numbers are claimed.
 
 ## Bucket D — Fresh research worth doing on current state of the field
 
@@ -69,10 +86,10 @@ Pass 1 was on 2026-06-03. The agent-framework field churns monthly. These are wo
 Strict-precedence rule: if a row in a later bucket can fail because of an unresolved row in an earlier bucket, do the earlier one first.
 
 1. **D3, D5, A4** (~15 min research total) — pick OTel semconv version, hallucination judge, eval-layer recommendation. These unblock Bucket C without code.
-2. **B3** (AbortSignal) — block phase-1 prod traffic; a production-relevant correctness fix.
-3. **B2** (PathHandle factory) — settle the "framework-promise vs reality" gap before the fs package lands.
-4. **C7 + C8 + C2** (models/bedrock + pgvector + rate-limit) — smallest unit that lets `@tenet/verifier` actually fire on real outputs.
-5. **C1** (`@tenet/retrieval`) — the heart of source-grounding. After it lands, the verifier has something to ground on.
+2. ~~**B3** (AbortSignal)~~ — DONE (`packages/core/src/model.ts:57`, required `signal`).
+3. ~~**B2** (PathHandle factory)~~ — DONE (`packages/core/src/path.ts:58`, `openPath`).
+4. ~~**C7 + C8 + C2** (models/bedrock + pgvector + rate-limit)~~ — DONE; all three packages landed.
+5. ~~**C1** (`@tenet/retrieval`)~~ — DONE; package landed.
 6. **D4** (refreshed OSS framework landscape) — feeds the next architecture review.
 7. **A2** (vector-store benchmark) — only matters once we have non-trivial corpus. Defer until MVP shows real traffic.
 8. **A1** (closed-tool architecture) + **D1, D2, D6** — informs phase-2 polish, not phase-1 ship.

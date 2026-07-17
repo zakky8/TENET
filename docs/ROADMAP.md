@@ -1,12 +1,16 @@
 # Roadmap
 
-**Status**: pre-MVP, v0.0.0. The doc tracks what's done, what's next, and what's deferred. Dates are targets, not promises.
+**Status**: pre-1.0, v0.0.0 (branch `upgrade/top-1pct`). Phase 0–1 landed; the canonical `ChatModel` contract is complete and the `@tenet/agent` orchestrator is in progress. The doc tracks what's done, what's next, and what's deferred. Dates are targets, not promises.
 
 Source of detail for each row: [ARCHITECTURE.md](ARCHITECTURE.md) (component map) and [BENCHMARKS.md](BENCHMARKS.md) (measurable targets).
 
 ---
 
-> **State as of 2026-06-04:** Phase 0 + Phase 1 MVP packages all landed. 327 tests passing across 31 suites. CI green. The 5 deferred review findings from the adversarial pass on `c9c9fb0` all shipped. The 7 open research questions all closed in [RESEARCH-PASS-2.md](RESEARCH-PASS-2.md).
+> **State as of 2026-07-18 (branch `upgrade/top-1pct`):** 1117 tests passing across 85 suites, all green; 62 workspace packages. CI green. The 5 deferred review findings from the adversarial pass on `c9c9fb0` all shipped. The 7 open research questions all closed in [RESEARCH-PASS-2.md](RESEARCH-PASS-2.md).
+>
+> **Canonical-contract upgrade (complete):** `@tenet/core` now defines ONE `ChatModel` contract — a `ModelMessage[]` array, a REQUIRED `AbortSignal`, tool round-trips (`ContentBlock`: text | tool_use | tool_result), and a lossless `StopReason` union (`packages/core/src/model.ts`). It replaced four duplicated single-string `chat({system, user}): Promise<string>` interfaces. All 6 model adapters (anthropic, bedrock, google, mistral, ollama, openai) migrated, fixing three provider "abnormal stop" bugs that had reported an abnormal stop as a clean completion: Anthropic streaming truncation, Mistral `model_length` context overflow (`models/mistral/src/index.ts:60`), and Google content-block reasons — PROHIBITED_CONTENT / SPII / BLOCKLIST / IMAGE_SAFETY (`models/google/src/index.ts:73-76`) — now map to `max_tokens` / `refusal` instead of `end_turn`. `@tenet/verifier`, `@tenet/router`, `@tenet/streaming` (re-exports the canonical `StreamChunk`), `@tenet/ag-ui`, `apps/quickstart`, `apps/measure-real`, and `apps/community-bot` all speak the canonical contract; the transitional migration bridges were deleted — every consumer speaks the canonical contract, no bridges remain. The `${role}: ${content}` turn-spoof is gone from community-bot — history is structured `ModelMessage[]`, so a user message containing `assistant:` can no longer forge a prior assistant turn (`apps/community-bot/src/index.ts:114`), guarded by a wire-level role-spoof regression test in the Anthropic adapter.
+>
+> **Agent orchestrator (in progress):** the new `@tenet/agent` package ships the orchestrator type contract (`OrchestratorState extends AgentState`; the discriminated `ReasonerOutput = answer | tool | handoff | abstain`) plus the fail-closed decides-and-drafts Reasoner (`modelReasoner` + `parseEnvelope`, `packages/agent/src/reasoner.ts`): grounded-or-abstain, with no code path yielding an answer without a non-blank citation — every ambiguity (parse failure, unknown action, tool_use-with-no-tools, refusal, aborted, uncited answer) resolves to `abstain`, proven by 33 deterministic tests. The `runAgent` workflow graph (deterministic pre-handlers → retrieve → reasoner → fail-closed verify → critique-retry → emit/abstain/handoff) is the next increment and is NOT yet built.
 
 ## Phase 0 — Scaffold (DONE)
 
@@ -58,7 +62,7 @@ The smallest end-to-end vertical that proves the spine. From [ARCHITECTURE.md §
 | `surfaces/discord` (discord.js) | not started |
 | `surfaces/slack` (Bolt; Marketplace + internal modes) | not started |
 | `surfaces/web-widget` (SSE + JWT) | not started |
-| `models/anthropic` | not started |
+| `models/anthropic` — canonical `ChatModel` + `chatStream` (SSE), StopReason mapping | ✓ |
 | `stores/vector/qdrant` (multi-tenant default) | not started |
 | `@tenet/memory` adapter for mem0 / Letta | not started |
 | Eval set growth to 1k+ cases via assertion mining | not started |
@@ -109,7 +113,7 @@ Fresh A-to-Z audit (3 parallel reviewers) + live June-2026 market research ident
 - `@tenet/ag-ui` — AG-UI event protocol + `streamChunksToAgUi` bridge from all 6 streaming model adapters.
 - `@tenet/harness` — context compaction + todo ledger + bounded-concurrency subagents + handoff.
 - `apps/quickstart` — `pnpm quickstart` zero-key REPL through the full retrieve→draft→verify pipeline.
-- Truth restoration: Bedrock streaming actually shipped (task #83 had claimed it falsely), `stores/state/postgres` filled (was an empty dir), empty `surfaces/webhook` removed, README counts reconciled (996 tests / 81 suites).
+- Truth restoration: Bedrock streaming actually shipped (task #83 had claimed it falsely), `stores/state/postgres` filled (was an empty dir), empty `surfaces/webhook` removed, README counts reconciled (see the current-state banner above for the live 1117 tests / 85 suites / 62 packages).
 
 ---
 

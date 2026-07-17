@@ -6,6 +6,81 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — canonical `ChatModel` contract + `@tenet/agent` Phase 2 (2026-07-18)
+Branch `upgrade/top-1pct`. Test suite: 1051 → 1117 tests across 83 → 85 suites,
+all green. 62 workspace packages.
+
+**One canonical `ChatModel` (Phase 1 complete).**
+- `@tenet/core` now defines a single `ChatModel.chat(req): Promise<ChatResponse>`
+  over a MESSAGES ARRAY (`ModelMessage[]`, `packages/core/src/model.ts:31`), tool
+  round-trips via a discriminated `ContentBlock` (`text | tool_use | tool_result`,
+  model.ts:14), and a lossless `StopReason` union (`end_turn | max_tokens |
+  stop_sequence | tool_use | refusal | aborted`, model.ts:38). It REPLACES the four
+  duplicated single-string `chat({system, user}): Promise<string>` interfaces.
+- `signal: AbortSignal` is REQUIRED on `ChatRequest`, not optional
+  (`packages/core/src/model.ts:57`) — resolves PENDING B3 (un-abortable `chat` →
+  zombie HTTP).
+- All 6 model adapters (`models/{anthropic,bedrock,google,mistral,ollama,openai}`)
+  migrated to the canonical contract; C7 (`models/bedrock` "not yet implemented")
+  is DONE — all six adapters exist.
+- Three real provider bugs fixed — each an abnormal stop that was being reported as
+  a clean completion:
+  - Anthropic streaming hardcoded `end_turn`; the real `stop_reason` from
+    `message_delta` is now mapped (`models/anthropic/src/index.ts:66,295`).
+  - Mistral `model_length` (context-window overflow, a truncation) → `max_tokens`,
+    not the default `end_turn` (`models/mistral/src/index.ts:60`).
+  - Google content-block finish reasons (`SAFETY`, `RECITATION`,
+    `PROHIBITED_CONTENT`, `BLOCKLIST`, `SPII`, `IMAGE_SAFETY`) → `refusal`, not
+    `end_turn` (`models/google/src/index.ts:71-76`).
+- `@tenet/streaming` re-exports the canonical `StreamChunk` / `StreamingChatModel`
+  from `@tenet/core` (its divergent local copy, which typed `stopReason` as a loose
+  `string`, was removed — `packages/streaming/src/index.ts:24`); `@tenet/ag-ui`
+  aligned its `StreamChunk` to the canonical one.
+- `@tenet/verifier`, `apps/quickstart`, `apps/measure-real`, `apps/community-bot`,
+  and `@tenet/router` all flipped onto the canonical contract.
+
+### Fixed — canonical migration (2026-07-18)
+- **`${role}: ${content}` turn-spoof killed.** community-bot history is now
+  STRUCTURED `ModelMessage`s (`apps/community-bot/src/index.ts:114` builds each
+  turn via `textMessage(role, content)`), so a member message containing
+  `assistant:` can no longer forge a prior assistant turn — the forged text is
+  preserved inside a user-role message, not promoted. Covered by a wire-level
+  role-spoof regression test in the Anthropic adapter
+  (`models/anthropic/src/index.test.ts:131`) and a community-bot test
+  (`apps/community-bot/src/index.test.ts:187`).
+- **Transitional migration bridges deleted.** `fromLegacyModel`, `asLegacyModel`,
+  `LegacySingleStringModel`, and `LegacyChatArgs` are gone — every consumer speaks
+  the canonical contract, no bridges remain (grep-clean across `packages/`,
+  `models/`, `apps/`).
+- The single-string `ChatModel` schism (the recon's "root of no conversation
+  memory") is RESOLVED — one messages-array contract; role structure now reaches
+  the model.
+- PENDING B2 (`PathHandle` had no factory) RESOLVED — `openPath()` ships
+  (`packages/core/src/path.ts:58`): allow-list root, with absolute-path and
+  `..`-traversal rejection at construction time.
+
+### Added — `@tenet/agent` (Phase 2, in progress, 2026-07-18)
+- Orchestrator TYPE CONTRACT: `OrchestratorState extends AgentState`
+  (`packages/agent/src/types.ts:45`) + a discriminated
+  `ReasonerOutput = answer | tool | handoff | abstain` with NO default `answer`
+  (types.ts:68).
+- FAIL-CLOSED decides-and-drafts Reasoner (`modelReasoner` + `parseEnvelope`,
+  `packages/agent/src/reasoner.ts`): grounded-or-abstain — an `answer` is discarded
+  unless it carries at least one non-blank citation (reasoner.ts:99), and every
+  ambiguity (envelope parse failure, unknown action, `tool_use` stop with no tool
+  blocks, `refusal`, `aborted`, uncited answer) resolves to `abstain`. Proven by 33
+  deterministic tests (`packages/agent/src/reasoner.test.ts`).
+
+**Still pending (honest read):**
+- The `runAgent` workflow graph (deterministic pre-handlers → retrieve → reasoner →
+  fail-closed verify → critique-retry → emit/abstain/handoff) is the next
+  increment. The orchestrator that DRIVES `AgentState` end-to-end is NOT finished;
+  `@tenet/agent` currently ships the type contract and the fail-closed Reasoner only.
+- The verifier's own fail-closed changes are a later phase (Phase 3).
+- No real-model benchmark numbers exist yet (no model access in this environment);
+  the hermetic stub remains the only measured plane.
+- PENDING B1, B4, B5 remain OPEN — not touched by this upgrade.
+
 ### Added — Phase 16 (answer-quality engine, 2026-06-11)
 Model-agnostic hallucination reduction + smarter/faster responses from
 ANY ChatModel:
@@ -59,8 +134,10 @@ open lanes. All three shipped, plus the audit's DX + truth findings:
 ### Fixed — Phase 15
 - Removed the empty `surfaces/webhook/` directory (ticketing connectors live
   in `connectors/ticketing`).
-- README drift: "3 model adapters" → 6 (all streaming), test counts
-  916/736/611 → 996 across 81 suites, surface arithmetic corrected to
+- README drift: "3 model adapters" → 6 (all streaming), the README's several
+  inconsistent test counts reconciled to a single reported figure (the canonical
+  total has since advanced to 1117 tests across 85 suites — see the 2026-07-18
+  entry above), surface arithmetic corrected to
   9 surfaces + 4 ticketing connectors, stale competitor-table HITL marks
   updated against June-2026 reality (LangGraph interrupt(), Mastra
   suspend/resume, OpenAI harness approvals).
@@ -111,9 +188,9 @@ Web-verified competitor research (LangChain, LangGraph, AutoGen, CrewAI, LlamaIn
   - B4 — `OutcomeEmitter` re-entrancy guard (`MAX_EMIT_DEPTH=4`) + `SwallowedErrorReporter` callback.
   - B5 — `ClaimPreFilter` + `JudgePromptDecorator` interfaces; `urlAllowlistFilter` + `examplesDecorator` factories.
 - Scaffolded the four MVP packages: `@tenet/core`, `@tenet/verifier`, `@tenet/policy`, `@tenet/telemetry`.
-- `Secret<T>` opaque type that refuses `JSON.stringify`, blocks the LangChain CVE-2025-68664-class secret-leak.
-- `Filter<TKey>` + `validateFilterKey` that reject `--`, `..`, and any non-`[a-zA-Z0-9_.-]` characters in metadata filter keys — blocks the CVE-2025-67644-class SQL-injection path.
-- `PathHandle` branded type for path-allowlisted file I/O (factory pending).
+- `Secret<T>` opaque type that refuses `JSON.stringify`, blocking a secret-leak-via-serialization class of bug.
+- `Filter<TKey>` + `validateFilterKey` that reject `--`, `..`, and any non-`[a-zA-Z0-9_.-]` characters in metadata filter keys — blocks a metadata-filter SQL-injection class of bug.
+- `PathHandle` branded type for path-allowlisted file I/O (factory ships as `openPath()`, `packages/core/src/path.ts:58`).
 - `TenetError` with stable error codes (`VERIFIER_FAILED`, `RETRIEVAL_FAILED`, `MODEL_FAILED`, `RATE_LIMITED`, `TIMEOUT`, `INVALID_INPUT`, `PERMISSION_DENIED`, `INTERNAL`).
 - `OutcomeEvent` first-class telemetry primitive (`resolved` / `handed_off` / `disqualified` / `qualified` / `pending`).
 - `OutcomeEmitter` with sink isolation — a broken sink can't kill the telemetry pipeline.

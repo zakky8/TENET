@@ -2,11 +2,39 @@
 
 > The existing TENET community bot (github.com/zakky8/bot, telegram-bot/ + shared/ + discord-bot/) becomes the first reference deployment under `apps/community-bot` after the platform's MVP lands. This doc describes the platform that subsumes it.
 
-**Status:** Draft v0.1
+**Status:** Draft v0.1 (proposal) — implementation status note added 2026-07-18
 **Date:** 2026-06-03
 **Owner:** TBD
 **Based on:** Research Pass 1 (108 agents, 23 verified claims, 26 sources — full report in `research-2026-06-03.json`)
 **Companion:** [BENCHMARKS.md](BENCHMARKS.md) — measurable 100× targets + method-of-attack per dimension
+
+---
+
+## 0. Implementation status (honest read, as of 2026-07-18)
+
+This document is still the forward-looking proposal. The section below records what
+is actually in the tree on branch `upgrade/top-1pct`, so the proposal is not read as
+a description of shipped code. Numbers are measured, not aspirational.
+
+- **Repo:** 62 workspace packages (every `package.json` under the `pnpm-workspace.yaml`
+  globs). Test suite: **85 suites / 1117 tests, all green** (was 83 / 1051 at the start
+  of this upgrade). All figures are from the **hermetic stub plane** — no real-model
+  access exists in this environment, so no real-model benchmark numbers are claimed here.
+- **Phase 1 — canonical model contract (complete):** one `ChatModel` in `@tenet/core`
+  (`packages/core/src/model.ts`) replaced four duplicated single-string
+  `chat({system, user}): Promise<string>` interfaces. The contract is a **messages array**
+  (`ModelMessage[]` of typed `ContentBlock`s), a **required** `AbortSignal`, tool
+  round-trips (`text | tool_use | tool_result`), and a lossless `StopReason` union. All
+  six model adapters (`models/{anthropic,bedrock,google,mistral,ollama,openai}`) speak it;
+  `@tenet/streaming` and `@tenet/ag-ui` re-align to the canonical `StreamChunk`; the
+  transitional legacy bridges were deleted. See §17.
+- **Phase 2 — agent turn contract (in progress):** the new `@tenet/agent` package ships
+  the orchestrator **type contract** (`OrchestratorState`, the discriminated fail-closed
+  `ReasonerOutput`) plus the **fail-closed Reasoner** (`modelReasoner` + `parseEnvelope`).
+  The `runAgent` workflow graph that drives `AgentState` end-to-end is the **next
+  increment — not yet shipped.** Do not read the orchestrator as finished. See §17.
+- **Still pending:** the verifier's own fail-closed changes (Phase 3), the end-to-end
+  `runAgent` graph, and real-model benchmarks. The stub plane is the only measured plane.
 
 ---
 
@@ -15,7 +43,7 @@
 The 2025/2026 agent landscape is split:
 
 - **Closed enterprise leaders** (Intercom Fin, Decagon, Sierra, Ada, Glean, Moveworks) lock you in to outcome-pricing ($0.99/resolution at Fin) and a proprietary helpdesk runtime. Customers pay six- to seven-figure annual contracts.
-- **OSS frameworks** (LangChain, LangGraph, CrewAI, AutoGen) have mindshare but ship CVE-class mistakes in production code paths — three high-severity CVEs in the LangChain ecosystem in the six months before this doc was written, including a 9.3 CVSS RCE with env-secret leak.
+- **OSS frameworks** (LangChain, LangGraph, CrewAI, AutoGen) have mindshare but have historically shipped CVE-class mistakes (unsafe deserialization, template injection, path traversal, SQL injection) in production code paths. We treat those mistake *classes* as the threat model to design out — see §7. This doc does not assert specific CVE identifiers or severities: unsourced CVE attributions are exactly the kind of unverified factual claim this framework exists to prevent, so any specific advisory belongs in a sourced security appendix, not here.
 - **Hallucination defenses** are still bolt-ons in most frameworks. Source-grounding, citation enforcement, Chain-of-Verification, and Reflexion exist as papers and one-off implementations, not as a first-class layer.
 - **Multi-surface** (Telegram + Discord + Slack + Teams + web widget + REST + ticketing) is duplicated across teams. Nobody ships one framework that does all surfaces with one config.
 
@@ -86,7 +114,7 @@ What concretely we ship that the field doesn't, on day 1:
 │                       Connectors / Stores                               │
 │  Vector: pgvector default, Qdrant/LanceDB/Pinecone optional             │
 │  State:  Postgres + Redis                                               │
-│  Models: Bedrock, Anthropic, OpenAI, Google, Ollama                     │
+│  Models: Bedrock, Anthropic, OpenAI, Google, Mistral, Ollama            │
 │  Ticketing: Zendesk, Intercom, Freshdesk, ServiceNow, Salesforce SC     │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -95,8 +123,9 @@ What concretely we ship that the field doesn't, on day 1:
 
 ```
 /
-├── packages/
-│   ├── core/                # runtime, state machine, conversation events
+├── packages/                # (62 workspace packages total; abbreviated list)
+│   ├── core/                # canonical ChatModel contract (model.ts), AgentState, openPath, conversation events
+│   ├── agent/               # orchestrator turn contract: OrchestratorState + fail-closed ReasonerOutput/Reasoner (runAgent graph WIP)
 │   ├── verifier/            # CoVe, Reflexion, constitutional, citation enforcement
 │   ├── retrieval/           # hybrid BM25+dense, contextual chunker, rerank
 │   ├── memory/              # episodic + semantic + working
@@ -120,11 +149,12 @@ What concretely we ship that the field doesn't, on day 1:
 │   ├── freshdesk/
 │   ├── servicenow/
 │   └── salesforce-service-cloud/
-├── models/
+├── models/                  # all 6 adapters exist and speak the canonical ChatModel contract
 │   ├── bedrock/
 │   ├── anthropic/
 │   ├── openai/
 │   ├── google/
+│   ├── mistral/
 │   └── ollama/
 ├── stores/
 │   ├── vector/
@@ -162,14 +192,14 @@ We do **not** ship Java or Go runtimes at launch. Only Google ADK currently does
 
 ## 7. Security stance (CVE-class mistakes prevented by construction)
 
-Each line below maps to a specific LangChain CVE category from research pass 1.
+Each row names a mistake *class* we design out by construction. CVE identifiers and severities are intentionally omitted: we do not ship unsourced CVE attributions (see §1). Specific advisories, if cited, belong in a sourced security appendix. The **Enforcement** column marks what is shipped vs planned.
 
 | Mistake category | Our policy | Enforcement |
 |---|---|---|
-| Unsafe deserialization (CVE-2025-68664, 9.3) | No pickle, no free-form dict rehydration. All persisted state is JSON-typed with Zod schemas. Secret fields are explicit `Secret<T>` opaque type, never serialized. | Schema validation in `core/persistence.ts`. CI lint rejects `JSON.parse` without schema. |
-| Template injection (Jinja2 escalation in same CVE) | No Jinja2. Prompt templates use tagged-template literals with explicit interpolation slots. No string concatenation of user input into prompts. | `eslint-plugin-prompt-safety` (we'll write a small custom rule). |
-| Path traversal (CVE-2026-34070, 7.5) | All file I/O takes a `PathHandle` opened against an allow-list root. No raw string paths. Abs paths and `..` rejected at type level. | `packages/core/fs.ts` exposes only `PathHandle`. CI lint bans `fs.readFile(string)` outside this module. |
-| SQL injection (CVE-2025-67644, 7.3) | All checkpoint and retrieval stores use parameterized queries. Filter keys validated against `/^[a-zA-Z0-9_.-]+$/`. | Type-level: store adapters take `Filter<T>` not `string`. Runtime: regex validation on key insertion. |
+| Unsafe deserialization | No pickle, no free-form dict rehydration. Secret fields are an explicit `Secret<T>` opaque type that throws on serialization, never persisted. | Shipped: `Secret<T>` in `packages/core/src/types.ts` (its `toJSON`/serialize path throws). Planned: schema-validated persistence layer + a CI lint rejecting unschema'd `JSON.parse` (persistence module not yet in `packages/core/src`). |
+| Template injection | No Jinja2. Prompt templates use tagged-template literals with explicit interpolation slots. No string concatenation of user input into prompts. | Planned: `eslint-plugin-prompt-safety` (small custom rule; not yet written). |
+| Path traversal | All file I/O takes a `PathHandle` produced by `openPath(relative)`, opened against a configured allow-list root. Absolute paths, empty paths, and `..` segments are rejected at construction; resolved paths that escape the root are rejected. | Shipped: `packages/core/src/path.ts` `openPath()` (allow-list root via `configurePathRoot`, abs-path + `..` + root-escape rejection); the `PathHandle` constructor is module-private. Planned: CI lint banning `fs.readFile(string)` outside this module. |
+| SQL injection | All checkpoint and retrieval stores use parameterized queries. Filter keys validated against `/^[a-zA-Z0-9_.-]+$/`. | Shipped: type-level `Filter<T>` (not `string`) and `validateFilterKey` in `packages/core/src/types.ts` (also rejects `--` and `..`). Runtime regex validation on key insertion. |
 | Supply chain | SBOM (CycloneDX) emitted on every release. Trivy + Dependabot + Snyk wired into CI. `npm audit` non-zero fails CI. Provenance via npm `--provenance` flag. | GitHub Actions: `trivy fs`, `dependabot.yml`, `npm publish --provenance`. |
 | Disclosure | `SECURITY.md` published day 1 with PGP key, security@ inbox, 90-day disclosure window. | File exists at repo root before public push. |
 
@@ -261,7 +291,7 @@ The smallest end-to-end vertical that proves the spine works:
 - `models/bedrock` only (gpt-oss-120b, matching TENET's current setup)
 - `stores/vector/pgvector` + `stores/state/redis`
 - `apps/community-bot` — port TENET's current behavior to the new framework
-- `eval/harness` running TENET's existing 277 tests against the new runtime
+- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 85 suites / 1117 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
 
 Success criteria for MVP:
 1. TENET's golden conversations replay through the new runtime with **same or better** accuracy
@@ -274,7 +304,7 @@ Success criteria for MVP:
 
 - Discord surface (community-bot deploys to both)
 - Slack surface (Marketplace + internal app modes)
-- Anthropic model adapter (Bedrock backup)
+- Anthropic model adapter (Bedrock backup) — **delivered ahead of plan**: all 6 adapters (anthropic, bedrock, google, mistral, ollama, openai) now implement the canonical `ChatModel` contract
 - Qdrant vector store (for multi-tenant deployments where pgvector is a bottleneck)
 - mem0 / Letta memory adapter (long-term episodic)
 - Web widget (SSE + JWT)
@@ -307,6 +337,77 @@ Carried forward from research pass 1 — not blocking architecture but blocking 
 | Multi-surface == multi-debt: every surface API changes quarterly | High | Pin SDK versions; CI runs against each platform's official test environment weekly; surface deprecation policy. |
 | Enterprise buyers want vendor support, not OSS | High (for enterprise app) | Commercial entity offers SLA + on-prem deploy for enterprise tier. OSS core remains free. |
 | OTel GenAI semconv is still alpha and changes | Medium | Pin to a specific spec version; adapter layer in `packages/telemetry`. Re-pin on stable. |
+
+## 17. Model + agent turn contract (shipped)
+
+The runtime spine described abstractly in §4 now has a concrete, single-source-of-truth
+contract in code. This section documents what exists on `upgrade/top-1pct`; it supersedes
+any earlier text that implied a single-string model or an undriven `AgentState`.
+
+### 17.1 Canonical `ChatModel` (Phase 1 — `packages/core/src/model.ts`)
+
+One interface replaced four duplicated `chat({system, user}): Promise<string>` copies:
+
+```ts
+interface ChatModel { chat(req: ChatRequest): Promise<ChatResponse>; }
+```
+
+- **Messages array, not a flattened string.** `ChatRequest.messages: ModelMessage[]`, where
+  each `ModelMessage` is `{ role, content: ContentBlock[] }`. Turn boundaries are structural,
+  so a user message whose text contains `"assistant:"` can no longer forge a prior assistant
+  turn (the `${role}: ${content}` spoof is gone — see §17.3).
+- **Tool round-trips are first-class.** `ContentBlock = text | tool_use | tool_result`, so a
+  turn can carry text and tool calls together, and tool results feed back as content.
+- **`signal: AbortSignal` is required** (non-optional, `model.ts:57`). A cancelled turn
+  releases the in-flight HTTP call — this closes the earlier "no `AbortSignal` → zombie HTTP"
+  gap (former PENDING B3).
+- **Lossless `StopReason` union:** `end_turn | max_tokens | stop_sequence | tool_use | refusal
+  | aborted` — `end_turn` and `stop_sequence` stay distinct; no collapse to a generic `stop`.
+
+All six adapters migrated to this contract, and three provider "abnormal stop" bugs were
+fixed — each had been reported as a clean completion:
+
+- **Anthropic** streaming hardcoded `end_turn` over real truncation → now maps to `max_tokens`.
+- **Mistral** `model_length` (context overflow) masked as `end_turn` → `max_tokens`
+  (`models/mistral/src/index.ts:60`).
+- **Google** content-block reasons (`PROHIBITED_CONTENT` / `SPII` / `BLOCKLIST` /
+  `IMAGE_SAFETY`, plus `SAFETY` / `RECITATION`) masked as `end_turn` → `refusal`
+  (`models/google/src/index.ts:71-76`).
+
+`@tenet/streaming` and `@tenet/ag-ui` re-export/align to the canonical `StreamChunk` (a
+divergent local copy with a loose `stopReason: string` was removed). The transitional
+bridges (`fromLegacyModel`, `asLegacyModel`, `LegacySingleStringModel`, `LegacyChatArgs`)
+were deleted — every consumer speaks the canonical contract, no bridges remain.
+
+### 17.2 Agent turn contract (Phase 2 — `packages/agent/`, in progress)
+
+`AgentState` (`packages/core/src/types.ts:161`) is now a real type contract — `event`,
+`history`, `intent`, `sources`, `draft`/`draftCitations`, `critique`, `attempts`,
+`outcome`. `@tenet/agent` drives it:
+
+- `OrchestratorState extends AgentState` (`agent/src/types.ts:45`) adds transient carriers
+  (`chunks`, `cachedDraft`, `toolResults`) and an explicit terminal `halt` channel.
+- One model turn returns a **discriminated `ReasonerOutput`** — `answer | tool | handoff |
+  abstain` (`agent/src/types.ts:68`). There is **no privileged/default `answer`**.
+- The **fail-closed Reasoner** (`modelReasoner` + `parseEnvelope`, `agent/src/reasoner.ts`)
+  is grounded-or-abstain: an `answer` is discarded unless it carries at least one citation
+  with a non-blank `sourceId` and verbatim `quote`; every ambiguity — envelope parse
+  failure, unknown action, missing field, `tool_use` stop with no tool blocks, `refusal`,
+  `aborted`, uncited answer — resolves to `abstain`. Enforcement never trusts the model.
+  Proven by 33 deterministic tests (`agent/src/reasoner.test.ts`).
+
+**Not yet shipped:** the `runAgent` workflow graph (deterministic pre-handlers → retrieve →
+reasoner → fail-closed verify → critique-retry → emit/abstain/handoff) that wires these
+types into an end-to-end loop. The types and the Reasoner exist; the orchestrator that
+drives them does not yet. The verifier's own fail-closed changes are Phase 3.
+
+### 17.3 Turn-spoof kill (`apps/community-bot`)
+
+History is now assembled as structured `ModelMessage`s rather than a concatenated
+`${role}: ${content}` string, so a user message containing `"assistant:"` cannot forge a
+prior assistant turn. Covered by a bot-level role-safety test
+(`apps/community-bot/src/index.test.ts:166`) and a wire-level role-spoof regression test in
+the Anthropic adapter (`models/anthropic/src/index.test.ts:131`).
 
 ---
 

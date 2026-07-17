@@ -9,7 +9,7 @@ Each entry below is a ready-to-paste PR description + the exact line to add to t
 **Line to add (under "AI Agent Frameworks" section, keep alphabetical):**
 
 ```markdown
-- [TENET](https://github.com/zakky8/TENET) — TypeScript verification-first agent framework. Multi-judge hallucination verifier + Vectara HHEM-2.1, pre-tool-call governance + approval gates + audit trail, WASM-sandboxed tools, MCP OAuth gateway, 10 surfaces (Discord/Slack/Telegram/Teams/web/REST/gRPC/ticketing), BENCHMARKS gated in CI on every PR. 0 CVEs. Apache-2.0.
+- [TENET](https://github.com/zakky8/TENET) — TypeScript verification-first agent framework. Multi-judge hallucination verifier + Vectara HHEM-2.1, pre-tool-call governance + approval gates + audit trail, WASM-sandboxed tools, MCP OAuth gateway, 10 surfaces (Discord/Slack/Telegram/Teams/web/REST/gRPC/ticketing), BENCHMARKS gated in CI on every PR (hermetic stub plane). Apache-2.0.
 ```
 
 **PR title:** `Add TENET — verification-first TypeScript agent framework`
@@ -25,8 +25,8 @@ TENET is a TypeScript agent framework focused on:
 - WASM tool sandbox with capability tokens + production wasmtime adapter
 - MCP OAuth gateway (RFC 9207, 2026-07-28 spec RC)
 - 10 surfaces in one config
-- BENCHMARKS measured + gated in CI on every PR (11/11 dimensions PASS)
-- 766 tests across 67 suites, 0 high-severity CVEs
+- BENCHMARKS measured + gated in CI on every PR (11/11 dimensions PASS against the hermetic stub SUT; real-model numbers are operator-run — see docs/BENCHMARKS.md)
+- 1117 tests across 85 suites, all green
 - Apache-2.0
 ```
 
@@ -55,7 +55,7 @@ TENET is a TypeScript agent framework focused on:
 
 **Line:**
 ```markdown
-- [TENET](https://github.com/zakky8/TENET) — TypeScript-native. 0 high-severity CVEs vs LangChain's 3 (CVE-2026-34070 path-traversal, CVE-2025-68664 deserialization secret-leak, CVE-2025-67644 SQLi). Multi-judge verifier + Vectara HHEM-2.1 + governance/approval/audit + WASM sandbox + MCP OAuth gateway. BENCHMARKS gated in CI.
+- [TENET](https://github.com/zakky8/TENET) — TypeScript-native alternative. File I/O is only reachable through a validated `openPath()` allow-list root that rejects absolute paths and `..` traversal (packages/core/src/path.ts). Multi-judge verifier + Vectara HHEM-2.1 + governance/approval/audit + WASM sandbox + MCP OAuth gateway. BENCHMARKS gated in CI (hermetic stub plane).
 ```
 
 ---
