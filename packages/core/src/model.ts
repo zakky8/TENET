@@ -33,9 +33,6 @@ export interface ModelMessage {
   readonly content: ReadonlyArray<ContentBlock>;
 }
 
-/** @deprecated transitional alias; remove after community-bot migrates. */
-export type ChatMessage = ModelMessage;
-
 /** Lossless with every adapter's provider stop reasons. `end_turn` and
  *  `stop_sequence` are DISTINCT (Anthropic emits both) — no collapse to 'stop'. */
 export type StopReason =
@@ -56,9 +53,7 @@ export interface ChatRequest {
   readonly tools?: ReadonlyArray<ToolDef>;
   /** REQUIRED — its PRESENCE is enforced by the type system, not JSDoc (this is
    *  what supersedes the optional `signal?` at verifier/types.ts:96-99). Presence
-   *  is not the same as abortability: adapters must actually FORWARD and honor it,
-   *  and one bridge (`asLegacyModel`, when its caller omits a signal) can only
-   *  synthesize an un-abortable one — see its note. */
+   *  is not the same as abortability: adapters must actually FORWARD and honor it. */
   readonly signal: AbortSignal;
   readonly temperature?: number;
 }
@@ -106,47 +101,4 @@ export function toolUses(
   return res.content.filter(
     (b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
   );
-}
-
-// ── Migration bridges (DELETED once every adapter is canonical) ────────────
-export interface LegacyChatArgs { system: string; user: string; maxTokens: number; signal?: AbortSignal; }
-export interface LegacySingleStringModel { chat(args: LegacyChatArgs): Promise<string>; }
-
-/** Adapt a legacy string model to canonical. Tools unsupported → single text
- *  block, stopReason 'end_turn'. */
-export function fromLegacyModel(legacy: LegacySingleStringModel): ChatModel {
-  return {
-    async chat(req) {
-      const user = req.messages
-        .flatMap((m) => m.content)
-        .map((b) => (b.type === 'text' ? b.text : b.type === 'tool_result' ? b.content : ''))
-        .join('\n'); // boundary flatten ONCE; internal code never flattens again
-      const text = await legacy.chat({
-        system: req.system, user, maxTokens: req.maxTokens, signal: req.signal,
-      });
-      return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
-    },
-  };
-}
-
-/** Adapt canonical → legacy so un-migrated call sites keep compiling.
- *  HONESTY NOTE: when the legacy caller omits a signal, we synthesize one from a
- *  discarded controller — it satisfies the REQUIRED-signal type but is
- *  permanently un-abortable (nothing can call `.abort()` on it). That is legacy
- *  PARITY, not a regression: legacy callers never had cancellation. A caller that
- *  passes its own signal keeps full abortability. This is a transient migration
- *  bridge, deleted once every call site is canonical. */
-export function asLegacyModel(model: ChatModel): LegacySingleStringModel {
-  return {
-    async chat(args) {
-      const res = await model.chat({
-        system: args.system,
-        messages: [textMessage('user', args.user)],
-        maxTokens: args.maxTokens,
-        // un-abortable fallback ONLY when the legacy caller gave us nothing (see note)
-        signal: args.signal ?? new AbortController().signal,
-      });
-      return responseText(res);
-    },
-  };
 }

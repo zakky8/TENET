@@ -4,7 +4,7 @@ import { measureReal, makeCostMeter, type CostMeter, type RealCase } from './run
 import { PUBLIC_SLICE, PUBLIC_SLICE_VERSION } from './dataset.js';
 
 /** Flatten a canonical ChatRequest's messages to the single user string the
- *  runner sent (mirrors the boundary flatten in @tenet/core's fromLegacyModel). */
+ *  runner sent (concatenates the text/tool_result blocks in message order). */
 function flattenUser(req: ChatRequest): string {
   return req.messages
     .flatMap((m) => m.content)

@@ -29,16 +29,6 @@ import type {
   ToolDef,
 } from '@tenet/core';
 
-/**
- * @deprecated Transitional re-export: the legacy single-string model
- * shape (identical to this package's pre-1.2a local `ChatModel`),
- * kept so un-migrated consumers (apps/measure-real's runner) keep
- * compiling. New code: use the canonical `ChatModel` from
- * '@tenet/core' and wrap with `asLegacyModel()` where a legacy
- * single-string model is required.
- */
-export type { LegacySingleStringModel as LegacyChatModel } from '@tenet/core';
-
 /** Minimal HTTP contract — fetch-compatible. */
 export interface AnthropicHttp {
   fetch(input: string, init: {

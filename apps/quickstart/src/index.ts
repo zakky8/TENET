@@ -147,9 +147,8 @@ export class QuickstartAgent {
         messages: [textMessage('user', `KNOWLEDGE:\n${knowledge}\n\nQUESTION: ${question}`)],
         maxTokens: 512,
         // Canonical ChatRequest.signal is required; synthesize an
-        // un-abortable one when the caller passed none (same fallback
-        // pattern as @tenet/core's asLegacyModel — legacy callers never
-        // had cancellation here either, so this is parity, not a change).
+        // un-abortable one when the caller passed none (a caller with no
+        // signal never had cancellation here either, so this is parity).
         signal: signal ?? new AbortController().signal,
       }),
     );

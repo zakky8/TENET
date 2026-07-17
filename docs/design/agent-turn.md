@@ -27,6 +27,13 @@ Implementers: re-verify each cited line before editing — this doc does not re-
 > reasoner map `history.map((m) => textMessage(m.role, m.content))`), it is correct as written. The shipped
 > `packages/core/src/model.ts` JSDoc is the source of truth for this distinction.
 
+> **MIGRATION COMPLETE (2026-07-18, increment 1.5):** the canonical-contract rollout in §5 has fully landed
+> (1.1 contract + bridges → 1.2 six adapters → 1.3 verifier+quickstart → 1.4 router/streaming/community-bot/
+> measure-real/ag-ui → 1.5). §5 step (5) is done: the transitional `fromLegacyModel`/`asLegacyModel` bridges,
+> the `LegacySingleStringModel`/`LegacyChatArgs` types, the `ChatMessage` alias, and the anthropic
+> `LegacyChatModel` re-export were all **deleted**. Any bridge/`ChatMessage`/`ConversationMessage` name below is
+> historical plan-of-record, not a live symbol — `packages/core/src/model.ts` is the source of truth.
+
 **Status:** APPROVED FOR IMPLEMENTATION — this document is the design gate. Fable agents implement against it without re-deciding. Every blocking finding from adversarial review is resolved below; where a decision was made, the rationale is stated so it is not re-litigated in the implementation phase.
 
 **Grounding note:** All line/file references are to the current TENET source as cited in the proposal and critique. This doc does not re-fetch; implementers MUST verify each cited line before editing, per the source-hierarchy rule.
