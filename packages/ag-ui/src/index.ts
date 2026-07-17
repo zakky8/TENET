@@ -19,6 +19,8 @@
  *      without bespoke glue. Plus encodeSse() for the wire.
  */
 
+import type { StreamChunk } from '@tenet/streaming';
+
 // ── Event types ───────────────────────────────────────────────────────
 
 export type AgUiEvent =
@@ -224,14 +226,13 @@ export class AgUiRunEmitter {
 
 // ── StreamChunk bridge ────────────────────────────────────────────────
 
-/** Structural copy of @tenet/streaming StreamChunk (type-compat). */
-export type StreamChunkLike =
-  | { kind: 'text'; text: string }
-  | { kind: 'tool_use_start'; id: string; name: string }
-  | { kind: 'tool_use_delta'; id: string; partial: string }
-  | { kind: 'tool_use_end'; id: string }
-  | { kind: 'message_stop'; stopReason: string }
-  | { kind: 'usage'; inputTokens: number; outputTokens: number };
+/**
+ * The canonical StreamChunk (defined in @tenet/core, re-exported via @tenet/streaming).
+ * Was a hand-maintained structural copy whose `stopReason: string` could drift from the
+ * canonical `StopReason` union; importing the real type keeps them aligned automatically.
+ * @deprecated alias kept for back-compat; prefer `StreamChunk`.
+ */
+export type StreamChunkLike = StreamChunk;
 
 /**
  * Bridge a streaming ChatModel's chunks into a full AG-UI run:
@@ -240,7 +241,7 @@ export type StreamChunkLike =
  * ('tenet.usage') so cost UIs get them without a protocol extension.
  */
 export async function* streamChunksToAgUi(
-  chunks: AsyncIterable<StreamChunkLike>,
+  chunks: AsyncIterable<StreamChunk>,
   ids: { threadId: string; runId: string },
 ): AsyncIterable<AgUiEvent> {
   const out: AgUiEvent[] = [];
