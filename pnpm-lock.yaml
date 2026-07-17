@@ -110,6 +110,9 @@ importers:
 
   models/mistral:
     dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tenet/streaming':
         specifier: workspace:*
         version: link:../../packages/streaming
@@ -122,6 +125,9 @@ importers:
 
   models/openai:
     dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tenet/streaming':
         specifier: workspace:*
         version: link:../../packages/streaming

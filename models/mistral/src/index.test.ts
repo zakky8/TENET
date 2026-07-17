@@ -1,5 +1,11 @@
 import { MistralChatModel, MistralApiError, type MistralHttp } from './index.js';
 import { streamToString } from '@tenet/streaming';
+import {
+  responseText,
+  textMessage,
+  type ChatRequest,
+  type StreamChunk,
+} from '@tenet/core';
 
 const enc = new TextEncoder();
 function bodyStream(...lines: string[]): ReadableStream<Uint8Array> {
@@ -21,6 +27,17 @@ function mockHttp(args: { status: number; text?: string; stream?: ReadableStream
   };
 }
 
+/** Canonical ChatRequest factory — signal is REQUIRED by the contract. */
+function req(overrides: Partial<ChatRequest> = {}): ChatRequest {
+  return {
+    system: 's',
+    messages: [textMessage('user', 'u')],
+    maxTokens: 10,
+    signal: new AbortController().signal,
+    ...overrides,
+  };
+}
+
 describe('MistralChatModel', () => {
   it('rejects missing apiKey/model + out-of-range temperature', () => {
     const { http } = mockHttp({ status: 200 });
@@ -29,24 +46,60 @@ describe('MistralChatModel', () => {
     expect(() => new MistralChatModel(http, { apiKey: 'k', model: 'm', temperature: 1.5 })).toThrow();
   });
 
-  it('chat() returns content + uses Bearer auth', async () => {
+  it('chat() returns canonical ChatResponse + uses Bearer auth + prepends system', async () => {
     const { http, calls } = mockHttp({
       status: 200,
-      text: JSON.stringify({ choices: [{ message: { content: 'bonjour' } }] }),
+      text: JSON.stringify({ choices: [{ message: { content: 'bonjour' }, finish_reason: 'stop' }] }),
     });
     const m = new MistralChatModel(http, { apiKey: 'mst-1', model: 'mistral-large-latest' });
-    expect(await m.chat({ system: 's', user: 'u', maxTokens: 10 })).toBe('bonjour');
+    const res = await m.chat(req());
+    expect(res.content).toEqual([{ type: 'text', text: 'bonjour' }]);
+    expect(responseText(res)).toBe('bonjour');
+    expect(res.stopReason).toBe('end_turn');
     expect(calls[0]!.headers['authorization']).toBe('Bearer mst-1');
-    expect(JSON.parse(calls[0]!.body).stream).toBe(false);
+    const body = JSON.parse(calls[0]!.body);
+    expect(body.stream).toBe(false);
+    expect(body.messages).toEqual([
+      { role: 'system', content: 's' },
+      { role: 'user', content: 'u' },
+    ]);
+  });
+
+  it('chat() maps finish_reason length → stopReason max_tokens + usage (was a bare string before 1.2b-i)', async () => {
+    const { http } = mockHttp({
+      status: 200,
+      text: JSON.stringify({
+        choices: [{ message: { content: 'tronqué' }, finish_reason: 'length' }],
+        usage: { prompt_tokens: 12, completion_tokens: 8 },
+      }),
+    });
+    const m = new MistralChatModel(http, { apiKey: 'k', model: 'm' });
+    const res = await m.chat(req());
+    expect(res.stopReason).toBe('max_tokens');
+    expect(responseText(res)).toBe('tronqué');
+    expect(res.usage).toEqual({ inputTokens: 12, outputTokens: 8 });
+  });
+
+  it('chat() maps Mistral-specific finish_reason model_length → max_tokens (a truncation, NOT default end_turn)', async () => {
+    const { http } = mockHttp({
+      status: 200,
+      text: JSON.stringify({
+        choices: [{ message: { content: 'cut off' }, finish_reason: 'model_length' }],
+      }),
+    });
+    const m = new MistralChatModel(http, { apiKey: 'k', model: 'm' });
+    const res = await m.chat(req());
+    // If model_length fell through to the default, this would be 'end_turn' — masking the truncation.
+    expect(res.stopReason).toBe('max_tokens');
   });
 
   it('chat() throws on non-2xx', async () => {
     const { http } = mockHttp({ status: 429, text: 'rate' });
     const m = new MistralChatModel(http, { apiKey: 'k', model: 'm' });
-    await expect(m.chat({ system: 's', user: 'u', maxTokens: 1 })).rejects.toBeInstanceOf(MistralApiError);
+    await expect(m.chat(req({ maxTokens: 1 }))).rejects.toBeInstanceOf(MistralApiError);
   });
 
-  it('chatStream parses SSE deltas + finish_reason + usage + [DONE]', async () => {
+  it('chatStream parses SSE deltas + usage + [DONE]', async () => {
     const sse = [
       'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n',
       'data: {"choices":[{"delta":{"content":"lo"},"finish_reason":"stop"}]}\n\n',
@@ -55,12 +108,25 @@ describe('MistralChatModel', () => {
     ];
     const { http } = mockHttp({ status: 200, stream: bodyStream(...sse) });
     const m = new MistralChatModel(http, { apiKey: 'k', model: 'm' });
-    expect(await streamToString(m.chatStream({ system: 's', user: 'u', maxTokens: 1 }))).toBe('Hello');
+    expect(await streamToString(m.chatStream(req({ maxTokens: 1 })))).toBe('Hello');
+  });
+
+  it('chatStream emits message_stop with canonical stopReason max_tokens for finish_reason length (raw string leaked before 1.2b-i)', async () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"x"},"finish_reason":"length"}]}\n\n',
+      'data: [DONE]\n\n',
+    ];
+    const { http } = mockHttp({ status: 200, stream: bodyStream(...sse) });
+    const m = new MistralChatModel(http, { apiKey: 'k', model: 'm' });
+    const chunks: StreamChunk[] = [];
+    for await (const c of m.chatStream(req({ maxTokens: 1 }))) chunks.push(c);
+    const stops = chunks.filter((c) => c.kind === 'message_stop');
+    expect(stops).toEqual([{ kind: 'message_stop', stopReason: 'max_tokens' }]);
   });
 
   it('chatStream throws on non-2xx', async () => {
     const { http } = mockHttp({ status: 500, text: 'err' });
     const m = new MistralChatModel(http, { apiKey: 'k', model: 'm' });
-    await expect((async () => { for await (const _ of m.chatStream({ system: 's', user: 'u', maxTokens: 1 })) void _; })()).rejects.toBeInstanceOf(MistralApiError);
+    await expect((async () => { for await (const _ of m.chatStream(req({ maxTokens: 1 }))) void _; })()).rejects.toBeInstanceOf(MistralApiError);
   });
 });
