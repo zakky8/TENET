@@ -17,6 +17,7 @@
     "README.md"
   ],
   "dependencies": {
+    "@tenet/core": "workspace:*",
     "@tenet/streaming": "workspace:*"
   },
   "scripts": {

@@ -98,12 +98,15 @@ importers:
 
   models/bedrock:
     dependencies:
-      '@tenet/streaming':
+      '@tenet/core':
         specifier: workspace:*
-        version: link:../../packages/streaming
+        version: link:../../packages/core
 
   models/google:
     dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tenet/streaming':
         specifier: workspace:*
         version: link:../../packages/streaming
@@ -119,6 +122,9 @@ importers:
 
   models/ollama:
     dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tenet/streaming':
         specifier: workspace:*
         version: link:../../packages/streaming

@@ -23,7 +23,7 @@
     "lint": "echo 'no lint yet' && exit 0"
   },
   "dependencies": {
-    "@tenet/streaming": "workspace:*"
+    "@tenet/core": "workspace:*"
   },
   "keywords": [
     "agent-framework",

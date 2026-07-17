@@ -10,12 +10,24 @@
  *   POST /v1beta/models/{model}:generateContent      (non-streaming)
  *   POST /v1beta/models/{model}:streamGenerateContent?alt=sse  (SSE)
  *
- * Pydantic-AI ships 8 providers; this is provider #4 for TENET
- * (after Anthropic, Bedrock, OpenAI). Mistral + Ollama in parallel
- * commits this turn.
+ * Increment 1.2b-ii: implements the canonical @tenet/core ChatModel
+ * (block-structured ChatRequest → ChatResponse) instead of the old
+ * local single-string interface, and maps Gemini's `finishReason`
+ * onto the canonical StopReason in both the non-streaming and
+ * streaming paths (the streaming path previously leaked the raw
+ * provider string, e.g. 'MAX_TOKENS', mid-stream).
  */
 
-import { parseSseStream, type ChatModelStreaming, type StreamChunk } from '@tenet/streaming';
+import { parseSseStream } from '@tenet/streaming';
+import type {
+  ChatModel,
+  ChatRequest,
+  ChatResponse,
+  ContentBlock,
+  ModelMessage,
+  StopReason,
+  StreamChunk,
+} from '@tenet/core';
 
 export interface GoogleHttp {
   fetch(input: string, init: {
@@ -30,15 +42,11 @@ export interface GoogleHttp {
   }>;
 }
 
-export interface ChatModel {
-  chat(args: { system: string; user: string; maxTokens: number; signal?: AbortSignal }): Promise<string>;
-}
-
 export interface GoogleChatModelOptions {
   apiKey: string;
   /** e.g. 'gemini-2.5-pro', 'gemini-2.5-flash'. */
   model: string;
-  /** Default 0.2. Gemini accepts [0,2]. */
+  /** Default 0.2. Gemini accepts [0,2]. Overridden per-request by ChatRequest.temperature. */
   temperature?: number;
   /** Default 'https://generativelanguage.googleapis.com'. */
   baseUrl?: string;
@@ -51,7 +59,55 @@ export class GoogleApiError extends Error {
   }
 }
 
-export class GoogleChatModel implements ChatModel, ChatModelStreaming {
+/** Map Gemini's raw finishReason onto the canonical StopReason.
+ *  Unknown / absent values degrade to 'end_turn'. Every reason that means the model
+ *  was BLOCKED/REFUSED maps to 'refusal' — reporting a content-blocked generation as a
+ *  clean 'end_turn' would mask a refusal (same failure class as truncation-masking), and
+ *  the canonical StopReason is documented lossless. */
+function mapFinishReason(raw: unknown): StopReason {
+  switch (raw) {
+    case 'STOP': return 'end_turn';
+    case 'MAX_TOKENS': return 'max_tokens';
+    case 'SAFETY': return 'refusal';
+    case 'RECITATION': return 'refusal';
+    case 'PROHIBITED_CONTENT': return 'refusal';
+    case 'BLOCKLIST': return 'refusal';
+    case 'SPII': return 'refusal';
+    case 'IMAGE_SAFETY': return 'refusal';
+    default: return 'end_turn';
+  }
+}
+
+/** Canonical messages → Gemini `contents`. Gemini's role vocabulary is
+ *  'user' | 'model'; assistant maps to 'model', everything else to
+ *  'user'. Text blocks are joined; tool blocks are skipped (this
+ *  adapter does not offer tools on the Gemini wire yet). */
+function toGoogleContents(
+  messages: ReadonlyArray<ModelMessage>,
+): Array<{ role: string; parts: Array<{ text: string }> }> {
+  return messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{
+      text: m.content
+        .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+        .map((b) => b.text)
+        .join('\n'),
+    }],
+  }));
+}
+
+function parseUsage(
+  parsed: object,
+): { inputTokens: number; outputTokens: number } | undefined {
+  const usage = (parsed as { usageMetadata?: unknown }).usageMetadata;
+  if (usage === null || usage === undefined || typeof usage !== 'object') return undefined;
+  const inT = (usage as { promptTokenCount?: unknown }).promptTokenCount;
+  const outT = (usage as { candidatesTokenCount?: unknown }).candidatesTokenCount;
+  if (typeof inT !== 'number' || typeof outT !== 'number') return undefined;
+  return { inputTokens: inT, outputTokens: outT };
+}
+
+export class GoogleChatModel implements ChatModel {
   private readonly apiKey: string;
   private readonly model: string;
   private readonly temperature: number;
@@ -68,68 +124,92 @@ export class GoogleChatModel implements ChatModel, ChatModelStreaming {
     this.baseUrl = (opts.baseUrl ?? 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
   }
 
-  private buildBody(args: { system: string; user: string; maxTokens: number }): string {
-    return JSON.stringify({
-      systemInstruction: { parts: [{ text: args.system }] },
-      contents: [{ role: 'user', parts: [{ text: args.user }] }],
-      generationConfig: { temperature: this.temperature, maxOutputTokens: args.maxTokens },
-    });
+  private buildBody(req: ChatRequest): string {
+    const body: Record<string, unknown> = {
+      contents: toGoogleContents(req.messages),
+      generationConfig: {
+        temperature: req.temperature ?? this.temperature,
+        maxOutputTokens: req.maxTokens,
+      },
+    };
+    if (req.system.length > 0) {
+      body['systemInstruction'] = { parts: [{ text: req.system }] };
+    }
+    return JSON.stringify(body);
   }
 
   private headers(): Record<string, string> {
     return { 'content-type': 'application/json', 'x-goog-api-key': this.apiKey };
   }
 
-  async chat(args: { system: string; user: string; maxTokens: number; signal?: AbortSignal }): Promise<string> {
-    if (args.maxTokens <= 0) throw new Error('maxTokens must be > 0');
+  async chat(req: ChatRequest): Promise<ChatResponse> {
+    if (req.maxTokens <= 0) throw new Error('maxTokens must be > 0');
     const url = `${this.baseUrl}/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
     const res = await this.http.fetch(url, {
       method: 'POST',
       headers: this.headers(),
-      body: this.buildBody(args),
-      ...(args.signal !== undefined ? { signal: args.signal } : {}),
+      body: this.buildBody(req),
+      signal: req.signal,
     });
     const text = await res.text();
     if (res.status < 200 || res.status >= 300) throw new GoogleApiError(res.status, text);
     return this.parseChat(text);
   }
 
-  private parseChat(body: string): string {
+  private parseChat(body: string): ChatResponse {
     let parsed: unknown;
     try { parsed = JSON.parse(body); } catch (e) { throw new Error(`Google response not JSON: ${(e as Error).message}`); }
     if (!parsed || typeof parsed !== 'object') throw new Error('Google response not object');
+    const usage = parseUsage(parsed);
     const candidates = (parsed as { candidates?: unknown }).candidates;
-    if (!Array.isArray(candidates) || candidates.length === 0) return '';
-    const content = (candidates[0] as { content?: { parts?: unknown } }).content;
-    const parts = content?.parts;
-    if (!Array.isArray(parts)) return '';
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      return { content: [], stopReason: 'end_turn', ...(usage !== undefined ? { usage } : {}) };
+    }
+    const first = candidates[0] as { content?: { parts?: unknown }; finishReason?: unknown };
+    const parts = first.content?.parts;
     const out: string[] = [];
-    for (const p of parts) {
-      if (p && typeof p === 'object') {
-        const t = (p as { text?: unknown }).text;
-        if (typeof t === 'string') out.push(t);
+    if (Array.isArray(parts)) {
+      for (const p of parts) {
+        if (p && typeof p === 'object') {
+          const t = (p as { text?: unknown }).text;
+          if (typeof t === 'string') out.push(t);
+        }
       }
     }
-    return out.join('');
+    const joined = out.join('');
+    const content: ContentBlock[] = joined.length > 0 ? [{ type: 'text', text: joined }] : [];
+    return {
+      content,
+      stopReason: mapFinishReason(first.finishReason),
+      ...(usage !== undefined ? { usage } : {}),
+    };
   }
 
-  async *chatStream(args: {
-    system: string; user: string; maxTokens: number; signal?: AbortSignal;
-  }): AsyncIterable<StreamChunk> {
-    if (args.maxTokens <= 0) throw new Error('maxTokens must be > 0');
+  /**
+   * SSE-streamed generateContent. Emits the canonical @tenet/core
+   * StreamChunk shapes. The raw `finishReason` is CAPTURED when it
+   * arrives on a candidate (skipping FINISH_REASON_UNSPECIFIED) and
+   * mapped onto the canonical StopReason for the single `message_stop`
+   * chunk emitted at stream end (previously the raw provider string
+   * leaked out mid-stream).
+   */
+  async *chatStream(req: ChatRequest): AsyncIterable<StreamChunk> {
+    if (req.maxTokens <= 0) throw new Error('maxTokens must be > 0');
     const url = `${this.baseUrl}/v1beta/models/${encodeURIComponent(this.model)}:streamGenerateContent?alt=sse`;
     const res = await this.http.fetch(url, {
       method: 'POST',
       headers: this.headers(),
-      body: this.buildBody(args),
-      ...(args.signal !== undefined ? { signal: args.signal } : {}),
+      body: this.buildBody(req),
+      signal: req.signal,
     });
     if (res.status < 200 || res.status >= 300) {
       throw new GoogleApiError(res.status, await res.text());
     }
     if (!res.body) throw new Error('Google streaming response missing body');
 
-    for await (const ev of parseSseStream(res.body, args.signal)) {
+    let capturedFinish: unknown;
+
+    for await (const ev of parseSseStream(res.body, req.signal)) {
       let parsed: unknown;
       try { parsed = JSON.parse(ev.data); } catch { continue; }
       if (!parsed || typeof parsed !== 'object') continue;
@@ -146,7 +226,7 @@ export class GoogleChatModel implements ChatModel, ChatModelStreaming {
             }
           }
           if (typeof finish === 'string' && finish.length > 0 && finish !== 'FINISH_REASON_UNSPECIFIED') {
-            yield { kind: 'message_stop', stopReason: finish };
+            capturedFinish = finish;
           }
         }
       }
@@ -156,6 +236,7 @@ export class GoogleChatModel implements ChatModel, ChatModelStreaming {
         if (inT > 0 || outT > 0) yield { kind: 'usage', inputTokens: inT, outputTokens: outT };
       }
     }
+    yield { kind: 'message_stop', stopReason: mapFinishReason(capturedFinish) };
   }
 }
 
