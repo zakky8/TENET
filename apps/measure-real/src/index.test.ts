@@ -1,18 +1,28 @@
-import type { LegacyChatModel as ChatModel } from '@tenet/models-anthropic';
+import type { ChatModel, ChatRequest } from '@tenet/core';
 import type { HhemScorer } from '@tenet/judge-hhem';
 import { measureReal, makeCostMeter, type CostMeter, type RealCase } from './runner.js';
 import { PUBLIC_SLICE, PUBLIC_SLICE_VERSION } from './dataset.js';
 
+/** Flatten a canonical ChatRequest's messages to the single user string the
+ *  runner sent (mirrors the boundary flatten in @tenet/core's fromLegacyModel). */
+function flattenUser(req: ChatRequest): string {
+  return req.messages
+    .flatMap((m) => m.content)
+    .map((b) => (b.type === 'text' ? b.text : b.type === 'tool_result' ? b.content : ''))
+    .join('\n');
+}
+
 /** Test ChatModel — deterministic answers per case id. */
 function fakeModel(answersById: Record<string, string>): ChatModel {
   return {
-    async chat({ user }) {
+    async chat(req) {
+      const user = flattenUser(req);
       const match = user.match(/Question:\s*(.+)$/);
       const q = match?.[1]?.trim() ?? '';
       // Look up by exact question match against PUBLIC_SLICE
       const c = PUBLIC_SLICE.find((x) => x.question === q);
-      if (!c) return 'Answer: unknown';
-      return `Answer: ${answersById[c.id] ?? c.acceptableAnswers[0]}`;
+      const text = !c ? 'Answer: unknown' : `Answer: ${answersById[c.id] ?? c.acceptableAnswers[0]}`;
+      return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
     },
   };
 }
@@ -97,7 +107,11 @@ describe('measureReal', () => {
         context: 'yes is the answer',
       },
     ];
-    const m: ChatModel = { async chat() { return 'Answer: yes'; } };
+    const m: ChatModel = {
+      async chat() {
+        return { content: [{ type: 'text', text: 'Answer: yes' }], stopReason: 'end_turn' };
+      },
+    };
     const report = await measureReal({
       model: m,
       modelId: 'fake',

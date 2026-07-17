@@ -16,7 +16,6 @@
  * any other dataset. To get those numbers, swap the dataset config.
  */
 
-import { asLegacyModel } from '@tenet/core';
 import { AnthropicChatModel } from '@tenet/models-anthropic';
 import { TOKEN_OVERLAP_SCORER } from '@tenet/judge-hhem';
 import { measureReal, makeCostMeter } from '@tenet/app-measure-real';
@@ -36,8 +35,8 @@ const http = {
   },
 };
 // AnthropicChatModel is canonical (@tenet/core ChatRequest/ChatResponse);
-// measureReal's runner still speaks the legacy single-string shape — bridge it.
-const model = asLegacyModel(new AnthropicChatModel(http, { apiKey, model: modelId }));
+// measureReal's runner is canonical too — pass it straight through.
+const model = new AnthropicChatModel(http, { apiKey, model: modelId });
 
 const cost = makeCostMeter({
   [modelId]: { inputUsdPerMillion: 3, outputUsdPerMillion: 15 },

@@ -16,7 +16,8 @@
  * Cloudflare Workers, etc.).
  */
 
-import type { LegacyChatModel as ChatModel } from '@tenet/models-anthropic';
+import type { ChatModel } from '@tenet/core';
+import { textMessage, responseText } from '@tenet/core';
 import {
   hallucinationRate,
   groundednessRate,
@@ -87,7 +88,13 @@ async function runCase(
   const system =
     'You are a grounded answerer. Use ONLY the provided context. Reply in the form "Answer: <short>".';
   const user = `Context:\n${c.context}\n\nQuestion: ${c.question}`;
-  const raw = await cfg.model.chat({ system, user, maxTokens: 256, signal });
+  const res = await cfg.model.chat({
+    system,
+    messages: [textMessage('user', user)],
+    maxTokens: 256,
+    signal,
+  });
+  const raw = responseText(res);
   const e2eMs = Date.now() - start;
   // The injected ChatModel doesn't expose a streaming TTFT; approximate
   // by reporting one-token wall-clock (e2eMs / tokens). Operators with a
