@@ -8,13 +8,13 @@
  * usage pattern is:
  *
  *   import { measureReal, makeCostMeter } from '@tenet/app-measure-real';
+ *   import { asLegacyModel } from '@tenet/core';
  *   import { AnthropicChatModel } from '@tenet/models-anthropic';
  *
- *   const model = new AnthropicChatModel({
- *     apiKey: process.env.ANTHROPIC_API_KEY!,
- *     model: 'claude-sonnet-4-5-20250929',
- *     http: { fetch: (url, init) => fetch(url, init) },
- *   });
+ *   const model = asLegacyModel(new AnthropicChatModel(
+ *     { fetch: (url, init) => fetch(url, init) },
+ *     { apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-sonnet-4-5-20250929' },
+ *   ));
  *   const cost = makeCostMeter({
  *     'claude-sonnet-4-5-20250929': { inputUsdPerMillion: 3, outputUsdPerMillion: 15 },
  *   });

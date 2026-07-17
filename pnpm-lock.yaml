@@ -41,6 +41,9 @@ importers:
 
   apps/measure-real:
     dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tenet/eval-metrics':
         specifier: workspace:*
         version: link:../../eval/metrics
@@ -86,6 +89,9 @@ importers:
 
   models/anthropic:
     dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@tenet/streaming':
         specifier: workspace:*
         version: link:../../packages/streaming

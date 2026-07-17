@@ -16,7 +16,7 @@
  * Cloudflare Workers, etc.).
  */
 
-import type { ChatModel } from '@tenet/models-anthropic';
+import type { LegacyChatModel as ChatModel } from '@tenet/models-anthropic';
 import {
   hallucinationRate,
   groundednessRate,

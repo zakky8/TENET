@@ -7,6 +7,7 @@
 
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, env } from 'node:process';
+import { asLegacyModel } from '@tenet/core';
 import { AnthropicChatModel } from '@tenet/models-anthropic';
 import type { ChatModel } from '@tenet/verifier';
 import { QuickstartAgent, StubChatModel } from './index.js';
@@ -14,10 +15,12 @@ import { QuickstartAgent, StubChatModel } from './index.js';
 function pickModel(): { model: ChatModel; label: string } {
   const apiKey = env['ANTHROPIC_API_KEY'];
   if (apiKey !== undefined && apiKey.length > 0) {
-    const model = new AnthropicChatModel(
+    // AnthropicChatModel is canonical (@tenet/core ChatRequest/ChatResponse);
+    // the verifier still speaks the legacy single-string shape — bridge it.
+    const model = asLegacyModel(new AnthropicChatModel(
       { fetch: (input, init) => fetch(input, init) },
       { apiKey, model: env['TENET_MODEL'] ?? 'claude-sonnet-4-6' },
-    );
+    ));
     return { model, label: `Anthropic (${env['TENET_MODEL'] ?? 'claude-sonnet-4-6'})` };
   }
   return { model: new StubChatModel(), label: 'offline stub (set ANTHROPIC_API_KEY for a real model)' };

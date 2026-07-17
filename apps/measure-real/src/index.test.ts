@@ -1,4 +1,4 @@
-import type { ChatModel } from '@tenet/models-anthropic';
+import type { LegacyChatModel as ChatModel } from '@tenet/models-anthropic';
 import type { HhemScorer } from '@tenet/judge-hhem';
 import { measureReal, makeCostMeter, type CostMeter, type RealCase } from './runner.js';
 import { PUBLIC_SLICE, PUBLIC_SLICE_VERSION } from './dataset.js';

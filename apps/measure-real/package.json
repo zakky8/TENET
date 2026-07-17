@@ -20,6 +20,7 @@
     "README.md"
   ],
   "dependencies": {
+    "@tenet/core": "workspace:*",
     "@tenet/eval-metrics": "workspace:*",
     "@tenet/judge-hhem": "workspace:*",
     "@tenet/models-anthropic": "workspace:*"
