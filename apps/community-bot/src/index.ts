@@ -14,26 +14,25 @@
  */
 
 import type {
+  ChatModel,
+  ChatRequest,
+  ChatResponse,
   ConversationMessage,
   NormalizedEvent,
   NormalizedReply,
   Outcome,
   Source,
 } from '@tenet/core';
+import { textMessage, responseText } from '@tenet/core';
 
 /** Minimal retriever signature — implement with @tenet/retrieval or any custom impl. */
 export interface BotRetriever {
   query(args: { text: string; tenantId?: string }): Promise<ReadonlyArray<Source>>;
 }
 
-export interface BotChatModel {
-  chat(args: {
-    system: string;
-    user: string;
-    maxTokens: number;
-    signal?: AbortSignal;
-  }): Promise<string>;
-}
+/** Canonical alias — community-bot now speaks the canonical ChatModel contract
+ *  (structured messages, not the legacy single-string shape). */
+export type BotChatModel = ChatModel;
 
 export interface BotVerifier {
   verify(args: {
@@ -110,21 +109,19 @@ export class CommunityBot {
     const sourcesBlock = sources.map((s, i) => `[${i + 1}] ${s.text}`).join('\n\n');
 
     const history = this.opts.memory.messages();
-    const historyBlock = history
-      .slice(-10)
-      .map((m) => `${m.role}: ${m.content}`)
-      .join('\n');
-
-    const user = `${historyBlock ? `Recent context:\n${historyBlock}\n\n` : ''}Sources:\n${sourcesBlock || '(none)'}\n\nQuestion: ${event.text}`;
+    const prior = history.slice(0, -1).slice(-10); // last 10 PRIOR turns; excludes the current user msg appended above
+    const finalUser = `Sources:\n${sourcesBlock || '(none)'}\n\nQuestion: ${event.text}`;
+    const messages = [...prior.map((m) => textMessage(m.role, m.content)), textMessage('user', finalUser)];
 
     let draft: string;
     try {
-      draft = await this.opts.model.chat({
+      const res = await this.opts.model.chat({
         system: this.opts.systemPrompt,
-        user,
+        messages,
         maxTokens: this.maxTokens,
-        ...(signal !== undefined ? { signal } : {}),
+        signal: signal ?? new AbortController().signal, // canonical requires signal; un-abortable fallback matches quickstart 1.3
       });
+      draft = responseText(res);
     } catch (e) {
       this.recordOutcome(
         'disqualified',
