@@ -22,6 +22,9 @@
     "test": "jest",
     "lint": "echo 'no lint yet' && exit 0"
   },
+  "dependencies": {
+    "@tenet/core": "workspace:*"
+  },
   "keywords": [
     "adaptive-routing",
     "agent-framework",

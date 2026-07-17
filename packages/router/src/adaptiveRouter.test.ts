@@ -13,7 +13,7 @@ function mockModel(name: string, fail = false): RouterChatModel {
   return {
     async chat() {
       if (fail) throw new Error(`${name} failed`);
-      return `output-from-${name}`;
+      return { content: [{ type: 'text', text: `output-from-${name}` }], stopReason: 'end_turn' };
     },
   };
 }

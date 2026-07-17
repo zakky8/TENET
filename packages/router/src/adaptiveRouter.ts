@@ -1,3 +1,4 @@
+import { textMessage, responseText } from '@tenet/core';
 import type { RouteClassifier, RouteDecision, RouterChatModel } from './types.js';
 
 /**
@@ -68,12 +69,13 @@ export class AdaptiveRouter {
     }
 
     try {
-      const text = await initialModel.chat({
+      const res = await initialModel.chat({
         system: args.system,
-        user: args.user,
+        messages: [textMessage('user', args.user)],
         maxTokens: args.maxTokens,
-        ...(args.signal !== undefined ? { signal: args.signal } : {}),
+        signal: args.signal ?? new AbortController().signal,
       });
+      const text = responseText(res);
       return { text, tierUsed: initialTier, decision, fellBackToFlagship: lowConfidence };
     } catch (e) {
       if (initialTier === this.flagshipTier) throw e;
@@ -89,12 +91,13 @@ export class AdaptiveRouter {
   ): Promise<RouterOutput> {
     const model = this.opts.tiers[tier];
     if (!model) throw new Error(`Tier ${tier} not registered`);
-    const text = await model.chat({
+    const res = await model.chat({
       system: args.system,
-      user: args.user,
+      messages: [textMessage('user', args.user)],
       maxTokens: args.maxTokens,
-      ...(args.signal !== undefined ? { signal: args.signal } : {}),
+      signal: args.signal ?? new AbortController().signal,
     });
+    const text = responseText(res);
     return { text, tierUsed: tier, decision, fellBackToFlagship: fellBack };
   }
 }

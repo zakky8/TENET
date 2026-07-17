@@ -13,15 +13,8 @@ export interface RouteClassifier {
   classify(args: { text: string; intent?: string; signal?: AbortSignal }): Promise<RouteDecision>;
 }
 
-/** Generic chat-style model the router invokes. */
-export interface RouterChatModel {
-  chat(args: {
-    system: string;
-    user: string;
-    maxTokens: number;
-    signal?: AbortSignal;
-  }): Promise<string>;
-}
+/** Generic chat-style model the router invokes — the canonical @tenet/core ChatModel. */
+export type { ChatModel as RouterChatModel } from '@tenet/core';
 
 /** Semantic answer-cache lookup result. */
 export interface CacheHit {

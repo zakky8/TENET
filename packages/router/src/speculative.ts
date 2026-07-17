@@ -1,3 +1,4 @@
+import { textMessage, responseText, type ChatResponse } from '@tenet/core';
 import type { RouterChatModel } from './types.js';
 
 /**
@@ -47,11 +48,11 @@ export class SpeculativeAgent {
     maxTokens: number;
     signal?: AbortSignal;
   }): Promise<SpeculativeResult> {
-    const sharedArgs: Parameters<RouterChatModel['chat']>[0] = {
+    const sharedArgs = {
       system: args.system,
-      user: args.user,
+      messages: [textMessage('user', args.user)],
       maxTokens: args.maxTokens,
-      ...(args.signal !== undefined ? { signal: args.signal } : {}),
+      signal: args.signal ?? new AbortController().signal,
     };
 
     const cheapPromise = this.opts.cheap.chat(sharedArgs);
@@ -66,7 +67,7 @@ export class SpeculativeAgent {
 
     // ES2024 Promise.withResolvers — same pattern as withTimeoutAndSignal.
     const { promise: flagshipWithTimeout, resolve, reject } =
-      Promise.withResolvers<string | typeof TIMEOUT>();
+      Promise.withResolvers<ChatResponse | typeof TIMEOUT>();
     const flagshipTimer = setTimeout(() => resolve(TIMEOUT), this.flagshipTimeoutMs);
     flagshipPromise.then(
       (v) => resolve(v),
@@ -75,17 +76,17 @@ export class SpeculativeAgent {
 
     let cheapResult: string;
     try {
-      cheapResult = await cheapPromise;
+      cheapResult = responseText(await cheapPromise);
     } catch (e) {
       // Cheap broke — wait for flagship as the only option
       const fl = await flagshipPromise.catch(() => {
         throw e;
       });
       clearTimeout(flagshipTimer);
-      return { cheap: '', flagship: fl, accepted: false, reason: 'cheap-error' };
+      return { cheap: '', flagship: responseText(fl), accepted: false, reason: 'cheap-error' };
     }
 
-    let flagshipResult: string | typeof TIMEOUT;
+    let flagshipResult: ChatResponse | typeof TIMEOUT;
     try {
       flagshipResult = await flagshipWithTimeout;
     } catch {
@@ -100,23 +101,25 @@ export class SpeculativeAgent {
       return { cheap: cheapResult, accepted: true, reason: 'flagship-timeout' };
     }
 
+    const flagshipText = responseText(flagshipResult);
+
     const cheapOk = await this.opts.verify({
       cheap: cheapResult,
-      flagship: flagshipResult,
+      flagship: flagshipText,
       query: args.user,
     });
 
     if (cheapOk) {
       return {
         cheap: cheapResult,
-        flagship: flagshipResult,
+        flagship: flagshipText,
         accepted: true,
         reason: 'cheap-verified',
       };
     }
     return {
       cheap: cheapResult,
-      flagship: flagshipResult,
+      flagship: flagshipText,
       accepted: false,
       reason: 'flagship-promoted',
     };

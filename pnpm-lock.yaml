@@ -200,7 +200,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/router: {}
+  packages/router:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/skills: {}
 

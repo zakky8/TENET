@@ -7,7 +7,11 @@ function model(name: string, delayMs: number, failure?: boolean): RouterChatMode
       new Promise((resolve, reject) => {
         setTimeout(() => {
           if (failure) reject(new Error(`${name} failed`));
-          else resolve(`output-${name}`);
+          else
+            resolve({
+              content: [{ type: 'text', text: `output-${name}` }],
+              stopReason: 'end_turn',
+            });
         }, delayMs);
       }),
   };
