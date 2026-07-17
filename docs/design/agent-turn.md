@@ -17,6 +17,16 @@ Implementers: re-verify each cited line before editing — this doc does not re-
 
 # TENET Design Gate: Canonical `ChatModel` + Verification-First Orchestrator
 
+> **CORRECTION (2026-07-17, after increment 1.1 was executed):** the canonical **wire** message is named
+> **`ModelMessage`**, NOT `ConversationMessage`. Executing `tsc` at 1.1 surfaced a `TS2308` collision the
+> design missed: `packages/core/src/types.ts:53` ALREADY defines `ConversationMessage { content: string }` —
+> the distinct **stored/history** message used by `AgentState.history` (`types.ts:164`) and `@tenet/memory`,
+> which is left untouched. **Wherever this document writes `ConversationMessage` for the array-of-`ContentBlock`
+> wire message (§2, §2.1, §3, §5.2, and the community-bot migration instruction in §5), read `ModelMessage`.**
+> Where it writes `ConversationMessage` for `AgentState.history` / the stored `content: string` type (e.g. the
+> reasoner map `history.map((m) => textMessage(m.role, m.content))`), it is correct as written. The shipped
+> `packages/core/src/model.ts` JSDoc is the source of truth for this distinction.
+
 **Status:** APPROVED FOR IMPLEMENTATION — this document is the design gate. Fable agents implement against it without re-deciding. Every blocking finding from adversarial review is resolved below; where a decision was made, the rationale is stated so it is not re-litigated in the implementation phase.
 
 **Grounding note:** All line/file references are to the current TENET source as cited in the proposal and critique. This doc does not re-fetch; implementers MUST verify each cited line before editing, per the source-hierarchy rule.
