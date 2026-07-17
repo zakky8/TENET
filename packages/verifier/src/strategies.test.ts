@@ -1,3 +1,4 @@
+import type { ChatResponse } from '@tenet/core';
 import {
   urlAllowlistFilter,
   examplesDecorator,
@@ -6,6 +7,10 @@ import {
 } from './strategies.js';
 import { verifyDraft } from './verifier.js';
 import type { ChatModel, ClaimPreFilter, JudgePromptDecorator } from './types.js';
+
+function textResponse(text: string): ChatResponse {
+  return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
+}
 
 describe('urlAllowlistFilter', () => {
   it('returns a ClaimPreFilter that auto-passes claims with allowlisted URLs', () => {
@@ -79,10 +84,10 @@ describe('verifyDraft — app-supplied ClaimPreFilter short-circuits judging', (
     const model: ChatModel = {
       chat: async ({ system }) => {
         if (system.includes('extract atomic')) {
-          return 'this is a TRUSTED claim with real content';
+          return textResponse('this is a TRUSTED claim with real content');
         }
         judgeCalls++;
-        return '[1] SUPPORTED';
+        return textResponse('[1] SUPPORTED');
       },
     };
     const out = await verifyDraft(

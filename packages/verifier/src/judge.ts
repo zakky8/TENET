@@ -1,4 +1,5 @@
 import type { ChatModel, ClaimVerdict, VerifierConfig } from './types.js';
+import { responseText, textMessage } from '@tenet/core';
 import { withTimeoutAndSignal } from './timeout.js';
 
 /**
@@ -99,16 +100,18 @@ export async function judgeOneBatch(
 
   let raw: string;
   try {
-    raw = await withTimeoutAndSignal(
-      (signal) =>
-        model.chat({
-          system,
-          user: `SOURCES:\n${sources}\n\nCLAIMS:\n${numbered}`,
-          maxTokens: 256,
-          signal,
-        }),
-      config.judgeTimeoutMs,
-      'judge',
+    raw = responseText(
+      await withTimeoutAndSignal(
+        (signal) =>
+          model.chat({
+            system,
+            messages: [textMessage('user', `SOURCES:\n${sources}\n\nCLAIMS:\n${numbered}`)],
+            maxTokens: 256,
+            signal,
+          }),
+        config.judgeTimeoutMs,
+        'judge',
+      ),
     );
   } catch {
     // fail-open — mark all supported so we don't block shipping on judge breakage

@@ -1,4 +1,5 @@
 import type { ChatModel, VerifierConfig } from './types.js';
+import { responseText, textMessage } from '@tenet/core';
 import { withTimeoutAndSignal } from './timeout.js';
 
 const EXTRACT_SYSTEM = (maxClaims: number) =>
@@ -22,16 +23,18 @@ export async function extractClaims(
 
   let raw: string;
   try {
-    raw = await withTimeoutAndSignal(
-      (signal) =>
-        model.chat({
-          system: EXTRACT_SYSTEM(config.maxClaims),
-          user: `DRAFT:\n${draft}\n\nClaims:`,
-          maxTokens: 256,
-          signal,
-        }),
-      config.extractionTimeoutMs,
-      'extract',
+    raw = responseText(
+      await withTimeoutAndSignal(
+        (signal) =>
+          model.chat({
+            system: EXTRACT_SYSTEM(config.maxClaims),
+            messages: [textMessage('user', `DRAFT:\n${draft}\n\nClaims:`)],
+            maxTokens: 256,
+            signal,
+          }),
+        config.extractionTimeoutMs,
+        'extract',
+      ),
     );
   } catch {
     return [];

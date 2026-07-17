@@ -1,8 +1,13 @@
+import type { ChatResponse } from '@tenet/core';
 import { extractClaims } from './claimExtractor.js';
 import { DEFAULT_VERIFIER_CONFIG, type ChatModel } from './types.js';
 
+function textResponse(text: string): ChatResponse {
+  return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
+}
+
 function mockModel(reply: string): ChatModel {
-  return { chat: async () => reply };
+  return { chat: async () => textResponse(reply) };
 }
 
 describe('extractClaims — basic behavior', () => {
@@ -22,7 +27,7 @@ describe('extractClaims — basic behavior', () => {
 
   it('returns [] on empty draft (no LLM call)', async () => {
     let called = 0;
-    const model: ChatModel = { chat: async () => { called++; return 'x'; } };
+    const model: ChatModel = { chat: async () => { called++; return textResponse('x'); } };
     expect(await extractClaims(model, '', DEFAULT_VERIFIER_CONFIG)).toEqual([]);
     expect(called).toBe(0);
   });

@@ -1,3 +1,4 @@
+import type { ChatResponse } from '@tenet/core';
 import {
   extractNumericValues,
   numericFabricationCheck,
@@ -7,6 +8,10 @@ import {
 } from './deterministic.js';
 import { verifyDraft } from './verifier.js';
 import type { ChatModel } from './types.js';
+
+function textResponse(text: string): ChatResponse {
+  return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
+}
 
 describe('extractNumericValues', () => {
   it('parses plain ints, decimals, thousands separators', () => {
@@ -165,9 +170,9 @@ describe('verifyDraft with claimPreChecks (integration)', () => {
     let judges = 0;
     const model: ChatModel = {
       chat: async ({ system }) => {
-        if (system.includes('extract atomic')) return opts.extract;
+        if (system.includes('extract atomic')) return textResponse(opts.extract);
         judges++;
-        return opts.judgeReply ?? '[1] SUPPORTED';
+        return textResponse(opts.judgeReply ?? '[1] SUPPORTED');
       },
     };
     return { model, judgeCalls: () => judges };

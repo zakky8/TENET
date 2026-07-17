@@ -1,5 +1,19 @@
+import type { ChatRequest, ChatResponse } from '@tenet/core';
 import { verifyDraft } from './verifier.js';
 import type { ChatModel } from './types.js';
+
+function textResponse(text: string): ChatResponse {
+  return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
+}
+
+/** Flatten a canonical request's message content back to the legacy
+ *  single `user` string these tests were written against. */
+function reqUserText(req: ChatRequest): string {
+  return req.messages
+    .flatMap((m) => m.content)
+    .map((b) => (b.type === 'text' ? b.text : ''))
+    .join('');
+}
 
 /**
  * Sequential mock: returns scripted replies in order. Use to script
@@ -11,7 +25,7 @@ function scriptedModel(replies: string[]): ChatModel {
     chat: async () => {
       const r = replies[i] ?? '';
       i++;
-      return r;
+      return textResponse(r);
     },
   };
 }
@@ -44,10 +58,10 @@ describe('verifyDraft — URL pre-pass', () => {
       chat: async ({ system }) => {
         if (system.includes('judge')) judgeCalls++;
         if (system.includes('extract atomic')) {
-          return 'Open a ticket in the official Discord at discord.gg/abc';
+          return textResponse('Open a ticket in the official Discord at discord.gg/abc');
         }
         judgeCalls++;
-        return '[1] SUPPORTED';
+        return textResponse('[1] SUPPORTED');
       },
     };
     const out = await verifyDraft(
@@ -63,13 +77,15 @@ describe('verifyDraft — URL pre-pass', () => {
   it('still judges non-URL claims when a mix exists', async () => {
     const calls: string[] = [];
     const model: ChatModel = {
-      chat: async ({ system, user }) => {
+      chat: async (req) => {
+        const { system } = req;
         if (system.includes('extract atomic')) {
-          return 'discord.gg/abc is the ticket channel\nThe price is $500';
+          return textResponse('discord.gg/abc is the ticket channel\nThe price is $500');
         }
         calls.push(system.slice(0, 20));
+        const user = reqUserText(req);
         const claimLines = (user.split('CLAIMS:\n')[1] ?? '').split('\n').filter(Boolean);
-        return claimLines.map((_, i) => `[${i + 1}] SUPPORTED`).join('\n');
+        return textResponse(claimLines.map((_, i) => `[${i + 1}] SUPPORTED`).join('\n'));
       },
     };
     const out = await verifyDraft(
@@ -87,8 +103,8 @@ describe('verifyDraft — strict + permissive flow', () => {
   it('passes when strict judge approves everything', async () => {
     const model: ChatModel = {
       chat: async ({ system }) => {
-        if (system.includes('extract atomic')) return 'claim A\nclaim B';
-        return '[1] SUPPORTED\n[2] SUPPORTED';
+        if (system.includes('extract atomic')) return textResponse('claim A\nclaim B');
+        return textResponse('[1] SUPPORTED\n[2] SUPPORTED');
       },
     };
     const out = await verifyDraft(model, { sources: 's', draft: 'd' });
@@ -202,7 +218,7 @@ describe('verifyDraft — model failure modes', () => {
     const model: ChatModel = {
       chat: async () => {
         call++;
-        if (call === 1) return 'real claim with content';
+        if (call === 1) return textResponse('real claim with content');
         throw new Error('judge died');
       },
     };

@@ -1,5 +1,10 @@
+import type { ChatResponse } from '@tenet/core';
 import { verifyDraft } from './verifier.js';
 import type { ChatModel } from './types.js';
+
+function textResponse(text: string): ChatResponse {
+  return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
+}
 
 /**
  * FIX #10 regression — when two extracted claims happen to be identical
@@ -14,7 +19,7 @@ describe('verifyDraft — duplicate-claim permissive merge (FIX #10)', () => {
       chat: async () => {
         const r = replies[i] ?? '';
         i++;
-        return r;
+        return textResponse(r);
       },
     };
   }

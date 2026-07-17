@@ -1,5 +1,10 @@
+import type { ChatResponse } from '@tenet/core';
 import { QuickstartAgent, StubChatModel, QUICKSTART_KB, ABSTAIN_REPLY } from './index.js';
 import type { ChatModel } from '@tenet/verifier';
+
+function textResponse(text: string): ChatResponse {
+  return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
+}
 
 describe('QuickstartAgent with the stub model (the zero-key path)', () => {
   it('answers a question through the full retrieve→draft→verify pipeline', async () => {
@@ -34,9 +39,9 @@ describe('QuickstartAgent abstention (verification-first behaviour)', () => {
     // Model that drafts confidently but whose claims get judged UNSUPPORTED.
     const liar: ChatModel = {
       async chat({ system }) {
-        if (system.includes('extract atomic')) return 'TENET was founded on Mars in 1850.';
-        if (system.toLowerCase().includes('judge')) return '[1] UNSUPPORTED';
-        return 'TENET was founded on Mars in 1850.';
+        if (system.includes('extract atomic')) return textResponse('TENET was founded on Mars in 1850.');
+        if (system.toLowerCase().includes('judge')) return textResponse('[1] UNSUPPORTED');
+        return textResponse('TENET was founded on Mars in 1850.');
       },
     };
     const agent = new QuickstartAgent({ model: liar });

@@ -8,7 +8,8 @@
  * and the same pipeline runs against a real model — see main.ts.
  */
 
-import type { Source } from '@tenet/core';
+import type { ChatRequest, ChatResponse, Source } from '@tenet/core';
+import { responseText, textMessage } from '@tenet/core';
 import { Bm25Index } from '@tenet/retrieval';
 import { defaultPreChecks, verifyDraft, type ChatModel } from '@tenet/verifier';
 
@@ -63,19 +64,35 @@ export const QUICKSTART_KB: Source[] = [
  *   - judge prompts            → '[1] SUPPORTED'
  *   - anything else (drafting) → answer composed from the KNOWLEDGE block
  */
+/** Extract the flattened text of a canonical request's message content —
+ *  the wire shape carries an array of blocks per message, but every caller
+ *  in this app sends a single text block, so a responseText-style flatten
+ *  reconstructs the same string the legacy `args.user` used to be. */
+function requestUserText(req: ChatRequest): string {
+  return req.messages
+    .flatMap((m) => m.content)
+    .map((b) => (b.type === 'text' ? b.text : ''))
+    .join('');
+}
+
+function textResponse(text: string): ChatResponse {
+  return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
+}
+
 export class StubChatModel implements ChatModel {
-  async chat(args: { system: string; user: string }): Promise<string> {
-    if (args.system.includes('extract atomic')) {
-      const firstSentence = args.user.split(/(?<=\.)\s/)[0] ?? args.user;
-      return firstSentence.slice(0, 200);
+  async chat(req: ChatRequest): Promise<ChatResponse> {
+    const user = requestUserText(req);
+    if (req.system.includes('extract atomic')) {
+      const firstSentence = user.split(/(?<=\.)\s/)[0] ?? user;
+      return textResponse(firstSentence.slice(0, 200));
     }
-    if (args.system.toLowerCase().includes('judge')) {
-      return '[1] SUPPORTED';
+    if (req.system.toLowerCase().includes('judge')) {
+      return textResponse('[1] SUPPORTED');
     }
     // Draft request: ground the reply in the first KNOWLEDGE chunk.
-    const m = args.user.match(/KNOWLEDGE:\n([\s\S]*?)(?:\n\n|$)/);
+    const m = user.match(/KNOWLEDGE:\n([\s\S]*?)(?:\n\n|$)/);
     const firstChunk = m?.[1]?.split('\n')[0] ?? 'I do not have enough information.';
-    return firstChunk;
+    return textResponse(firstChunk);
   }
 }
 
@@ -123,13 +140,19 @@ export class QuickstartAgent {
     const knowledge = sources.map((s) => s.text).join('\n');
 
     // 2. Draft, grounded on the KNOWLEDGE block.
-    const draft = await this.model.chat({
-      system:
-        'Answer using ONLY the KNOWLEDGE block. If the knowledge does not contain the answer, say you do not know.',
-      user: `KNOWLEDGE:\n${knowledge}\n\nQUESTION: ${question}`,
-      maxTokens: 512,
-      ...(signal !== undefined ? { signal } : {}),
-    });
+    const draft = responseText(
+      await this.model.chat({
+        system:
+          'Answer using ONLY the KNOWLEDGE block. If the knowledge does not contain the answer, say you do not know.',
+        messages: [textMessage('user', `KNOWLEDGE:\n${knowledge}\n\nQUESTION: ${question}`)],
+        maxTokens: 512,
+        // Canonical ChatRequest.signal is required; synthesize an
+        // un-abortable one when the caller passed none (same fallback
+        // pattern as @tenet/core's asLegacyModel — legacy callers never
+        // had cancellation here either, so this is parity, not a change).
+        signal: signal ?? new AbortController().signal,
+      }),
+    );
 
     // 3. Verify every atomic claim in the draft against the sources.
     // The deterministic tier (P16) settles verbatim quotes and

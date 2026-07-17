@@ -1,5 +1,19 @@
+import type { ChatRequest, ChatResponse } from '@tenet/core';
 import { isClaimAboutAllowedUrl, judgeBatched, judgeOneBatch } from './judge.js';
 import { DEFAULT_VERIFIER_CONFIG, type ChatModel } from './types.js';
+
+function textResponse(text: string): ChatResponse {
+  return { content: [{ type: 'text', text }], stopReason: 'end_turn' };
+}
+
+/** Flatten a canonical request's message content back to the legacy
+ *  single `user` string these tests were written against. */
+function reqUserText(req: ChatRequest): string {
+  return req.messages
+    .flatMap((m) => m.content)
+    .map((b) => (b.type === 'text' ? b.text : ''))
+    .join('');
+}
 
 describe('isClaimAboutAllowedUrl', () => {
   const PATTERNS = ['discord.gg/abc', 'example.com', 'github.com/foo'];
@@ -69,12 +83,12 @@ describe('isClaimAboutAllowedUrl', () => {
 });
 
 function mockModel(reply: string): ChatModel {
-  return { chat: async () => reply };
+  return { chat: async () => textResponse(reply) };
 }
 function slowModel(reply: string, delayMs: number): ChatModel {
   return {
     chat: () =>
-      new Promise((res) => setTimeout(() => res(reply), delayMs)),
+      new Promise((res) => setTimeout(() => res(textResponse(reply)), delayMs)),
   };
 }
 function brokenModel(): ChatModel {
@@ -205,9 +219,9 @@ describe('judgeOneBatch', () => {
   it('permissive mode does NOT inject adversarial examples', async () => {
     let capturedSystem = '';
     const model: ChatModel = {
-      chat: async ({ system }) => {
-        capturedSystem = system;
-        return '[1] SUPPORTED';
+      chat: async (req) => {
+        capturedSystem = req.system;
+        return textResponse('[1] SUPPORTED');
       },
     };
     await judgeOneBatch(model, 'srcs', ['x'], true, {
@@ -221,9 +235,9 @@ describe('judgeOneBatch', () => {
   it('strict mode DOES inject adversarial examples', async () => {
     let capturedSystem = '';
     const model: ChatModel = {
-      chat: async ({ system }) => {
-        capturedSystem = system;
-        return '[1] SUPPORTED';
+      chat: async (req) => {
+        capturedSystem = req.system;
+        return textResponse('[1] SUPPORTED');
       },
     };
     await judgeOneBatch(model, 'srcs', ['x'], false, {
@@ -239,14 +253,15 @@ describe('judgeBatched', () => {
   it('processes claims in batches of claimsPerBatch', async () => {
     let calls = 0;
     const model: ChatModel = {
-      chat: async ({ user }) => {
+      chat: async (req) => {
         calls++;
         // Echo back SUPPORTED for every numbered claim in the user payload
+        const user = reqUserText(req);
         const claimLines = user.split('CLAIMS:\n')[1] ?? '';
         const ns = (claimLines.match(/\[(\d+)\]/g) ?? []).map((m) =>
           parseInt(m.replace(/[[\]]/g, ''), 10),
         );
-        return ns.map((n) => `[${n}] SUPPORTED`).join('\n');
+        return textResponse(ns.map((n) => `[${n}] SUPPORTED`).join('\n'));
       },
     };
     const out = await judgeBatched(model, 'src', ['a', 'b', 'c', 'd', 'e'], false, {
@@ -260,14 +275,17 @@ describe('judgeBatched', () => {
 
   it('preserves claim order across batches', async () => {
     const model: ChatModel = {
-      chat: async ({ user }) => {
+      chat: async (req) => {
+        const user = reqUserText(req);
         const claims = (user.split('CLAIMS:\n')[1] ?? '').split('\n').filter(Boolean);
-        return claims
-          .map((line, i) => {
-            const isFirstClaimInBatch = line.includes('[1]');
-            return isFirstClaimInBatch ? `[${i + 1}] UNSUPPORTED: x` : `[${i + 1}] SUPPORTED`;
-          })
-          .join('\n');
+        return textResponse(
+          claims
+            .map((line, i) => {
+              const isFirstClaimInBatch = line.includes('[1]');
+              return isFirstClaimInBatch ? `[${i + 1}] UNSUPPORTED: x` : `[${i + 1}] SUPPORTED`;
+            })
+            .join('\n'),
+        );
       },
     };
     const out = await judgeBatched(model, 'src', ['c1', 'c2', 'c3', 'c4'], false, {
@@ -297,7 +315,7 @@ describe('judgeBatched', () => {
         peak = Math.max(peak, inFlight);
         await new Promise((r) => setTimeout(r, 20));
         inFlight--;
-        return '[1] SUPPORTED\n[2] SUPPORTED';
+        return textResponse('[1] SUPPORTED\n[2] SUPPORTED');
       },
     };
     // 10 claims / 2 per batch = 5 batches; cap to 2 parallel

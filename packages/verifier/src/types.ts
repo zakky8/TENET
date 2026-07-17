@@ -86,24 +86,9 @@ export const DEFAULT_VERIFIER_CONFIG: VerifierConfig = {
   allowedUrlPatterns: [],
 };
 
-/** Adapter the verifier uses to call a language model. */
-export interface ChatModel {
-  /**
-   * System + user → completion text. Throws on timeout/error.
-   *
-   * `signal` is the verifier's cancellation channel: when the verifier's
-   * own timeout fires it calls AbortController.abort() to release the
-   * in-flight HTTP request. Adapters MUST forward `signal` to their HTTP
-   * client (fetch / AWS SDK / etc.) — otherwise zombie requests keep
-   * billing and consuming rate-limit budget after the verifier has moved on.
-   */
-  chat(args: {
-    system: string;
-    user: string;
-    maxTokens: number;
-    signal?: AbortSignal;
-  }): Promise<string>;
-}
+/** Adapter the verifier uses to call a language model.
+ *  Canonical @tenet/core contract — see packages/core/src/model.ts. */
+export type { ChatModel } from '@tenet/core';
 
 export interface VerifyInput {
   /** Concatenated KNOWLEDGE block + retrieved source chunks the model saw. */
