@@ -2,8 +2,9 @@
  * @tenet/agent — the verification-first agent turn.
  *
  * Public surface. Increment 2.1a ships the type contract (see ./types.ts);
- * the Reasoner (2.2), the graph nodes, and the orchestrator (runAgent) land in
- * subsequent increments and are exported from here as they arrive.
+ * increment 2.2a ships the fail-closed Reasoner (see ./reasoner.ts); the graph
+ * nodes and the orchestrator (runAgent) land in subsequent increments and are
+ * exported from here as they arrive.
  */
 export type {
   ToolCall,
@@ -13,5 +14,7 @@ export type {
   ReasonerOutput,
   Reasoner,
 } from './types.js';
+
+export { modelReasoner, parseEnvelope, buildSystem } from './reasoner.js';
 
 export const VERSION = '0.0.0';
