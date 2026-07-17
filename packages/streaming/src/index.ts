@@ -2,13 +2,12 @@
  * Streaming ChatModel contract — closes the table-stakes gap vs
  * Pydantic-AI / Mastra / OpenAI Agents SDK.
  *
- * Non-breaking: ChatModelStreaming is a SEPARATE interface. Existing
- * ChatModel adapters stay unchanged. Adapters that support streaming
- * implement both; the verifier / router asks for streaming when the
- * surface supports it and falls back to non-streaming otherwise.
+ * The streaming contract (StreamingChatModel) and StreamChunk are CANONICAL,
+ * defined in @tenet/core and re-exported here. Adapters that support streaming
+ * implement `StreamingChatModel` over the SAME ChatRequest as non-streaming.
  *
  * Three shipped capabilities:
- *   1. ChatModelStreaming — AsyncIterable<StreamChunk> protocol
+ *   1. StreamingChatModel — AsyncIterable<StreamChunk> protocol (from @tenet/core)
  *   2. parseSseStream() — SSE event-stream parser (Anthropic, OpenAI,
  *      Mistral all use SSE)
  *   3. structuredStreamingParser() — incremental JSON-shape validator
@@ -16,24 +15,14 @@
  *      (Pydantic-AI's headline differentiator — now ours too)
  */
 
-// ── Streaming ChatModel contract ──────────────────────────────────────
-
-export type StreamChunk =
-  | { kind: 'text'; text: string }
-  | { kind: 'tool_use_start'; id: string; name: string }
-  | { kind: 'tool_use_delta'; id: string; partial: string }
-  | { kind: 'tool_use_end'; id: string }
-  | { kind: 'message_stop'; stopReason: string }
-  | { kind: 'usage'; inputTokens: number; outputTokens: number };
-
-export interface ChatModelStreaming {
-  chatStream(args: {
-    system: string;
-    user: string;
-    maxTokens: number;
-    signal?: AbortSignal;
-  }): AsyncIterable<StreamChunk>;
-}
+// ── Streaming ChatModel contract (CANONICAL — defined in @tenet/core) ──
+// StreamChunk + the streaming contract live in @tenet/core so streaming and non-streaming share ONE
+// block vocabulary. This re-export closes the divergence flagged during the adapter migration: this
+// package used to define its OWN StreamChunk with a loose `stopReason: string` (vs the canonical
+// `StopReason` union) plus a single-string `ChatModelStreaming` (superseded by the messages-array
+// StreamingChatModel). Re-exported here so the `@tenet/streaming` import path keeps working.
+import type { StreamChunk, StreamingChatModel } from '@tenet/core';
+export type { StreamChunk, StreamingChatModel };
 
 // ── SSE parser ────────────────────────────────────────────────────────
 

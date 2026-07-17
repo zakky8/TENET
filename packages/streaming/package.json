@@ -16,6 +16,9 @@
     "dist",
     "README.md"
   ],
+  "dependencies": {
+    "@tenet/core": "workspace:*"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
