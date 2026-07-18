@@ -322,7 +322,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/core
 
-  surfaces/matrix: {}
+  surfaces/matrix:
+    dependencies:
+      '@tenet/rate-limit':
+        specifier: workspace:*
+        version: link:../../packages/rate-limit
 
   surfaces/rest:
     dependencies:

@@ -6,6 +6,25 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — Matrix surface is a supervised, deployable `/sync` loop (5.2 COMPLETE → Phase 5 done, 2026-07-18)
+The Matrix surface already had an injected-fetch transport + a `/sync` long-poll, but the loop **threw on any
+non-2xx** — a single 503/429 killed the bot — and it yielded the bot's OWN messages (a reply-loop). Made it
+genuinely deployable:
+- **Supervised loop with backoff+jitter.** A transient failure (fetch throw, or a 429/408/5xx classified by
+  `@tenet/rate-limit`'s `isRetryable`) now backs off with jittered exponential delay and RETRIES instead of
+  crashing; a good sync resets the schedule. `initialBackoffMs` / `maxBackoffMs` / `backoffJitter` / `sleep` /
+  `random` are injectable (deterministic under test). This wires the resilience taxonomy into a surface.
+- **Token-expiry handling.** A 401 (M_UNKNOWN_TOKEN) throws a distinct `MatrixTokenExpiredError` (a
+  `MatrixApiError` subclass) — the surface can't re-auth itself, so it STOPS with an actionable signal for the
+  supervisor to obtain a fresh token; it does NOT burn requests retrying a dead token. Other 4xx stay fatal.
+- **Self-message filter.** A new `userId?` option drops events whose sender is the bot's own mxid.
+
+3 new tests (transient-5xx-recovers, 401→MatrixTokenExpiredError, 400→fatal-no-retry, self-filter) + 2
+non-vacuous mutation probes (5xx-throws-instead-of-backoff reddens the recovery test; removing the self-filter
+reddens the self-filter test). Suite 1288 → 1291 (+3). **5.2 COMPLETE → PHASE 5 DONE** (5.1 resilience family,
+5.2 deployable surface, 5.3 surface hardening all landed; the Phase-5 gate — a surface refuses an ungrounded
+reply + a failover test passes — is met).
+
 ### Changed — de-fork the two HS256 JWT verifiers into `@tenet/surface-core` (5.3 COMPLETE, 2026-07-18)
 The REST and web-widget surfaces each shipped their OWN copy of an HS256 JWT verifier — and the copies had
 already drifted once (the web-widget copy silently lost its `alg` + `nbf` checks; fixed in 981be3c). One

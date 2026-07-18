@@ -21,6 +21,8 @@
  *   PUT  /_matrix/client/r0/rooms/{roomId}/send/m.room.message/{txnId}
  */
 
+import { isRetryable } from '@tenet/rate-limit';
+
 export interface MatrixHttp {
   fetch(input: string, init: {
     method: 'GET' | 'POST' | 'PUT';
@@ -37,6 +39,22 @@ export interface MatrixSurfaceOptions {
   accessToken: string;
   /** Optional user-agent — operator-supplied for identification. */
   userAgent?: string;
+  /**
+   * The bot's OWN mxid (e.g. '@bot:matrix.org'). When set, the sync loop
+   * drops events sent by this id — a bot must not react to its own messages
+   * (the classic reply-loop). Absent → no self-filtering.
+   */
+  userId?: string;
+  /** Base backoff before the FIRST retry of a transient /sync failure (ms). Default 1000. */
+  initialBackoffMs?: number;
+  /** Backoff cap (ms), before jitter. Default 30_000. */
+  maxBackoffMs?: number;
+  /** Jitter fraction in [0,1] on the backoff (full jitter by default). */
+  backoffJitter?: number;
+  /** Injected wait (for deterministic tests). Default an abort-aware timer. */
+  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  /** Injected randomness in [0,1) (for deterministic tests). Default Math.random. */
+  random?: () => number;
 }
 
 export interface MatrixMessageEvent {
@@ -77,10 +95,51 @@ export class MatrixApiError extends Error {
   }
 }
 
+/**
+ * A 401 from /sync means the access token is invalid or expired. The surface
+ * cannot re-authenticate itself (it only holds a token), so it STOPS the loop
+ * with this distinct, actionable error — the supervisor obtains a fresh token
+ * and restarts. Retrying a dead token would only burn requests. Subclasses
+ * MatrixApiError so existing `instanceof MatrixApiError` handling still catches it.
+ */
+export class MatrixTokenExpiredError extends MatrixApiError {
+  constructor(body: string) {
+    super(401, body);
+    this.name = 'MatrixTokenExpiredError';
+  }
+}
+
+/** Abort-aware timer — rejects if the signal fires. */
+function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted === true) {
+      resolve(); // aborted → the loop's own `while (!aborted)` guard will exit
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onAbort = (): void => {
+      if (timer !== undefined) clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    };
+    timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export class MatrixSurface {
   private readonly baseUrl: string;
   private readonly accessToken: string;
   private readonly userAgent: string;
+  private readonly userId: string | undefined;
+  private readonly initialBackoffMs: number;
+  private readonly maxBackoffMs: number;
+  private readonly backoffJitter: number;
+  private readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
+  private readonly random: () => number;
   private syncToken: string | undefined;
   private txnCounter = 0;
 
@@ -90,6 +149,22 @@ export class MatrixSurface {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
     this.accessToken = opts.accessToken;
     this.userAgent = opts.userAgent ?? '@tenet/surface-matrix';
+    this.userId = opts.userId;
+    this.initialBackoffMs = opts.initialBackoffMs ?? 1000;
+    this.maxBackoffMs = opts.maxBackoffMs ?? 30_000;
+    this.backoffJitter = opts.backoffJitter ?? 1;
+    if (this.backoffJitter < 0 || this.backoffJitter > 1) {
+      throw new Error('MatrixSurface: backoffJitter must be in [0,1]');
+    }
+    this.sleep = opts.sleep ?? defaultSleep;
+    this.random = opts.random ?? Math.random;
+  }
+
+  /** Jittered exponential backoff before the next /sync retry. */
+  private async backoff(attempt: number, signal?: AbortSignal): Promise<void> {
+    const base = Math.min(this.maxBackoffMs, this.initialBackoffMs * 2 ** attempt);
+    const delayMs = base * (1 - this.backoffJitter * this.random());
+    await this.sleep(delayMs, signal);
   }
 
   private headers(): Record<string, string> {
@@ -106,24 +181,51 @@ export class MatrixSurface {
    * events not seen before. Caller breaks on AbortSignal.
    */
   async *events(signal?: AbortSignal): AsyncIterable<MatrixMessageEvent> {
+    let failures = 0;
     while (!signal?.aborted) {
       const since = this.syncToken !== undefined ? `&since=${encodeURIComponent(this.syncToken)}` : '';
       const url = `${this.baseUrl}/_matrix/client/r0/sync?timeout=30000${since}`;
-      const res = await this.http.fetch(url, {
-        method: 'GET',
-        headers: this.headers(),
-        ...(signal !== undefined ? { signal } : {}),
-      });
+
+      let res: { status: number; text(): Promise<string> };
+      try {
+        res = await this.http.fetch(url, {
+          method: 'GET',
+          headers: this.headers(),
+          ...(signal !== undefined ? { signal } : {}),
+        });
+      } catch {
+        // A cancelled turn stops; any other fetch failure is transient (the
+        // homeserver may be briefly unreachable) → back off + retry, never crash.
+        if (signal?.aborted === true) return;
+        await this.backoff(failures++, signal);
+        continue;
+      }
       const text = await res.text();
+
+      if (res.status === 401) {
+        // Token invalid/expired — the surface cannot re-auth itself → STOP.
+        throw new MatrixTokenExpiredError(text);
+      }
       if (res.status < 200 || res.status >= 300) {
+        // Transient (429 / 408 / 5xx) → back off + retry; any other 4xx → fatal.
+        if (isRetryable({ status: res.status })) {
+          await this.backoff(failures++, signal);
+          continue;
+        }
         throw new MatrixApiError(res.status, text);
       }
+
+      failures = 0; // a good sync resets the backoff schedule
       let parsed: unknown;
       try { parsed = JSON.parse(text); } catch { continue; }
       if (!parsed || typeof parsed !== 'object') continue;
       const nextBatch = (parsed as { next_batch?: unknown }).next_batch;
       if (typeof nextBatch === 'string') this.syncToken = nextBatch;
-      yield* extractMessages(parsed);
+      for (const ev of extractMessages(parsed)) {
+        // A bot must NOT react to its own messages (reply-loop). Drop self.
+        if (this.userId !== undefined && ev.senderId === this.userId) continue;
+        yield ev;
+      }
     }
   }
 

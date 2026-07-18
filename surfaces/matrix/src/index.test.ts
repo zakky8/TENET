@@ -1,4 +1,4 @@
-import { MatrixSurface, MatrixApiError, type MatrixHttp } from './index.js';
+import { MatrixSurface, MatrixApiError, MatrixTokenExpiredError, type MatrixHttp } from './index.js';
 
 function makeHttp(responses: Array<{ status: number; body: string }>): {
   http: MatrixHttp;
@@ -136,11 +136,66 @@ describe('MatrixSurface.events', () => {
     expect(out[0]!.eventId).toBe('$txt');
   });
 
-  it('throws MatrixApiError on non-2xx /sync response', async () => {
-    const { http } = makeHttp([{ status: 401, body: 'expired' }]);
+  it('throws MatrixTokenExpiredError (distinct, actionable) on a 401', async () => {
+    const { http } = makeHttp([{ status: 401, body: 'M_UNKNOWN_TOKEN' }]);
     const s = new MatrixSurface(http, { baseUrl: 'https://m.org', accessToken: 't' });
-    const ctrl = new AbortController();
-    const it = s.events(ctrl.signal);
+    const it = s.events(new AbortController().signal);
+    const p = it.next();
+    await expect(p).rejects.toBeInstanceOf(MatrixTokenExpiredError);
+    await expect(p).rejects.toBeInstanceOf(MatrixApiError); // still a MatrixApiError subclass
+  });
+
+  it('throws MatrixApiError (fatal, NOT retried) on a non-401 4xx', async () => {
+    const { http, calls } = makeHttp([{ status: 400, body: 'bad request' }]);
+    let slept = 0;
+    const s = new MatrixSurface(http, {
+      baseUrl: 'https://m.org', accessToken: 't', sleep: async () => { slept++; },
+    });
+    const it = s.events(new AbortController().signal);
     await expect(it.next()).rejects.toBeInstanceOf(MatrixApiError);
+    expect(calls).toHaveLength(1); // one fetch, then threw — no backoff/retry
+    expect(slept).toBe(0);
+  });
+
+  it('backs off on a transient 5xx and RECOVERS — the loop never crashes', async () => {
+    const sync = {
+      next_batch: 's-1',
+      rooms: { join: { '!r:m.org': { timeline: { events: [
+        { type: 'm.room.message', event_id: '$e', sender: '@a:m.org', content: { msgtype: 'm.text', body: 'hi' } },
+      ] } } } },
+    };
+    const delays: number[] = [];
+    const { http, calls } = makeHttp([
+      { status: 503, body: 'overloaded' },
+      { status: 200, body: JSON.stringify(sync) },
+    ]);
+    const s = new MatrixSurface(http, {
+      baseUrl: 'https://m.org', accessToken: 't',
+      sleep: async (ms) => { delays.push(ms); }, random: () => 0, initialBackoffMs: 1000,
+    });
+    const ctrl = new AbortController();
+    const out = [];
+    for await (const ev of s.events(ctrl.signal)) { out.push(ev); ctrl.abort(); }
+    expect(out).toHaveLength(1);          // recovered — the message came through
+    expect(out[0]!.eventId).toBe('$e');
+    expect(delays).toEqual([1000]);       // backed off once (attempt 0, random=0 → full base)
+    expect(calls.length).toBeGreaterThanOrEqual(2); // it retried the sync
+  });
+
+  it('drops the bot own messages (self-filter) when userId is set', async () => {
+    const sync = {
+      next_batch: 's-1',
+      rooms: { join: { '!r:m.org': { timeline: { events: [
+        { type: 'm.room.message', event_id: '$self', sender: '@bot:m.org', content: { msgtype: 'm.text', body: 'from me' } },
+        { type: 'm.room.message', event_id: '$other', sender: '@alice:m.org', content: { msgtype: 'm.text', body: 'from alice' } },
+      ] } } } },
+    };
+    const { http } = makeHttp([{ status: 200, body: JSON.stringify(sync) }]);
+    const s = new MatrixSurface(http, { baseUrl: 'https://m.org', accessToken: 't', userId: '@bot:m.org' });
+    const ctrl = new AbortController();
+    const out = [];
+    for await (const ev of s.events(ctrl.signal)) { out.push(ev); ctrl.abort(); }
+    expect(out.map((e) => e.senderId)).toEqual(['@alice:m.org']); // the bot's own message is dropped
+    expect(out.map((e) => e.eventId)).not.toContain('$self');
   });
 });
