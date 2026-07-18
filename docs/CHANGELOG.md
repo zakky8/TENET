@@ -6,6 +6,20 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Changed — de-fork the two HS256 JWT verifiers into `@tenet/surface-core` (5.3 COMPLETE, 2026-07-18)
+The REST and web-widget surfaces each shipped their OWN copy of an HS256 JWT verifier — and the copies had
+already drifted once (the web-widget copy silently lost its `alg` + `nbf` checks; fixed in 981be3c). One
+shared, hardened implementation now lives in `@tenet/surface-core` (`jwt.ts`: `hs256Verifier` + `JwtClaims` /
+`JwtVerifier` / `JwtError`, with the alg-confusion + nbf + timing-safe hardening), and both surfaces
+**re-export it** so there is a single source of truth that cannot drift again. Public APIs are unchanged:
+web-widget re-exports `hs256Verifier` / `JwtError` / `JwtClaims` / `JwtVerifier` 1:1; REST re-exports
+`hs256Verifier as hs256RestVerifier` and aliases `RestJwtClaims` / `RestJwtVerifier` to the shared types — so
+both surfaces' existing tests pass unchanged, now exercising the shared impl through their public API. Added a
+canonical JWT test suite in surface-core (valid, alg:none/RS256 confusion with a valid HMAC, nbf future/past,
+exp, malformed, bad-sig, missing-claims). MUTATION PROBE proves the de-fork's value: removing the alg check in
+the ONE shared impl reddens the alg-confusion tests of BOTH surfaces at once. Suite 1278 → 1288 (+10 canonical
+tests), 96 → 97 suites. **5.3 COMPLETE.**
+
 ### Added — REST surface enforces the grounded-render gate (5.3, Phase-5 gate MET, 2026-07-18)
 `RestSurface` gains an opt-in `groundedFallback?: string`. When set, the surface REFUSES to render a
 non-stream `/v1/converse` reply that carries no grounded citation — it returns the safe fallback (citations

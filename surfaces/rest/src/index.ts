@@ -13,9 +13,9 @@
  * dep).
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { NormalizedEvent, NormalizedReply } from '@tenet/core';
-import { groundedRenderGate } from '@tenet/surface-core';
+import { groundedRenderGate, hs256Verifier } from '@tenet/surface-core';
+import type { JwtClaims, JwtVerifier } from '@tenet/surface-core';
 
 // ── HTTP types ─────────────────────────────────────────────────────────
 
@@ -33,76 +33,14 @@ export interface RestResponse {
   body: AsyncIterable<string> | string;
 }
 
-// ── JWT verifier (HS256 minimal — same surface as web-widget) ──────────
-
-export interface RestJwtClaims {
-  sub: string;
-  tnt: string;
-  exp: number;
-}
-
-export interface RestJwtVerifier {
-  verify(token: string): Promise<RestJwtClaims>;
-}
-
-export function hs256RestVerifier(secret: string, opts: { now?: () => number } = {}): RestJwtVerifier {
-  if (!secret || secret.length < 16) throw new Error('hs256RestVerifier: secret must be >= 16 chars');
-  const now = opts.now ?? (() => Math.floor(Date.now() / 1000));
-  return {
-    async verify(token: string): Promise<RestJwtClaims> {
-      const parts = token.split('.');
-      if (parts.length !== 3) throw new Error('malformed JWT');
-      const [hdr, pld, sig] = parts as [string, string, string];
-      // SECURITY 2026-06-04 vuln-test: assert alg=HS256 BEFORE verifying
-      // — prevents the alg=none + alg-confusion (RS256→HS256-with-RSA-
-      // public-key) classes. Standard JWT discipline.
-      let header: unknown;
-      try {
-        header = JSON.parse(Buffer.from(b64UrlDecode(hdr), 'base64').toString('utf8'));
-      } catch {
-        throw new Error('malformed JWT header');
-      }
-      if (
-        header === null ||
-        typeof header !== 'object' ||
-        (header as { alg?: unknown }).alg !== 'HS256'
-      ) {
-        throw new Error('JWT alg must be HS256');
-      }
-      const expected = createHmac('sha256', secret).update(`${hdr}.${pld}`).digest();
-      const decoded = Buffer.from(b64UrlDecode(sig), 'base64');
-      // SECURITY 2026-06-04 vuln-test: length-equalise before timingSafeEqual
-      // so the same code path runs regardless of attacker-controlled sig
-      // length (timing-uniformity). Mismatched length still fails the equal.
-      const actual = decoded.length === expected.length
-        ? decoded
-        : Buffer.alloc(expected.length);
-      if (!timingSafeEqual(actual, expected) || decoded.length !== expected.length) {
-        throw new Error('signature mismatch');
-      }
-      const payload = JSON.parse(Buffer.from(b64UrlDecode(pld), 'base64').toString('utf8'));
-      if (
-        payload === null ||
-        typeof payload !== 'object' ||
-        typeof payload.sub !== 'string' ||
-        typeof payload.tnt !== 'string' ||
-        typeof payload.exp !== 'number'
-      ) {
-        throw new Error('claims missing sub/tnt/exp');
-      }
-      // Optional nbf (not-before) check when present.
-      if (typeof payload.nbf === 'number' && payload.nbf > now()) {
-        throw new Error('token not yet valid');
-      }
-      if (payload.exp < now()) throw new Error('token expired');
-      return payload as RestJwtClaims;
-    },
-  };
-}
-
-function b64UrlDecode(s: string): string {
-  return s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4);
-}
+// ── JWT verifier — re-exported from the shared hardened verifier ────────
+// De-forked into @tenet/surface-core so REST + web-widget share ONE hardened
+// HS256 impl and can never drift apart again. Public API is preserved via
+// aliases: hs256RestVerifier IS the shared hs256Verifier; RestJwtClaims /
+// RestJwtVerifier alias the shared JwtClaims / JwtVerifier types.
+export { hs256Verifier as hs256RestVerifier };
+export type RestJwtClaims = JwtClaims;
+export type RestJwtVerifier = JwtVerifier;
 
 // ── Surface ────────────────────────────────────────────────────────────
 

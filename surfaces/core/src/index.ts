@@ -12,6 +12,8 @@
 
 import type { Citation } from '@tenet/core';
 
+export * from './jwt.js';
+
 /** The minimal outbound shape the gate inspects (a NormalizedReply satisfies it). */
 export interface RenderableReply {
   text: string;
