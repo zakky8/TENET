@@ -6,6 +6,16 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — refresh the stale Phase-3 status in ARCHITECTURE §0 (docs-sync, 2026-07-18)
+`docs/ARCHITECTURE.md` §0 "Implementation status" claimed Phase-3 "truncation/maxClaims hardening remain" —
+a stale status that shipped fires ago (a stale repo fact is a hallucination in the repo's own voice).
+Corrected against the CODE, re-verified this fire: the Reasoner abstains on a `max_tokens`/refusal/aborted
+stop (`reasoner.ts`), an over-cap claim extraction throws `ClaimExtractionError` under `failClosed`
+(`claimExtractor.ts`), and `defaultPreChecks` fails a fabricated number/spelled-amount/URL before any judge
+(`deterministic.ts`: `numericFabricationCheck`/`parseSpelledNumbers`/`urlFabricationCheck`); `groundedOrAbstain`
+(3.4) ships in `@tenet/refine`. §0 now states Phase 3 effectively-complete (only 3.2's named-entity + negation
+guards deferred until a real judge) and Phases 4–5 in progress. Doc-only; suite unchanged (1254/94).
+
 ### Added — `retryWithBackoff` fail-closed retry wrapper in `@tenet/rate-limit` (5.1 partial, 2026-07-18)
 `retryWithBackoff(fn, opts)` retries an outbound call with jittered exponential backoff, and it fails CLOSED
 by construction: the default retry decision is the `isRetryable` taxonomy, so a fatal error (AbortError, 4xx,

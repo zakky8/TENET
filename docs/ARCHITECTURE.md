@@ -37,9 +37,23 @@ a description of shipped code. Numbers are measured, not aspirational.
   into an abstain. A failed draft is rewritten (`deps.rewrite`) and re-verified through the
   same emit edge up to `maxRepairRounds`, then abstains. Only real-model prompt validation
   remains a follow-up. See §17.
-- **Still pending:** the rest of Phase 3 (verifier `failClosed` MODE ships — 3.1; the
-  non-numeric claim tier + truncation/maxClaims hardening remain), real-model validation
-  of the turn prompt, and real-model benchmarks. The stub plane is the only measured plane.
+- **Phase 3 — verifier hardening (effectively complete):** the opt-in `failClosed` mode
+  (3.1) plus, verified in the tree: the Reasoner abstains on a `max_tokens` (TRUNCATED) /
+  refusal / aborted stop (`packages/agent/src/reasoner.ts` — a cut-off draft never ships);
+  an over-cap claim extraction throws `ClaimExtractionError` under `failClosed` instead of
+  silently dropping the unverified overflow (`packages/verifier/src/claimExtractor.ts`);
+  and the deterministic pre-check tier fails a fabricated number, spelled-out amount, or
+  `http(s)://` URL that is absent from the sources BEFORE any judge runs
+  (`packages/verifier/src/deterministic.ts`: `numericFabricationCheck` incl.
+  `parseSpelledNumbers`, `urlFabricationCheck`, `quoteGroundingCheck`, composed in
+  `defaultPreChecks`). A `groundedOrAbstain` reference orchestrator (3.4) chains the
+  knowledge-boundary gate → draft → verify + bounded repair → answer/abstain in
+  `@tenet/refine`. Only 3.2's named-entity + negation-scope guards remain — deferred until
+  a real judge model ships (defense-in-depth for the judge, not a current end-to-end hole).
+- **Still pending:** real-model validation of the turn prompt and real-model benchmarks —
+  no live-model access exists in this environment, so the hermetic stub plane is the only
+  measured plane. Phases 4–5 (hero apps + honest measurement; surfaces + resilience) are
+  in progress on `upgrade/top-1pct`.
 
 ---
 
