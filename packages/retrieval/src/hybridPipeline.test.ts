@@ -64,9 +64,16 @@ describe('HybridPipeline — end-to-end', () => {
       await Promise.all(docs.map(async (d) => ({ source: d, embedding: await embedder.embed(d.text) }))),
     );
     const out = await new HybridPipeline({ embedder, lexical, dense }).query({ text: 'two' });
-    expect(out.metrics.bm25Returned).toBeGreaterThanOrEqual(0);
-    expect(out.metrics.denseReturned).toBeGreaterThanOrEqual(0);
-    expect(out.metrics.fusedReturned).toBeGreaterThanOrEqual(0);
+    // Metrics must reflect the ACTUAL per-stage retrieval, not merely be non-negative
+    // (`>= 0` on a `.length` is structurally always true → a stage returning ZERO, or a
+    // metric wired to the wrong value, would pass). For this fixed setup: only doc A
+    // ('one two three') contains 'two' → BM25 returns 1; the dense store scores both docs
+    // → 2; RRF unions them → 2; with no reranker the final set IS the fused set.
+    expect(out.metrics.bm25Returned).toBe(1);
+    expect(out.metrics.denseReturned).toBe(2);
+    expect(out.metrics.fusedReturned).toBe(2);
+    expect(out.metrics.rerankedReturned).toBe(out.results.length); // the metric ties to real output
+    expect(out.results.length).toBe(2);
     expect(typeof out.metrics.embedMs).toBe('number');
   });
 
