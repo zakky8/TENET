@@ -145,14 +145,19 @@ describe('MistralChatModel', () => {
 
 describe('MistralApiError — secret scrubbing (a model error must never surface a credential)', () => {
   it('scrubs a Bearer token + authorization value from the message AND stored .body', () => {
+    // These are SYNTHETIC, deliberately-low-entropy placeholders — NOT real credentials.
+    // Kept obviously-fake so secret scanners (GitGuardian et al.) do not flag the fixture
+    // that verifies our OWN redaction (the earlier high-entropy `mst-…abc123def456` value
+    // tripped one). The scrubber matches by PATTERN (`Bearer \S+`, `authorization:`), so a
+    // placeholder exercises it exactly as a real token would.
     const e = new MistralApiError(
       401,
-      'auth failed for Bearer mst-super-secret-key-abc123def456 with authorization: raw-token-xyz789',
+      'auth failed for Bearer example-not-a-real-bearer-token with authorization: example-authorization-value',
     );
     expect(e.message).toContain('Bearer [redacted]');
-    expect(e.message).not.toContain('mst-super-secret-key-abc123def456');
-    expect(e.body).not.toContain('mst-super-secret-key-abc123def456');
-    expect(e.body).not.toContain('raw-token-xyz789');
+    expect(e.message).not.toContain('example-not-a-real-bearer-token');
+    expect(e.body).not.toContain('example-not-a-real-bearer-token');
+    expect(e.body).not.toContain('example-authorization-value');
   });
 
   it('scrubs an api_key JSON field', () => {
