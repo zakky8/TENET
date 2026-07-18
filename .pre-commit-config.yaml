@@ -2,8 +2,8 @@
 # Install: pip install pre-commit && pre-commit install
 # Run on full tree: pre-commit run --all-files
 #
-# Pattern borrowed from OpenClaw audit + adjusted for TENET's stack
-# (TypeScript-first, no Swift/Python skill payloads).
+# Shift-left security + hygiene for a TypeScript-first monorepo: file
+# hygiene, secret scanning, GitHub Actions audit, per-package typecheck.
 
 repos:
   # ── File hygiene ──────────────────────────────────────────────────────

@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1.7
 #
-# TENET production container.
-# Pattern borrowed from OpenClaw audit (376k★) + tightened:
+# TENET production container. Hardened multi-stage build:
 #   - multi-stage: deps → build → prune → runtime
 #   - SHA-pinned base images for reproducibility (pin in CI on tag releases)
 #   - non-root USER (uid 10001 to match infra/helm/tenet defaults)

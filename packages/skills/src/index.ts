@@ -1,8 +1,8 @@
 /**
  * SKILL.md format loader + registry.
  *
- * The skill-packaging convention used by Claude Code skills, OpenClaw,
- * and rising as the agent-skill standard. Bundle a capability as:
+ * A skill-packaging convention compatible with the Claude Code SKILL.md
+ * format. Bundle a capability as:
  *
  *     ---
  *     name: foo

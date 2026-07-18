@@ -2,8 +2,6 @@
  * Network policy primitives — closes two SSRF / credential-leak gaps
  * the rest of the framework relied on operators to handle.
  *
- * Borrowed from OpenClaw audit (net-policy package).
- *
  * Why this matters:
  *   1. SSRF — an LLM-tool that fetches a URL the model emits will
  *      hit 169.254.169.254 (cloud metadata) or 10.x.x.x (internal

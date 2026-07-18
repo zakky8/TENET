@@ -6,6 +6,26 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Changed — purge cross-project references + a fabricated star-count from tracked files (2026-07-18)
+TENET ships nothing that isn't its own: every lesson is generalized, no other project's brand/words are
+imported (a hard rule), and no number lives in the repo unless it traces to a source (§1/§9). A tree sweep
+(`git grep -i openclaw`) found **6 tracked files** attributing TENET's patterns to an external "OpenClaw"
+project — and the `Dockerfile` decorated it "(376k★)", a star count no repository on GitHub has (the largest
+is ~400k; the actual OpenClaw game project has ~6k), so the figure is fabricated regardless of what OpenClaw
+is. Generalized every one to describe the pattern on its own merit, preserving all technical substance:
+- `Dockerfile` — dropped "Pattern borrowed from OpenClaw audit (376k★)"; kept every hardening bullet
+  (multi-stage, SHA-pinned bases, non-root uid 10001, tini PID 1, HEALTHCHECK, loopback default).
+- `.pre-commit-config.yaml` — comment now describes the shift-left hooks directly (hygiene, secret scan,
+  Actions audit, per-package typecheck).
+- `packages/net-policy/src/index.ts`, `packages/tool-call-repair/src/index.ts` — removed the "Borrowed from
+  OpenClaw audit" JSDoc lines; the SSRF/credential-leak and bad-JSON-repair rationale stands unchanged.
+- `packages/skills/{package.json,src/index.ts}` — "(Claude Code / OpenClaw convention)" → "compatible with
+  the Claude Code SKILL.md convention" (SKILL.md is a real, public Claude Code format — a legitimate interop
+  statement, kept); also dropped the unsourced "rising as the agent-skill standard" trend claim (§9).
+Left intact: the legitimate `CODE_OF_CONDUCT.md` Contributor-Covenant attribution and internal "…from TENET"
+references. Comment/description-only — no behavior change; `pnpm -r build` green, `pnpm test` **1294/97
+green** (unchanged), post-edit `git grep -i openclaw` and the star-count scan both return nothing.
+
 ### Fixed — `AGENTS.md` reconciled against the code (removed ungrounded + stale claims, 2026-07-18)
 The public operating manual is held to §1/§9 like any other doc — a claim contributors rely on that isn't
 backed by the code is a hallucination in the repo's own voice. Re-verified every factual claim in `AGENTS.md`

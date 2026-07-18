@@ -15,8 +15,6 @@
  * the repair pipeline behind their MCP tool-runner — bad JSON becomes
  * good JSON instead of a 500 to the user.
  *
- * Pattern borrowed from OpenClaw audit (tool-call-repair package).
- *
  * No deps. Pure functions. Composable.
  */
 

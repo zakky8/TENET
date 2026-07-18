@@ -1,7 +1,7 @@
 {
   "name": "@tenet/skills",
   "version": "0.0.0",
-  "description": "SKILL.md format loader + registry. YAML frontmatter + lazy-loaded body, with @tenet/governance allowed-tools enforcement. Composable skill packaging pattern (Claude Code / OpenClaw convention).",
+  "description": "SKILL.md format loader + registry. YAML frontmatter + lazy-loaded body, with @tenet/governance allowed-tools enforcement. Composable skill-packaging pattern compatible with the Claude Code SKILL.md convention.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
