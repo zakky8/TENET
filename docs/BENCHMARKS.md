@@ -168,9 +168,9 @@ This is non-negotiable and continuous. See [SECURITY.md](../SECURITY.md). The me
 
 1. **WASM-sandboxed tool execution** — every MCP tool runs in a wasmtime sandbox with declared capabilities (network/filesystem/env-var allow-lists). Tool RCE cannot escape into host process.
 2. **Capability tokens** — tools receive narrow `Secret<T>` tokens, not env access. Token leaks revoke individually.
-3. **SBOM + provenance** — `npm publish --provenance`, CycloneDX SBOM per release, signed commits.
+3. **Minimal supply-chain surface** — no production dependencies (apps inject their own SDKs); secrets blocked pre-commit (gitleaks + `detect-private-key`), workflows audited (actionlint, zizmor).
 
-**Measured how:** Zero CVE entries in our advisory database. Trivy + Snyk + Dependabot run in CI; SARIF uploaded to GitHub Security. Disclosure inbox monitored.
+**Measured how:** a Trivy filesystem scan + `pnpm audit --prod` run in CI (report-only pre-1.0; Trivy SARIF is uploaded to the GitHub Security tab). No production dependencies to audit beyond dev-only transitives. Disclosure inbox per `SECURITY.md`.
 
 ---
 

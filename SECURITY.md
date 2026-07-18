@@ -36,7 +36,7 @@ TENET is designed to avoid entire categories of known agent-framework vulnerabil
 | Path traversal | No raw filesystem paths in public APIs | `PathHandle` type opened against allow-list root |
 | SQL injection | All store queries parameterized; metadata filter keys validated `/^[a-zA-Z0-9_.-]+$/` | Store-adapter type signatures take `Filter<T>`, not strings |
 | Secret leakage | Secrets are an opaque `Secret<T>` type, never serialized | Custom `toJSON()` rejects |
-| Supply chain | SBOM (CycloneDX) per release; Trivy + Dependabot + Snyk gates | GitHub Actions CI |
+| Supply chain | No production dependencies (adapters inject their own SDKs); Trivy fs scan + `pnpm audit --prod` in CI (report-only pre-1.0); gitleaks + `detect-private-key` pre-commit | GitHub Actions + pre-commit |
 
 ## Scope
 
@@ -55,7 +55,7 @@ What we explicitly defend against:
 5. **Secret leakage via serialization.** `@tenet/core`'s `Secret<T>` throws on `JSON.stringify`. Util.inspect / Pino-style structured logs are out of scope for this guarantee — apps must mark fields explicitly.
 6. **Telemetry stack exhaustion.** `@tenet/telemetry`'s `OutcomeEmitter` has a `MAX_EMIT_DEPTH=4` re-entrancy cap. Sink errors don't disappear silently — they're forwarded to the `SwallowedErrorReporter` callback.
 7. **Provider-side budget exhaustion.** `withTimeoutAndSignal` aborts the underlying HTTP request when the timer fires; no zombie inflight calls after timeout. Rate-limit scheduler's circuit breaker opens on 401/403 streaks (default 100) to avoid Discord-style IP bans.
-8. **Supply-chain compromise.** SBOM (CycloneDX) per release. Trivy + pnpm audit + GitHub Dependabot Alerts run in CI. We do NOT bundle major SDKs (AWS, pg, grammY) as hard deps — apps inject their own.
+8. **Supply-chain compromise.** No production dependencies — we do NOT bundle major SDKs (AWS, pg, grammY) as hard deps; apps inject their own, so there is no prod-dep surface to compromise. A Trivy filesystem scan + `pnpm audit --prod` run in CI (report-only pre-1.0, to be tightened to a hard gate at 1.0); `gitleaks` + `detect-private-key` block secrets pre-commit; `actionlint` + `zizmor` audit the workflow definitions.
 
 What we explicitly do NOT defend against:
 

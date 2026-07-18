@@ -6,6 +6,21 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — reconcile supply-chain SECURITY claims to what CI actually runs (removed SBOM/Dependabot/Snyk/provenance) (2026-07-18)
+A security doc that overclaims controls is worse than a stale feature count — an operator could rely on
+protections that aren't there (§9: no capability that isn't in the code). Trust-code review of `.github/
+workflows/ci.yml` + `.pre-commit-config.yaml` found the docs claimed a supply-chain posture that **does not
+exist**: SBOM (CycloneDX), a Dependabot config, Snyk, and npm `--provenance`/publish are nowhere in CI; Trivy
+runs **report-only** (`exit-code: '0'`, `continue-on-error`), not as a gate; `pnpm audit` is **informational**
+(`continue-on-error`), not "fails CI". Corrected every occurrence to the verified reality across `SECURITY.md`
+(supply-chain row + threat-model item), `docs/ARCHITECTURE.md` (§3 + the security table), `docs/BENCHMARKS.md`,
+and `README.md`: **no production dependencies** (adapters inject their own SDKs, so there is no prod-dep surface
+to compromise); a Trivy `fs` scan + `pnpm audit --prod` run report-only in CI (to be tightened to a hard gate
+at 1.0; Trivy SARIF → the GitHub Security tab); `gitleaks` + `detect-private-key` block secrets and `actionlint`
++ `zizmor` audit the workflows via pre-commit. Removed SBOM/Dependabot/Snyk/provenance entirely (not present,
+not traceably planned). Docs-only; every retained claim verified this fire; `pnpm -r build`/`pnpm test`
+unaffected (green at parent `9e4cefe`, 1325/98); counts/jsonld/inventory/links/readme all green.
+
 ### Added — lock the verifier's FINAL-ness in the PERMISSIVE branch (a fabrication survives even a rescue) (2026-07-18)
 The load-bearing anti-hallucination property: a deterministic fabrication (currency/percent/URL/email absent
 from sources) is FINAL — the permissive re-judge can never rescue it, because `deterministicVerdicts` merge
