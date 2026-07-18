@@ -6,6 +6,19 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — lock the verifier's FINAL-ness in the PERMISSIVE branch (a fabrication survives even a rescue) (2026-07-18)
+The load-bearing anti-hallucination property: a deterministic fabrication (currency/percent/URL/email absent
+from sources) is FINAL — the permissive re-judge can never rescue it, because `deterministicVerdicts` merge
+AFTER the rescue loop (`verifier.ts:151`). The existing "mixed" integration test covered this only in the
+strict-PASS branch (`strictFails.length === 0`); the PERMISSIVE branch (a claim strict-fails → permissive
+rescues it) coexisting with a deterministic fabrication was untested — a regression dropping that post-rescue
+merge would ship the fabrication, uncaught. Added the missing test: the permissive judge rescues the judged
+claim, but a percent-marked fabrication keeps the draft `pass: false`. Mutation probe non-vacuous: dropping
+`deterministicVerdicts` from the permissive-branch merge reddens THIS test while the strict-pass "mixed" test
+stays green — confirming a real coverage gap. Test-only — `verifyDraft` unchanged (already correct). `pnpm -r
+build`/`pnpm test` green, suite 1324 → **1325** (+1). Completes the verifier audit (extract/judge/deterministic/
+strict-permissive/duplicate-claim FIX#10/failClosed all sound + tested).
+
 ### Added — lock `withTimeout`'s error classification (parent-abort ≠ timeout; normal errors pass through) (2026-07-18)
 `withTimeout` (which the orchestrator wraps every pre-reasoning node in) has non-obvious `catch` logic: only if
 the wall-clock controller fired does it throw `WorkflowError('timeout')` — a caller (parent-signal) abort

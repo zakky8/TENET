@@ -274,6 +274,32 @@ describe('verifyDraft with claimPreChecks (integration)', () => {
     expect(det?.reason).toContain('87.3');
   });
 
+  it('permissive-rescued claim + a deterministic fabrication STILL fails (fabrication is FINAL past the rescue)', async () => {
+    // The permissive judge RESCUES the judged claim (strict UNSUPPORTED → permissive SUPPORTED),
+    // but a second claim is a percent-marked fabrication settled by the deterministic tier.
+    // deterministicVerdicts merge AFTER the permissive rescue loop, so the fabrication can never
+    // be rescued — the draft must fail. A regression dropping that merge would SHIP the fabrication.
+    // (The existing "mixed" test only covers the strict-PASS branch; this covers the permissive one.)
+    let i = 0;
+    const replies = [
+      'The service is reliable.\nUptime was 87.3% last year.', // extract → 2 claims
+      '[1] UNSUPPORTED: not in the sources',                    // strict fails the judged claim
+      '[1] SUPPORTED',                                          // permissive RESCUES it
+    ];
+    const model: ChatModel = { chat: async () => textResponse(replies[i++] ?? '') };
+    const out = await verifyDraft(model, {
+      sources: 'Our service had 99.99 percent uptime according to the status page.',
+      draft: 'x',
+    }, { claimPreChecks: defaultPreChecks() });
+
+    expect(out.pass).toBe(false); // the deterministic fabrication sinks it DESPITE the rescue
+    const rescued = out.verdicts.find((v) => v.claim.includes('reliable'));
+    const fabricated = out.verdicts.find((v) => v.claim.includes('87.3'));
+    expect(rescued?.supported).toBe(true); // the permissive judge DID rescue this one
+    expect(fabricated?.supported).toBe(false); // ...but the fabrication stays failed, FINAL
+    expect(fabricated?.reason).toMatch(/deterministic/);
+  });
+
   it('without claimPreChecks behaviour is unchanged (backwards compat)', async () => {
     const { model, judgeCalls } = modelScript({ extract: 'The product costs $499.' });
     const out = await verifyDraft(model, {
