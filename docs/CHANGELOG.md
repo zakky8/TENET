@@ -6,6 +6,18 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — community-bot no longer hardcodes costUsd: 0 (4.3 partial, 2026-07-18)
+The community-bot reference recorded `costUsd: 0` on every outcome (a fabricated "free" measurement,
+commented "cost meter integration is Phase 2"). Fixed with the same structural CostMeter wiring as
+enterprise-support: a `costMeter?: CostMeterLike` (`{ total(): number }`, satisfied by `@tenet/telemetry`'s
+`CostMeter` — no new dependency) is read at outcome time; unmetered defaults to 0 explicitly, never a
+fabricated figure. Cost is recorded on all three outcome paths (resolved / verifier-rejected / model-error).
+TRUST-CODE correction to the PLAN: community-bot's `verifierPassed` was NOT the enterprise-support
+fabrication — it already runs `verifier.verify()` and reports the real verdict (`true` on pass, `false` on
+reject, `null` on model error), so only `costUsd` needed fixing. 3 new tests (metered resolved, metered
+disqualified, unmetered 0); mutation-verified non-vacuous — and the probe caught a `toBeCloseTo(0.0031)`
+that was vacuous under the default 2-digit precision (0 ≈ 0.0031), now exact `toBe`. Suite 1227 → 1230 (+3).
+
 ### Fixed — enterprise-support telemetry no longer fabricates verifierPassed / costUsd (4.3 partial, 2026-07-18)
 The reference dispatcher recorded a FALSE `verifierPassed = true` on every successful dispatch — set
 unconditionally right after `agent.handle()`, without observing any verification (and, if `send` then

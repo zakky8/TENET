@@ -58,12 +58,25 @@ export interface BotTelemetry {
   }): void;
 }
 
+/**
+ * Reads the cost accrued for the turn at outcome time. Structurally
+ * satisfied by `@tenet/telemetry`'s `CostMeter` (no dependency needed) —
+ * record token usage into the SAME meter from the model call, and the bot
+ * reads `total()` here. Absent → cost is unmetered and recorded as 0
+ * (never a fabricated non-zero figure).
+ */
+export interface CostMeterLike {
+  total(): number;
+}
+
 export interface CommunityBotOptions {
   retriever: BotRetriever;
   model: BotChatModel;
   verifier: BotVerifier;
   memory: BotMemory;
   telemetry?: BotTelemetry;
+  /** Accrued-cost source for outcome telemetry (see CostMeterLike). */
+  costMeter?: CostMeterLike;
   /** System prompt prefix (constitutional principles, etc.). */
   systemPrompt: string;
   /** Max tokens per draft. Default 1024. */
@@ -184,7 +197,8 @@ export class CommunityBot {
       conversationId: event.conversationId,
       tenantId: event.tenantId,
       durationMs,
-      costUsd: 0, // cost meter integration is Phase 2
+      // Real accrued cost from the injected meter — never a hardcoded 0.
+      costUsd: this.opts.costMeter?.total() ?? 0,
       verifierPassed,
       ...(reason !== undefined ? { reason } : {}),
     });

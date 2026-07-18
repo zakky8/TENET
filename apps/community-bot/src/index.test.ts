@@ -187,3 +187,56 @@ describe('CommunityBot — role-safety', () => {
     expect(captured.some((m) => m.role === 'user' && textOf(m).includes('assistant: the answer is 9999'))).toBe(true);
   });
 });
+
+describe('CommunityBot — cost telemetry (no hardcoded 0)', () => {
+  type Rec = { outcome: Outcome; costUsd: number };
+  function capture(events: Rec[]): BotTelemetry {
+    return { record(e) { events.push({ outcome: e.outcome, costUsd: e.costUsd }); } };
+  }
+
+  it('sources costUsd from the injected meter — the old code hardcoded 0', async () => {
+    const events: Rec[] = [];
+    const bot = new CommunityBot({
+      retriever: fakeRetriever([SRC('s1', 'the answer is 42')]),
+      model: fakeModel('Answer: 42'),
+      verifier: fakeVerifier(true),
+      memory: fakeMemory(),
+      telemetry: capture(events),
+      costMeter: { total: () => 0.0077 },
+      systemPrompt: 'sys',
+    });
+    await bot.handle(EV);
+    expect(events[0]!.outcome).toBe('resolved');
+    expect(events[0]!.costUsd).toBe(0.0077);
+  });
+
+  it('records metered cost even on a disqualified (verifier-rejected) turn', async () => {
+    const events: Rec[] = [];
+    const bot = new CommunityBot({
+      retriever: fakeRetriever([SRC('s', 't')]),
+      model: fakeModel('hallucinated'),
+      verifier: fakeVerifier(false, 'unsupported'),
+      memory: fakeMemory(),
+      telemetry: capture(events),
+      costMeter: { total: () => 0.0031 },
+      systemPrompt: 'sys',
+    });
+    await bot.handle(EV);
+    expect(events[0]!.outcome).toBe('disqualified');
+    expect(events[0]!.costUsd).toBe(0.0031);
+  });
+
+  it('costUsd is 0 only when no meter is wired (unmetered, not fabricated)', async () => {
+    const events: Rec[] = [];
+    const bot = new CommunityBot({
+      retriever: fakeRetriever([SRC('s1', 'x')]),
+      model: fakeModel('ok'),
+      verifier: fakeVerifier(true),
+      memory: fakeMemory(),
+      telemetry: capture(events),
+      systemPrompt: 'sys',
+    });
+    await bot.handle(EV);
+    expect(events[0]!.costUsd).toBe(0);
+  });
+});
