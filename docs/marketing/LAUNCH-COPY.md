@@ -37,11 +37,11 @@ audit sink you get without wiring anything up. Three things I'd point at:
    framework plane, real-model harness measures TENET + your model on a
    public-shape dataset (operator brings keys + dataset).
 
-2. Pre-tool-call governance + approval gates + audit. 2026 research over
-   LangChain / LlamaIndex / Semantic Kernel / AutoGen / CrewAI confirmed:
-   "none evaluates a tool call against a policy before it executes, none
-   requires approval gates by default, none ships a structured audit
-   trail without custom integration." TENET ships all three with a
+2. Pre-tool-call governance + approval gates + audit. Evaluating a tool
+   call against policy BEFORE it executes — and requiring approval gates
+   and a structured audit trail as first-class layers, not custom
+   integration — is what most agent frameworks leave to the operator.
+   TENET ships all three with a
    redacting audit sink (allow-list redactor) so secrets in tool args
    don't leak to S3/SIEM sinks.
 
@@ -49,7 +49,7 @@ audit sink you get without wiring anything up. Three things I'd point at:
    HHEM-2.1 adapter so the headline hallucination row isn't self-judging
    LLM-as-judge. WASM tool sandbox with capability tokens (wasmtime
    adapter for production). MCP OAuth gateway with RFC 9207 iss
-   validation per the 2026-07-28 spec RC.
+   validation per the published spec.
 
 9 channel surfaces (Discord/Slack/Telegram/Teams/Matrix/Twilio/web/REST/
 gRPC) + 4 ticketing connectors (Zendesk/Intercom/Freshdesk/ServiceNow),
@@ -58,10 +58,11 @@ gRPC) + 4 ticketing connectors (Zendesk/Intercom/Freshdesk/ServiceNow),
 
 Things I cut from the headline that someone will ask about:
 - It's a framework, not a model. It calls Claude/GPT/Gemini, it doesn't
-  beat them. The claim is "makes whichever model you call more grounded,
-  cheaper per resolution, harder to jailbreak". That claim is measurable.
-- Voice surface: not shipped. Decagon/Sierra have it; no OSS competitor
-  does either. Out of scope until someone asks for it.
+  beat them. The claim is a systems one: "makes whichever model you call
+  answer only with a source-grounded, verified citation or abstain." That
+  is a contract you can read in the packages and exercise in the tests.
+- Voice: a voice surface ships (@tenet/voice + OpenAI Realtime + Twilio
+  Media Streams) — one of the 9 surface adapters.
 - Self-distillation: trace capture + JSONL emit ship. The fine-tune side
   is compute infra (Modal/RunPod), not framework.
 
@@ -253,7 +254,7 @@ LLM-as-judge.
 production wasmtime runtime adapter.
 
 → A Model Context Protocol OAuth gateway with RFC 9207 issuer
-validation per the 2026-07-28 spec RC.
+validation per the published spec.
 
 → Nine channel surfaces (Discord, Slack, Telegram, Microsoft Teams,
 Matrix, Twilio, web widget, REST, gRPC) plus four ticketing connectors

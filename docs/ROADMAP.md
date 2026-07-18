@@ -102,10 +102,10 @@ Every row in [BENCHMARKS.md](BENCHMARKS.md) measured + CI-gated:
 - `@tenet/models-anthropic.chatStream()` — Anthropic SSE streaming
 - `@tenet/workflow` — sequential / parallel / branch / retry / withTimeout DAG primitives
 
-## Phase 6 — Competitor weakness exploit (DONE)
-Web-verified research (LangChain, AutoGen, CrewAI, LlamaIndex, Semantic Kernel, Mastra, Pydantic-AI, OpenAI Agents, mem0, Letta, Zep). The 2026 confirmed quote: *"None evaluates a tool call against a policy before it executes, none requires approval gates by default, none ships a structured audit trail without custom integration."* We ship all three:
-- `@tenet/governance` — `PolicyEvaluator` + `ApprovalGate` + `AuditSink`. Idempotent approval keys; 6 typed audit event kinds; 4 built-in rule factories.
-- `@tenet/memory` consistency layer — fixes mem0 indexing-reliability + Zep read-after-write bug class. `mintToken` / `WriteAck.readableAtMs` / `waitUntilReadable` / `resolveConflict`.
+## Phase 6 — Pre-tool-call governance + memory consistency (DONE)
+Two first-class layers most agent frameworks leave to custom integration — evaluating a tool call against policy *before* it executes, and read-after-write consistency for agent memory — ship here as code:
+- `@tenet/governance` — `PolicyEvaluator` + `ApprovalGate` + `AuditSink`. Per-tool deny/allow/require-approval, idempotent approval keys, 6 typed audit event kinds, 4 built-in rule factories; the tool executor only ever sees policy-allowed calls.
+- `@tenet/memory` consistency layer — a read-after-write consistency guarantee (`mintToken` / `WriteAck.readableAtMs` / `waitUntilReadable` / `resolveConflict`) so a just-written memory is readable before the next turn depends on it.
 
 ## Phases 7–14 — Breadth + protocols + security (DONE)
 Shipped 2026-06-04: Gemini/Mistral/Ollama adapters, Bedrock + Anthropic streaming, OTLP wiring, voice surface (@tenet/voice + OpenAI Realtime + Twilio Media Streams), SKILL.md loader, Matrix surface, Dockerfile + health endpoints + pre-commit, @tenet/tool-call-repair + @tenet/net-policy, @tenet/acp (Agent Client Protocol), and a 23-finding vuln-test triage (44 bugs caught cumulatively across three adversarial review passes).

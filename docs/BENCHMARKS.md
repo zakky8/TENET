@@ -71,11 +71,11 @@ Measured against stub SUT + bundled fixtures on 2026-06-04, scorer `@tenet/eval-
 | 3 | **TTFT p95** | 2-4s typical hosted enterprise agents | < 200ms | ~10-20× |
 | 4 | **E2E p95** | 8-15s typical | < 1.5s | ~5-10× |
 | 5 | **Time-to-integrate** | Days-weeks closed; months DIY | < 10 min | ~1000× |
-| 6 | **High-sev CVEs / 6mo** | 3 in LangChain ecosystem Dec 2025 → Mar 2026 | 0 | floor |
+| 6 | **High-sev CVEs / 6mo** | the deserialization / template-injection RCE class recurs across the ecosystem (attributed to no named project) | 0 | floor |
 | 7 | **Eval-set size** | ~100-500 manual | 1,000,000+ auto-grown | ~1000-10000× |
 | 8 | **Retrieval failure @ K=10** | 1.9% @ K=20 (Anthropic Contextual Retrieval) | < 0.5% @ K=10 | ~4× |
 | 9 | **Surfaces / config** | 1-3 closed / 1 DIY | 8+ | new category |
-| 10 | **Tool-execution escapes** | Untracked; LangChain Jinja2/pickle had RCEs | 0 (WASM isolated) | floor |
+| 10 | **Tool-execution escapes** | Untracked in most frameworks (template-injection / unsafe-deserialization RCE class) | 0 (WASM isolated) | floor |
 
 ---
 
@@ -92,9 +92,9 @@ We don't trust the model. Every output passes a parallel verifier stack before e
 3. **Reflexion checklist** — N-item self-critique against Constitutional Principles. Lifted from TENET (~25 KG temporal guards + 13 Principles).
 4. **Multi-judge consensus** — 3 independent verifier passes with different lenses (correctness / source-grounding / sycophancy). Need 2/3 to pass. Mirrors adversarial-verify pattern from research-pass-1.
 5. **Citation enforcement** — output schema requires `{claim, source_chunk_id}` pairs. Claims without citations are stripped before emission.
-6. **Vectara HHEM-2.1 / Lynx as judge** — independent third-party hallucination detector runs on a sample of outputs in CI. Regression on this metric fails the build.
+6. **HHEM-2.1 judge adapter (optional, operator-run)** — an HHEM-style third-party hallucination detector, wired by the operator against their own runtime, scores a sample of outputs. It runs on the operator's real-model plane, NOT the hermetic CI stub plane (which has no real-model access).
 
-**Measured how:** Vectara HHEM-2.1 on every CI eval run + sampled production outputs. Target = mean score > 0.999 on hallucination-detection.
+**Measured how:** an HHEM-2.1 adapter, wired by the operator against their own runtime (not the hermetic CI plane), scores sampled outputs. Target = mean score > 0.999 on hallucination-detection.
 
 **Honest caveat:** "< 0.1%" assumes retrieved sources are themselves correct. Garbage-in still produces garbage-out — we add a `source.confidence` score per chunk so the verifier can flag low-confidence retrieval as "I'm not sure".
 
@@ -231,7 +231,7 @@ These are starting picks. The framework's router lets operators swap without cod
 | Long-context | Gemini 2.5 Pro (2M ctx) | Claude Opus 4.8 (1M ctx) | When entire knowledge base fits in context, this beats RAG on hard cases |
 | Self-host flagship | Llama 3.3 70B Instruct | Qwen 2.5 72B, Mistral Large 2 | Best open weights available 2026-06-03 |
 | Self-host fast | Llama 3.3 8B | Qwen 2.5 7B, Gemma 2 9B | For air-gapped enterprise / HIPAA |
-| Hallucination judge | Vectara HHEM-2.1 + Patronus Lynx | Self-trained judge on distilled data | Independent third-party detector reduces self-judging bias |
+| Hallucination judge | HHEM-2.1 / Lynx-style adapter (bring the model) | Self-trained judge on distilled data | An independent third-party detector reduces self-judging bias |
 
 **Distillation pipeline (the "best training" mechanism):**
 

@@ -17,7 +17,7 @@
 
 ## The honest read
 
-This is a *framework*, not a model. It does not train, fine-tune, or distill a frontier LLM. Nothing here "beats" Claude / GPT / Gemini at language tasks — it *calls* them. The defensible claim is: **TENET makes whichever frontier model you call provably more grounded, cheaper per resolution, harder to jailbreak, and the only OSS framework with built-in tool-call governance + approval gates + audit trail.** That is a systems claim, and it is measurable. The BENCHMARKS gate runs every PR; numbers are produced, not asserted.
+This is a *framework*, not a model. It does not train, fine-tune, or distill a frontier LLM. Nothing here "beats" Claude / GPT / Gemini at language tasks — it *calls* them. The defensible claim is a **systems** one: **TENET makes whichever frontier model you call answer only with a source-grounded, verified citation or abstain, and adds pre-tool-call governance — per-tool policy + approval gates + a structured audit trail — as a first-class, in-code layer.** Those are contracts you can read in the packages and exercise in the tests; the hermetic BENCHMARKS gate runs every PR, and numbers are produced, not asserted.
 
 ## Where TENET focuses
 
@@ -287,7 +287,7 @@ PRs welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md). The project values
 
 - **Anthropic** — Constitutional AI (Bai et al. 2022 → our `STANDARD_PRINCIPLES`), Citations API, Contextual Retrieval recipe, Claude Agent SDK.
 - **DeepMind / OpenAI prompt-engineering research** — Chain-of-Verification (Dhuliawala et al. 2023), Reflexion (Shinn et al. 2023), Sycophancy (Sharma et al. 2024 → our P11).
-- **Wang et al. 2024** — Speculative RAG (-51% latency / +13% accuracy → our `SpeculativeAgent`).
+- **Wang et al. 2024** — Speculative RAG; the pattern informs our `SpeculativeAgent` (the paper's -51% latency / +13% accuracy are its own reported results, not numbers measured for this repo).
 - **Cormack et al. 2009** — Reciprocal Rank Fusion → our `reciprocalRankFusion`.
 - **The OpenTelemetry GenAI** semantic conventions working group.
 - **The Model Context Protocol** spec maintainers + the 2026-07-28 RC iss-validation contributors.
