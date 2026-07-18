@@ -2,7 +2,7 @@
 
 **As of:** 2026-07-18 (revised after the canonical-ChatModel upgrade on `upgrade/top-1pct`). Lists what's queued, why, and how I'd rank it.
 
-> **Upgrade update (2026-07-18).** Phase 1 (canonical `ChatModel` migration) landed and Phase 2 is in progress. B2 and B3 are now RESOLVED (see bucket B); the single-string `ChatModel` schism is resolved by one messages-array contract (`packages/core/src/model.ts`); the model-adapter C-items are done (all 6 adapters exist). The new `@tenet/agent` package ships the orchestrator type contract plus the fail-closed decides-and-drafts Reasoner (`packages/agent/src/types.ts`, `packages/agent/src/reasoner.ts`). B1, B4, B5 remain open. Details inline below.
+> **Upgrade update (2026-07-18).** Phase 1 (canonical `ChatModel` migration) landed and Phase 2's agent turn is SHIPPED. B2 and B3 are now RESOLVED (see bucket B); the single-string `ChatModel` schism is resolved by one messages-array contract (`packages/core/src/model.ts`); the model-adapter C-items are done (all 6 adapters exist). The `@tenet/agent` package now ships the full driven turn: `runAgent` (`packages/agent/src/orchestrator.ts`) executes `OrchestratorState` as a fail-closed `@tenet/workflow` graph (nodes → Reasoner → governance-gated tools → verify → single emit edge). B1, B4, B5 remain open. Details inline below.
 
 > **All 26 original rows closed.** See [RESEARCH-PASS-2.md](RESEARCH-PASS-2.md) for buckets A + D (research), [CHANGELOG.md](CHANGELOG.md) for bucket B (5 adversarial fixes) + bucket C (11 MVP packages). This doc is preserved as the historical triage; future open items live in GitHub Issues.
 
@@ -48,7 +48,7 @@ Each is in [ROADMAP.md Phase 1](ROADMAP.md). All 11 packages landed (see [CHANGE
 | C7 | **DONE** | `models/bedrock` | First model adapter. Implements `ChatModel`. | done — all 6 adapters exist (`models/{anthropic,bedrock,google,mistral,ollama,openai}/src/index.ts`), migrated to the canonical `ChatModel` contract. |
 | C8 | landed | `stores/vector/pgvector` | First vector store. Implements the swappable interface. | medium |
 | C9 | landed | `stores/state/redis` | Session + cache state. | small |
-| C10 | **DONE** | `apps/community-bot` | First reference deployment. | `apps/community-bot/src/index.ts` exists and is on the canonical contract; history is now STRUCTURED `ModelMessage`s (`textMessage(m.role, m.content)` at `index.ts:114`), killing the `${role}: ${content}` turn-spoof. End-to-end orchestrator still in progress (see below). |
+| C10 | **DONE** | `apps/community-bot` | First reference deployment. | `apps/community-bot/src/index.ts` exists and is on the canonical contract; history is now STRUCTURED `ModelMessage`s (`textMessage(m.role, m.content)` at `index.ts:114`), killing the `${role}: ${content}` turn-spoof. End-to-end orchestrator now shipped (`runAgent`, see below). |
 | C11 | landed | `eval/harness` | Eval-as-CI requires a runner before any eval-set growth makes sense. | medium-large (golden dataset loader, LLM-as-judge, regression gate) |
 
 ## Upgrade status — canonical `ChatModel` (Phase 1) + fail-closed Reasoner (Phase 2)
@@ -58,11 +58,11 @@ Each is in [ROADMAP.md Phase 1](ROADMAP.md). All 11 packages landed (see [CHANGE
 **Landed:**
 
 - **Phase 1 — one canonical `ChatModel` contract in `@tenet/core`.** A messages array (`ModelMessage[]`), a required `AbortSignal`, tool round-trips (`ContentBlock`: `text` | `tool_use` | `tool_result`), and a lossless `StopReason` union (`packages/core/src/model.ts`). This replaced the duplicated single-string `chat({system, user}): Promise<string>` interfaces — the schism the recon flagged as the root of "no conversation memory." Role structure now reaches the model. All 6 adapters were migrated onto it, and the transitional bridges were deleted (no `fromLegacyModel`/`asLegacyModel`/`LegacySingleStringModel`/`LegacyChatArgs` remain in code — every consumer speaks the canonical contract).
-- **Phase 2 — new `@tenet/agent` package.** Ships the orchestrator TYPE contract (`OrchestratorState extends AgentState`; the discriminated `ReasonerOutput = answer | tool | handoff | abstain`, `packages/agent/src/types.ts`) plus the FAIL-CLOSED decides-and-drafts Reasoner (`modelReasoner` + `parseEnvelope`, `packages/agent/src/reasoner.ts`). Grounded-or-abstain: no path yields an `answer` without a non-blank citation, and every ambiguity (parse failure, unknown action, `tool_use` stop with no tool blocks, refusal, aborted, uncited answer) resolves to `abstain`.
+- **Phase 2 — the `@tenet/agent` driven turn (SHIPPED).** `runAgent` (`packages/agent/src/orchestrator.ts`) executes `OrchestratorState` as a `@tenet/workflow` graph: `injectionGate → retrieveNode → cacheNode → criticLoop`, all fail-closed. The FAIL-CLOSED decides-and-drafts Reasoner (`modelReasoner` + `parseEnvelope`) is grounded-or-abstain (no `answer` without a non-blank citation; every ambiguity → `abstain`). `verifyAndEmit` is the single emit edge (verify → ≥1 grounded citation → outbound leak gate); tools run through governance (`runTools`); terminals are carried in `state.halt` with a `finalize` default + a top-level catch that fails closed on any error.
 
 **Still pending (stated honestly):**
 
-- The orchestrator that DRIVES `AgentState` end-to-end is **in progress**. `@tenet/agent` ships the type contract + the fail-closed Reasoner; the `runAgent` workflow graph (deterministic pre-handlers → retrieve → reasoner → fail-closed verify → critique-retry → emit/abstain/handoff) is the next increment. Not finished.
+- The **answer repair-retry** capability (`RewriteFn` in the `criticLoop` answer branch) — a capability enhancement on the safe floor; today an unverifiable draft fails closed to `abstain`. And **real-model validation** of the decides-and-drafts prompt (`buildSystem`) — deferred until an API key exists in the build env. Neither weakens the control-flow guarantee.
 - The verifier's own fail-CLOSED changes are a later phase (Phase 3).
 - REAL-MODEL benchmark numbers still do not exist (no model access in this environment). The hermetic stub remains the only measured plane; keep the stub-vs-real split in the benchmark docs honest — no real-model numbers are claimed.
 

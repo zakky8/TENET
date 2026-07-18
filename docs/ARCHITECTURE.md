@@ -17,7 +17,7 @@ is actually in the tree on branch `upgrade/top-1pct`, so the proposal is not rea
 a description of shipped code. Numbers are measured, not aspirational.
 
 - **Repo:** 62 workspace packages (every `package.json` under the `pnpm-workspace.yaml`
-  globs). Test suite: **85 suites / 1117 tests, all green** (was 83 / 1051 at the start
+  globs). Test suite: **92 suites / 1174 tests, all green** (was 83 / 1051 at the start
   of this upgrade). All figures are from the **hermetic stub plane** — no real-model
   access exists in this environment, so no real-model benchmark numbers are claimed here.
 - **Phase 1 — canonical model contract (complete):** one `ChatModel` in `@tenet/core`
@@ -28,13 +28,17 @@ a description of shipped code. Numbers are measured, not aspirational.
   six model adapters (`models/{anthropic,bedrock,google,mistral,ollama,openai}`) speak it;
   `@tenet/streaming` and `@tenet/ag-ui` re-align to the canonical `StreamChunk`; the
   transitional legacy bridges were deleted. See §17.
-- **Phase 2 — agent turn contract (in progress):** the new `@tenet/agent` package ships
-  the orchestrator **type contract** (`OrchestratorState`, the discriminated fail-closed
-  `ReasonerOutput`) plus the **fail-closed Reasoner** (`modelReasoner` + `parseEnvelope`).
-  The `runAgent` workflow graph that drives `AgentState` end-to-end is the **next
-  increment — not yet shipped.** Do not read the orchestrator as finished. See §17.
-- **Still pending:** the verifier's own fail-closed changes (Phase 3), the end-to-end
-  `runAgent` graph, and real-model benchmarks. The stub plane is the only measured plane.
+- **Phase 2 — agent turn (shipped):** the `@tenet/agent` package ships the full driven
+  turn. `runAgent` (`packages/agent/src/orchestrator.ts`) executes `OrchestratorState` as
+  a `@tenet/workflow` graph — injection gate → retrieve + knowledge-boundary → cache
+  re-verify → fail-closed decides-and-drafts Reasoner → governance-gated tools →
+  fail-closed verify → **single emit edge** — with terminals CARRIED in `state.halt` (not
+  thrown), a `finalize` fail-closed default, and a top-level catch that turns any error
+  into an abstain. Repair-retry (a capability, not a safety gap) and real-model prompt
+  validation remain follow-ups. See §17.
+- **Still pending:** the verifier's own fail-closed changes (Phase 3), the answer
+  repair-retry capability, real-model validation of the turn prompt, and real-model
+  benchmarks. The stub plane is the only measured plane.
 
 ---
 
@@ -125,7 +129,7 @@ What concretely we ship that the field doesn't, on day 1:
 /
 ├── packages/                # (62 workspace packages total; abbreviated list)
 │   ├── core/                # canonical ChatModel contract (model.ts), AgentState, openPath, conversation events
-│   ├── agent/               # orchestrator turn contract: OrchestratorState + fail-closed ReasonerOutput/Reasoner (runAgent graph WIP)
+│   ├── agent/               # the driven turn: runAgent graph (nodes → Reasoner → tools → verify → emit), all fail-closed
 │   ├── verifier/            # CoVe, Reflexion, constitutional, citation enforcement
 │   ├── retrieval/           # hybrid BM25+dense, contextual chunker, rerank
 │   ├── memory/              # episodic + semantic + working
@@ -291,7 +295,7 @@ The smallest end-to-end vertical that proves the spine works:
 - `models/bedrock` only (gpt-oss-120b, matching TENET's current setup)
 - `stores/vector/pgvector` + `stores/state/redis`
 - `apps/community-bot` — port TENET's current behavior to the new framework
-- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 85 suites / 1117 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
+- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 92 suites / 1174 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
 
 Success criteria for MVP:
 1. TENET's golden conversations replay through the new runtime with **same or better** accuracy
@@ -379,7 +383,7 @@ divergent local copy with a loose `stopReason: string` was removed). The transit
 bridges (`fromLegacyModel`, `asLegacyModel`, `LegacySingleStringModel`, `LegacyChatArgs`)
 were deleted — every consumer speaks the canonical contract, no bridges remain.
 
-### 17.2 Agent turn contract (Phase 2 — `packages/agent/`, in progress)
+### 17.2 Agent turn (Phase 2 — `packages/agent/`, shipped)
 
 `AgentState` (`packages/core/src/types.ts:161`) is now a real type contract — `event`,
 `history`, `intent`, `sources`, `draft`/`draftCitations`, `critique`, `attempts`,
@@ -396,10 +400,27 @@ were deleted — every consumer speaks the canonical contract, no bridges remain
   `aborted`, uncited answer — resolves to `abstain`. Enforcement never trusts the model.
   Proven by 33 deterministic tests (`agent/src/reasoner.test.ts`).
 
-**Not yet shipped:** the `runAgent` workflow graph (deterministic pre-handlers → retrieve →
-reasoner → fail-closed verify → critique-retry → emit/abstain/handoff) that wires these
-types into an end-to-end loop. The types and the Reasoner exist; the orchestrator that
-drives them does not yet. The verifier's own fail-closed changes are Phase 3.
+**Shipped — `runAgent` (`agent/src/orchestrator.ts`)** wires these into the end-to-end loop:
+`sequential(halting(withTimeout(injectionGate)), halting(withTimeout(retrieveNode)),
+halting(withTimeout(cacheNode)), halting(criticLoop))` run via `runWorkflow`.
+
+- **Pre-reasoning nodes** (`agent/src/nodes.ts`): `injectionGate` (a blocked/throwing inbound
+  filter → security handoff), `retrieveNode` (thin evidence / retriever error → abstain; feeds
+  retrieval *relevance*, not `Source.confidence`, to the knowledge-boundary gate), `cacheNode`
+  (a hit is a CANDIDATE only — re-verified, never emitted here; miss/error → continue).
+- **`criticLoop`** (`agent/src/criticLoop.ts`): reason → `abstain | handoff | tool | answer`; a
+  tool runs through governance (`runTools`, `agent/src/tools.ts` — gate-all-before-executing-any,
+  deny/`require_approval` → ops handoff) and its results fold back into history; an answer goes
+  through the single emit edge.
+- **`verifyAndEmit`** (`agent/src/emit.ts`) is the ONLY emit edge: verify (fail-closed) → require
+  ≥1 grounded citation → outbound leak gate → emit. A verify failure, uncited pass, or leak → abstain.
+- **Two fail-closed backstops:** `finalize` abstains if the graph ever returns without a carried
+  terminal; the top-level catch turns any `WorkflowError` (timeout/abort) or uncaught throw into an
+  abstain. Terminals are CARRIED in `state.halt`, never thrown, so a handoff is never mistaken for a crash.
+
+Follow-ups (neither weakens the guarantee): the answer repair-retry capability, and real-model
+validation of the decides-and-drafts prompt (deferred until a key exists). The verifier's own
+fail-closed changes are Phase 3.
 
 ### 17.3 Turn-spoof kill (`apps/community-bot`)
 

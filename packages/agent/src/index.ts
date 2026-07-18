@@ -1,10 +1,11 @@
 /**
  * @tenet/agent — the verification-first agent turn.
  *
- * Public surface. Increment 2.1a ships the type contract (see ./types.ts);
- * increment 2.2a ships the fail-closed Reasoner (see ./reasoner.ts); the graph
- * nodes and the orchestrator (runAgent) land in subsequent increments and are
- * exported from here as they arrive.
+ * Public surface: the type contract (./types.ts), the fail-closed Reasoner
+ * (./reasoner.ts), the DI surface + narrow ports (./deps.ts), the pre-reasoning
+ * graph nodes (./nodes.ts), the single emit edge (./emit.ts), governance-gated
+ * tools (./tools.ts), the critic loop (./criticLoop.ts), and the composition root
+ * `runAgent` that drives them all as a fail-closed workflow graph (./orchestrator.ts).
  */
 export type {
   ToolCall,

@@ -6,7 +6,27 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
-### Added — canonical `ChatModel` contract + `@tenet/agent` Phase 2 (2026-07-18)
+### Added — `@tenet/agent` orchestrator SHIPPED: the driven, fail-closed turn (2026-07-18)
+Branch `upgrade/top-1pct`. Test suite: 1117 → 1174 tests across 85 → 92 suites, all green.
+62 workspace packages. This completes Phase 2's agent turn — `AgentState` was a state machine
+nothing drove; it is now driven end-to-end.
+
+- **`runAgent`** (`packages/agent/src/orchestrator.ts`) executes `OrchestratorState` as a
+  `@tenet/workflow` graph: `sequential(halting(withTimeout(injectionGate)), halting(withTimeout(
+  retrieveNode)), halting(withTimeout(cacheNode)), halting(criticLoop))`, then `finalize`.
+- **Pre-reasoning nodes** (`agent/src/nodes.ts`): `injectionGate` (blocked/throwing filter →
+  security handoff), `retrieveNode` (thin evidence / retriever error → abstain; boundary gate keys
+  on retrieval relevance, not `Source.confidence`), `cacheNode` (hit is a candidate, re-verified).
+- **`criticLoop`** (`agent/src/criticLoop.ts`): reason → abstain | handoff | tool | answer; tools
+  run through governance (`runTools`, `agent/src/tools.ts` — gate all before executing any;
+  deny/`require_approval` → ops handoff), results fold back into history.
+- **`verifyAndEmit`** (`agent/src/emit.ts`) is the single emit edge: verify (fail-closed) → require
+  ≥1 grounded citation (non-blank `sourceId` + `quote`) → outbound leak gate → emit.
+- **Fail-closed backstops:** terminals CARRIED in `state.halt` (never thrown); `finalize` abstains
+  on an unset terminal; a top-level catch turns any `WorkflowError`/throw into an abstain.
+- Deferred (do not weaken the guarantee): answer repair-retry capability; real-model prompt validation.
+
+### Added — canonical `ChatModel` contract + `@tenet/agent` Phase 2 start (2026-07-18)
 Branch `upgrade/top-1pct`. Test suite: 1051 → 1117 tests across 83 → 85 suites,
 all green. 62 workspace packages.
 
@@ -71,11 +91,10 @@ all green. 62 workspace packages.
   blocks, `refusal`, `aborted`, uncited answer) resolves to `abstain`. Proven by 33
   deterministic tests (`packages/agent/src/reasoner.test.ts`).
 
-**Still pending (honest read):**
-- The `runAgent` workflow graph (deterministic pre-handlers → retrieve → reasoner →
-  fail-closed verify → critique-retry → emit/abstain/handoff) is the next
-  increment. The orchestrator that DRIVES `AgentState` end-to-end is NOT finished;
-  `@tenet/agent` currently ships the type contract and the fail-closed Reasoner only.
+**Pending at the time of this entry (SINCE SHIPPED — see the top entry):**
+- The `runAgent` workflow graph that DRIVES `AgentState` end-to-end. As of the entry
+  above it is shipped (`packages/agent/src/orchestrator.ts`): nodes → Reasoner →
+  governance-gated tools → verify → single emit edge, all fail-closed.
 - The verifier's own fail-closed changes are a later phase (Phase 3).
 - No real-model benchmark numbers exist yet (no model access in this environment);
   the hermetic stub remains the only measured plane.
@@ -136,7 +155,7 @@ open lanes. All three shipped, plus the audit's DX + truth findings:
   in `connectors/ticketing`).
 - README drift: "3 model adapters" → 6 (all streaming), the README's several
   inconsistent test counts reconciled to a single reported figure (the canonical
-  total has since advanced to 1117 tests across 85 suites — see the 2026-07-18
+  total has since advanced to 1174 tests across 92 suites — see the 2026-07-18
   entry above), surface arithmetic corrected to
   9 surfaces + 4 ticketing connectors, stale competitor-table HITL marks
   updated against June-2026 reality (LangGraph interrupt(), Mastra
