@@ -6,6 +6,13 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — coverage gate that protects the actual coverage level (6.2, 2026-07-18)
+`pnpm test:coverage` is now a CI step, and the `jest.config.cjs` `coverageThreshold` was raised from the loose
+60/70/70/70 floor to **75 branches / 90 functions / 90 lines / 88 statements** — just below the actual
+90.3/78.5/94.4/93.0 (small margin). The old floor silently allowed coverage to regress to 60%; the new gate
+fails CI on a real drop. Verified: coverage passes at the new thresholds (exit 0); mutation-probed that it
+ENFORCES (setting branches to 90 > actual 78.46 failed with "threshold for branches (90%) not met").
+
 ### Changed — replace competitor ✓/✗ grids with TENET-only capability tables (7.2, 2026-07-18)
 Both README comparison tables ("Where TENET focuses" and "Quick comparison") asserted specific, unverified
 capabilities about ~7 named competitors — including "maintenance" (implying AutoGen is abandoned), dated

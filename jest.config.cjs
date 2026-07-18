@@ -53,12 +53,16 @@ module.exports = {
     '!**/src/**/*.test.ts',
     '!**/src/index.ts',
   ],
+  // Raised 2026-07-18 to just-below the actual level (90.3/78.5/94.4/93.0 with a small
+  // margin) so this gate PROTECTS the current coverage — a regression below these fails
+  // CI, instead of the old floor that silently allowed a drop to 60%. Enforced by
+  // `pnpm test:coverage` in CI.
   coverageThreshold: {
     global: {
-      branches: 60,
-      functions: 70,
-      lines: 70,
-      statements: 70,
+      branches: 75,
+      functions: 90,
+      lines: 90,
+      statements: 88,
     },
   },
   testTimeout: 10_000,

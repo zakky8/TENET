@@ -33,7 +33,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: pnpm test
+      - name: Test + coverage gate (thresholds in jest.config.cjs)
+        run: pnpm test:coverage
       - name: Doc counts match the live suite (no stale numbers)
         run: pnpm counts:check
 
