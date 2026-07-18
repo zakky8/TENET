@@ -6,6 +6,22 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `retryWithBackoff` fail-closed retry wrapper in `@tenet/rate-limit` (5.1 partial, 2026-07-18)
+`retryWithBackoff(fn, opts)` retries an outbound call with jittered exponential backoff, and it fails CLOSED
+by construction: the default retry decision is the `isRetryable` taxonomy, so a fatal error (AbortError, 4xx,
+or anything unrecognized) is re-thrown on the FIRST attempt with no backoff — only known-transient errors
+(429/408, 5xx, transient socket codes) are retried. This is the deliberate opposite of `@tenet/workflow`'s
+generic `retry`, whose default `shouldRetry` is `() => true` (retries any throw, including a cancelled call);
+the model-call wrapper lives in rate-limit precisely so it can consume the taxonomy without inverting the
+workflow→rate-limit layering. Backoff is exponential with FULL JITTER by default (delay ∈ (0, base], capped
+at `maxDelayMs`) to de-correlate concurrent clients off a recovering upstream; `sleep`, `random`, and
+`shouldRetry` are injectable so the schedule is deterministic under test, and an abort during a backoff wait
+rejects immediately. On exhaustion it surfaces the ORIGINAL error, never a shipped fallback. 11 tests (the
+fail-closed no-retry cases for AbortError / 4xx / unknown are front and centre; plus the exponential+cap
+schedule and the jitter formula); 2 mutation probes non-vacuous (blind-retry default reddens all 3
+fail-closed tests; removing jitter reddens the jitter test). Suite 1243 → 1254 (+11), 93 → 94 suites. STILL
+OPEN in 5.1: wire the CircuitBreaker into this wrapper, and the cross-provider failover chain.
+
 ### Added — retryable-vs-fatal error taxonomy in `@tenet/rate-limit` (5.1 partial, 2026-07-18)
 `classifyError(err) → { retryClass: 'retryable' | 'fatal', reason }` + `isRetryable(err)` — the foundation a
 resilience layer (retry / backoff / cross-provider failover) must consult BEFORE any retry. Encodes 5.1's
