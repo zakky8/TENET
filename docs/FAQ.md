@@ -17,7 +17,7 @@ description: "Answers to common questions about TENET: how it prevents hallucina
     {
       "@type": "Question",
       "name": "How does TENET prevent hallucination?",
-      "acceptedAnswer": { "@type": "Answer", "text": "By making the safe outcome the default and enforcing it in code, not a prompt. The agent turn is a fail-closed graph: an inbound injection gate, a retrieval plus knowledge-boundary gate (thin evidence abstains), a cache re-verification step, a decides-and-drafts reasoner with no default answer (any ambiguity abstains), governance-gated tools, a fail-closed verifier, and a single emit edge. A fact-bearing reply can leave the agent at exactly one call site, reachable only past the verifier, a grounded-citation guard, and an outbound leak gate. Infrastructure failures fail closed: a verifier error, a judge timeout, a retriever error, or a truncated (max_tokens) response all resolve to abstain." }
+      "acceptedAnswer": { "@type": "Answer", "text": "By making the safe outcome the default and enforcing it in code, not a prompt. The agent turn is a fail-closed graph: an inbound injection gate, a retrieval plus knowledge-boundary gate (thin evidence abstains), a cache re-verification step, a decides-and-drafts reasoner with no default answer (any ambiguity abstains), governance-gated tools, a fail-closed verifier, and a single emit edge. A fact-bearing reply can leave the agent at exactly one call site, reachable only past the verifier, a grounded-citation guard, and an outbound leak gate. The graph fails closed by default: a retriever error, a compaction error, or a truncated (max_tokens) response resolves to abstain, and the orchestrator's top-level catch turns any unexpected throw into one. The verifier's own infra failures (a judge timeout or an extractor error) are fail-open by default and resolve to not-supported only under the opt-in fail-closed mode." }
     },
     {
       "@type": "Question",
@@ -87,7 +87,7 @@ By making the safe outcome the *default* and enforcing it in code, not in a prom
 
 - The agent turn is a **fail-closed graph**: an inbound injection gate, a retrieval + knowledge-boundary gate (thin evidence → abstain), a cache re-verification step, a decides-and-drafts reasoner with **no default `answer`** (any ambiguity → abstain), governance-gated tools, a fail-closed verifier, and a **single emit edge**.
 - A fact-bearing reply can leave the agent at **exactly one call site**, reachable only past the verifier, a grounded-citation guard, and an outbound leak gate. Every other outcome is a fixed safe message.
-- Infrastructure failures fail *closed*: a verifier error, a judge timeout, a retriever error, or a truncated (`max_tokens`) model response all resolve to abstain — never a shipped, unverified answer.
+- The graph fails *closed* by default: a retriever error, a compaction error, or a truncated (`max_tokens`) response resolves to abstain, and the orchestrator's top-level catch turns any unexpected throw into one. The verifier's *own* infra failures — a judge timeout, an extractor error — are fail-*open* by default and resolve to *not-supported* only under the opt-in `failClosed` mode.
 
 ## What does "grounded-or-abstain" mean?
 

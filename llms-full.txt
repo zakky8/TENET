@@ -15,7 +15,7 @@ An agent turn either answers with a grounded, verified citation, or it abstains 
 ## How hallucination is prevented (the fail-closed edges)
 
 - **No default answer.** Any ambiguity — a parse failure, an unknown action, a missing field, a refusal, an abort, a `max_tokens` truncation, an uncited draft — resolves to `abstain`, enforced in the parser, not left to the model.
-- **Fail CLOSED on infra failure.** A verifier throw, a judge timeout, a retriever error, or a truncated response all resolve to abstain — never a shipped, unverified answer.
+- **Fail CLOSED on graph failure.** A retriever error, a compaction error, a truncated (`max_tokens`) response, and any unexpected throw (the orchestrator's top-level catch) all resolve to abstain. The verifier's own infra failures (a judge timeout or an extractor error) are fail-OPEN by default and resolve to not-supported only under the opt-in `failClosed` mode.
 - **Deterministic pre-checks first.** Before any LLM judge, the verifier settles what it can deterministically: quote-grounding, and fabrication checks for numbers (including spelled-out amounts) and `http(s)://` URLs that appear nowhere in the sources. A number or URL being *present* never passes a claim; only absence can fail it.
 - **Multi-judge, fail-closed mode.** Remaining claims go to a strict-then-permissive atomic-claim multi-judge; an opt-in `failClosed` mode resolves extractor/judge infra failures to not-supported instead of a spurious pass.
 - **Absence is not proof of a negative.** "The sources don't mention X, so we do not offer X" is a fabrication; a negative claim needs positive grounding.

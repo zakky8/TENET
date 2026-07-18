@@ -86,7 +86,10 @@ export interface VerifierConfig {
    *     `supported:false` (instead of the fail-OPEN "all supported so we don't block ship").
    * A GENUINELY claim-free draft (greeting/filler) still passes — there is nothing to
    * ground, and emit policy (require a citation) belongs to the orchestrator, not here.
-   * The reference `@tenet/agent` orchestrator sets this `true` behind its Verifier port.
+   * Opt-in and currently UNSET in the reference composition — the shipped default is
+   * fail-OPEN (this flag is set nowhere outside tests). `@tenet/agent` takes the verifier
+   * as an injected port; a caller that wants the verifier's own infra failures to abstain
+   * rather than ship sets this `true` when it constructs that `verify` function.
    */
   failClosed?: boolean;
 }

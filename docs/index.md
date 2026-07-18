@@ -57,7 +57,7 @@ inbound guard → retrieve + knowledge-boundary → cache re-verify → reason �
                                                                                              fact ships
 ```
 
-A fact-bearing reply leaves the agent at **exactly one call site**, reachable only past the verifier, a grounded-citation guard, and an outbound leak gate. Every infrastructure failure — a verifier throw, a judge timeout, a truncated (`max_tokens`) response — resolves to **abstain**, never a shipped, unverified answer.
+A fact-bearing reply leaves the agent at **exactly one call site**, reachable only past the verifier, a grounded-citation guard, and an outbound leak gate. The graph fails closed by default — a retriever error, a compaction error, a truncated (`max_tokens`) response, and any unexpected throw (via the orchestrator's top-level catch) all resolve to **abstain**. The verifier's own infra failures (a judge timeout or an extractor error) fail *open* by default and resolve to *not-supported* only under the opt-in `failClosed` mode.
 
 ## The honest read
 
