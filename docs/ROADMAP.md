@@ -20,7 +20,7 @@ The decides-and-drafts Reasoner (`modelReasoner` + `parseEnvelope`) is grounded-
 |---|---|
 | Repo layout, license, security policy | ✓ |
 | pnpm workspaces, TS strict + ESM | ✓ |
-| CI: typecheck + lint + test + audit + Trivy + eval-regression | ✓ |
+| CI: typecheck + test + audit + Trivy + eval-regression (lint is a `no lint yet` no-op stub — real ESLint is Phase 6.1) | ✓ |
 | `@tenet/core` types (Conversation, Surface, Filter, Secret, PathHandle, OutcomeEvent) | ✓ |
 | `@tenet/verifier` atomic-claim multi-judge | ✓ |
 | `@tenet/policy` Constitutional Principles registry + composer + drift fingerprint | ✓ |

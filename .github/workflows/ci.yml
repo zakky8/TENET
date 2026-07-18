@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build-test:
-    name: Build, typecheck, lint, test
+    name: Build, typecheck, test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -32,7 +32,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: pnpm lint
+      # No lint step yet: every package's `lint` is a `no lint yet` no-op stub, and
+      # ESLint is not installed. Running `pnpm lint` would be a VACUOUS green "lint"
+      # gate that checks nothing — omitted so CI never falsely implies linting. The real
+      # typescript-eslint gate is tracked as ROADMAP Phase 6.1.
       - name: Test + coverage gate (thresholds in jest.config.cjs)
         run: pnpm test:coverage
       - name: Doc counts match the live suite (no stale numbers)
