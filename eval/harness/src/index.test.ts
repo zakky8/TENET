@@ -44,9 +44,21 @@ describe('runEval — happy path', () => {
     expect(r.results).toHaveLength(2);
   });
 
-  it('attaches durations to results', async () => {
-    const r = await runEval(SAMPLE, upperSut);
-    for (const c of r.results) expect(c.durationMs).toBeGreaterThanOrEqual(0);
+  it('records the EXACT per-case duration measured on the injected clock', async () => {
+    // The old test asserted only `durationMs >= 0` — always true (it is a monotonic
+    // `now() - start` delta), so a hardcoded 0, an absolute-epoch return, or a backwards
+    // subtraction all slipped through. Inject a fake clock the SUT advances by a known
+    // amount and assert durationMs equals it. concurrency:1 keeps the cases serial so each
+    // measures its own advance (no interleave on the shared clock).
+    let t = 0;
+    const clock = () => t;
+    const timedSut = async (input: unknown): Promise<unknown> => {
+      t += 7; // the "work" consumes 7ms of fake time
+      return String(input).toUpperCase();
+    };
+    const r = await runEval(SAMPLE, timedSut, { now: clock, concurrency: 1 });
+    expect(r.results).toHaveLength(2);
+    for (const c of r.results) expect(c.durationMs).toBe(7);
   });
 });
 

@@ -13,6 +13,9 @@ export interface RunOptions {
   labelFilter?: ReadonlyArray<string>;
   /** Hard timeout per case, ms. Default 30s. */
   perCaseTimeoutMs?: number;
+  /** Monotonic time source in ms (default Date.now). Injectable so a test can assert an
+   *  EXACT per-case duration instead of a vacuous `durationMs >= 0`. */
+  now?: () => number;
 }
 
 /** Execute a dataset against a sut and score. */
@@ -24,6 +27,7 @@ export async function runEval(
   const concurrency = Math.max(1, opts.concurrency ?? 4);
   const timeout = opts.perCaseTimeoutMs ?? 30_000;
   const labelFilter = opts.labelFilter ?? [];
+  const now = opts.now ?? Date.now;
 
   const cases = dataset.cases.filter(
     (c) =>
@@ -38,7 +42,7 @@ export async function runEval(
       while (true) {
         const idx = next++;
         if (idx >= cases.length) return;
-        results[idx] = await runOne(cases[idx]!, sut, timeout);
+        results[idx] = await runOne(cases[idx]!, sut, timeout, now);
       }
     }),
   );
@@ -57,8 +61,13 @@ export async function runEval(
   };
 }
 
-async function runOne(c: EvalCase, sut: Sut, timeoutMs: number): Promise<CaseResult> {
-  const start = Date.now();
+async function runOne(
+  c: EvalCase,
+  sut: Sut,
+  timeoutMs: number,
+  now: () => number,
+): Promise<CaseResult> {
+  const start = now();
   let output: unknown;
   let errorMsg: string | undefined;
   const ctrl = new AbortController();
@@ -76,7 +85,7 @@ async function runOne(c: EvalCase, sut: Sut, timeoutMs: number): Promise<CaseRes
       caseId: c.id,
       passed: false,
       assertions: [],
-      durationMs: Date.now() - start,
+      durationMs: now() - start,
       error: errorMsg,
     };
   }
@@ -89,6 +98,6 @@ async function runOne(c: EvalCase, sut: Sut, timeoutMs: number): Promise<CaseRes
     caseId: c.id,
     passed: allPassed,
     assertions: assertionResults,
-    durationMs: Date.now() - start,
+    durationMs: now() - start,
   };
 }
