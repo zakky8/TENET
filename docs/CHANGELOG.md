@@ -6,6 +6,18 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — Open Graph image is now a real PNG (`og:image` unfurls; SVG never did) (2026-07-18)
+`og:image` pointed at `docs/assets/og-image.svg`, but X / Slack / Discord / LinkedIn / Facebook unfurlers do
+NOT render SVG — so every shared link showed a blank preview, a silent AEO/discoverability defect. Rasterized
+the SVG to a 1280×640 PNG (`docs/assets/og-image.png`, ~82 KB, verified valid + non-blank + visually correct —
+wordmark, tagline, thesis with the green "abstains", footer chips, and the verification-seal hexagon all
+legible in a fallback sans-serif) and repointed `og:image` at it in both `docs/_config.yml` (Jekyll defaults)
+and `docs/index.md` front matter. The SVG stays as the editable SOURCE; `scripts/render-og.mjs` regenerates
+the PNG from it (2× density → fit 1280×640), so an SVG edit is reproducible — `sharp` is an optional dev tool,
+not a gate or runtime dep. Docs/asset only — no TypeScript source or test changed, so `pnpm -r build`/
+`pnpm test` are unaffected (green at parent `5d7f13f`); counts/jsonld/inventory/readme gates all still green.
+Closes the 7.3 "OG image SVG→PNG + og:image" item.
+
 ### Changed — the turn driver's reasoner-decision switch is now exhaustiveness-guarded + fails closed on an unmappable decision (2026-07-18)
 `criticLoop` (the central turn driver) `switch`es on `ReasonerOutput.kind` (`abstain | handoff | tool |
 answer`) — the point where a model decision becomes an outcome. It had no `default`, so an unexpected variant

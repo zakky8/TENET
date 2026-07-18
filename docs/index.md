@@ -2,7 +2,7 @@
 layout: default
 title: "TENET — Verification-first TypeScript AI agent framework"
 description: "An agent turn answers with a grounded, verified citation or it abstains — grounded-or-abstain. Fail-closed multi-judge verifier with deterministic pre-checks, pre-tool-call governance + approval + audit, WASM tool sandbox, MCP OAuth gateway, 9 surface adapters, 6 model adapters. Apache-2.0, pre-1.0."
-image: /TENET/assets/og-image.svg
+image: /TENET/assets/og-image.png
 ---
 
 <script type="application/ld+json">

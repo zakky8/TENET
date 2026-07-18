@@ -49,4 +49,4 @@ defaults:
   - scope:
       path: ""
     values:
-      image: /TENET/assets/og-image.svg
+      image: /TENET/assets/og-image.png
