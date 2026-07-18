@@ -308,22 +308,30 @@ export function modelReasoner(model: ChatModel, tools: ReadonlyArray<ToolDef>): 
 
 ## 4. The orchestrator as a labeled state graph
 
-Nodes are `Step<OrchestratorState, OrchestratorState>`. Terminals are carried in `state.halt`, **not** thrown (this is the resolution of review §6 — no `Terminate` sentinel, no handoff→abstain collapse). Every node begins with a pass-through guard so a set `halt` skips the rest of the graph deterministically. The finalizer converts `halt` (or a genuine crash) into the returned `Result`.
+Nodes are `Step<OrchestratorState, OrchestratorState>`. Terminals are carried in `state.halt`, **not** thrown (this is the resolution of review §6 — no `Terminate` sentinel, no handoff→abstain collapse). `halting` wraps each node so a set `halt` skips the rest of the graph deterministically. The finalizer converts `halt` (or a genuine crash) into the returned `Result`.
+
+> **AS-BUILT (commits `af35acf`→`7e6772e`, verified against the source this revision).** The snippets below
+> reflect the SHIPPED API, which diverged from the original sketch in three deliberate ways discovered while
+> grounding against the real dependencies: (1) `verifyAndEmit` returns a discriminated **`EmitDecision`**
+> (`emit | repair | abstain`), not `Result | null` with a `state.critique` side-effect; (2) the turn depends on
+> a **narrow `Verifier` port** (`deps.verify.check`) — there is no `failClosed` verifier-config field (it never
+> existed); (3) the answer **repair-retry** (`refine.repairDraft`) is a deferred capability — an unverifiable
+> draft currently fails closed to `abstain`. The safety floor holds without it.
 
 ### 4.1 Graph topology
 
 ```
-runAgent(state0, deps)
+runAgent(state0, deps, signal)
   │
-  ├─(A) injectionGate ───────────── inbound runFilterChain (guardrails/filters.ts:64)
+  ├─(A) injectionGate ───────────── inbound runFilterChain (guardrails/filters.ts:64); throw → handoff too
   │
-  ├─(B) retrieveNode ────────────── retriever.query → knowledgeBoundaryGate (refine:83)
+  ├─(B) retrieveNode ────────────── retriever.query → knowledgeBoundaryGate (refine/index.ts:83)
   │
-  ├─(C) cacheNode ───────────────── SemanticAnswerCache.lookup  (sets cachedDraft; NEVER emits)
+  ├─(C) cacheNode ───────────────── AnswerCache.lookup (narrow port; sets cachedDraft; NEVER emits)
   │
-  ├─(D) criticLoop ──────────────── reason ⇄ (tool | verify → repair)   [bounded by maxAttempts]
+  ├─(D) criticLoop ──────────────── reason ⇄ (tool via runTools | answer → verifyAndEmit)  [bounded by maxAttempts]
   │        │
-  │        └─(D.emit) outboundGate ─ systemPromptLeakFilter on final draft (guardrails/promptInjection.ts:50)
+  │        └─(D.emit) verifyAndEmit ─ verify → ≥1 grounded citation → outbound leak gate → emit
   │
   └─(F) finalize ────────────────── halt → Result;  else abstain default
 ```
@@ -332,26 +340,32 @@ runAgent(state0, deps)
 
 ```ts
 // packages/agent/src/orchestrator.ts
-import { sequential, runWorkflow, type Step } from '@tenet/workflow';
+import { runWorkflow, sequential, withTimeout, type Step } from '@tenet/workflow';
 
-/** Guard: once halt is set, every downstream node is a no-op. */
-function halting(step: Step<OrchestratorState, OrchestratorState>): Step<OrchestratorState, OrchestratorState> {
-  return async (s, ctx) => (s.halt ? s : step(s, ctx));
+/** Guard: once state.halt is set, every downstream node is a no-op. */
+export function halting(step: Step<OrchestratorState, OrchestratorState>): Step<OrchestratorState, OrchestratorState> {
+  return async (s, ctx) => (s.halt !== undefined ? s : step(s, ctx));
 }
 
-export async function runAgent(state0: OrchestratorState, deps: AgentDeps): Promise<Result> {
-  const graph = sequential<OrchestratorState, OrchestratorState>(
+/** THE FAIL-CLOSED DEFAULT: a graph that ended without a carried terminal abstains. */
+export function finalize(state: OrchestratorState): Result {
+  return state.halt ?? abstainResult('graph ended without a terminal');
+}
+
+export async function runAgent(
+  state0: OrchestratorState,
+  deps: AgentDeps,
+  signal: AbortSignal,          // per-turn cancellation → runWorkflow → ctx → nodes
+): Promise<Result> {
+  const graph = sequential(
     halting(withTimeout(injectionGate(deps), deps.timeouts.gate)),
     halting(withTimeout(retrieveNode(deps),  deps.timeouts.retrieve)),
     halting(withTimeout(cacheNode(deps),     deps.timeouts.cache)),
     halting(criticLoop(deps)),               // sets state.halt to its terminal Result
   );
   try {
-    const end = await runWorkflow(graph, state0, {
-      runId: state0.event.conversationId,
-      signal: deps.signal,
-    });
-    return end.halt ?? abstainResult('graph ended without terminal'); // FAIL CLOSED default
+    const end = await runWorkflow(graph, state0, { runId: state0.event.conversationId, signal });
+    return finalize(end);
   } catch (err) {
     // Any WorkflowError (timeout/aborted/retry_exhausted) or thrown node → abstain.
     // Terminals are carried in state.halt, never thrown, so no handoff is lost here.
@@ -362,28 +376,42 @@ export async function runAgent(state0: OrchestratorState, deps: AgentDeps): Prom
 
 ```ts
 // packages/agent/src/nodes.ts
-function injectionGate(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
+export function injectionGate(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
   return async (s) => {
-    const chain = runFilterChain(s.event.text, deps.inboundFilters);        // guardrails/filters.ts:64
+    let chain: ReturnType<typeof runFilterChain>;
+    try {
+      chain = runFilterChain(s.event.text, deps.inboundFilters);           // guardrails/filters.ts:64
+    } catch (err) {
+      // A guardrail that THROWS cannot clear the input — hand off, never pass it through.
+      return { ...s, halt: handoffResult('security', `filter error: ${(err as Error).message}`) };
+    }
     return chain.verdict.kind === 'block'
-      ? { ...s, halt: handoffResult('security', `blocked: ${chain.filterId}`) } // FAIL CLOSED → handoff
-      : s;
+      ? { ...s, halt: handoffResult('security', `blocked by ${chain.filterId}: ${chain.verdict.reason}`) }
+      : s;                                                                   // FAIL CLOSED → handoff
   };
 }
 
-function retrieveNode(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
-  return async (s) => {
-    const chunks = await deps.retriever.query({ text: s.event.text, tenantId: s.event.tenantId });
-    // Feed RETRIEVAL RELEVANCE, not Source.confidence (review §8). Floors are non-zero.
-    const gate = knowledgeBoundaryGate(chunks.map((c) => ({ score: c.relevance })), deps.boundary);
+export function retrieveNode(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
+  return async (s, ctx) => {
+    let scored: ReadonlyArray<ScoredResult>;
+    try {
+      scored = await deps.retriever.query({
+        text: s.event.text, k: deps.retrieveK, tenantId: s.event.tenantId, signal: ctx.signal,
+      });
+    } catch (err) {
+      return { ...s, halt: abstainResult(`retrieval error: ${(err as Error).message}`) }; // FAIL CLOSED
+    }
+    const results = scored ?? [];  // a retriever that resolves null → zero evidence → gate abstains
+    // Feed RETRIEVAL RELEVANCE (the producer score), NOT Source.confidence (review §8).
+    const gate = knowledgeBoundaryGate(results.map((c) => ({ score: c.score })), deps.boundary);
     if (!gate.proceed) return { ...s, halt: abstainResult(gate.reason) };   // FAIL CLOSED → abstain
-    return { ...s, chunks };
+    return { ...s, chunks: results.map((c) => ({ source: c.source, relevance: c.score })) };
   };
 }
 
-function cacheNode(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
-  return async (s) => {
-    const hit = await deps.cache.lookup(s.event.text).catch(() => null);    // throw → no hit, continue
+export function cacheNode(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
+  return async (s, ctx) => {
+    const hit = await deps.cache.lookup(s.event.text, ctx.signal).catch(() => null); // throw → no hit
     // A cache hit is a CANDIDATE draft only. It is NOT emitted here; it re-enters
     // verification in criticLoop. Resolves the similarity-hit fail-open (review §3).
     return hit ? { ...s, cachedDraft: hit.answer } : s;
@@ -391,87 +419,99 @@ function cacheNode(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> 
 }
 ```
 
-### 4.3 `criticLoop` — the single emit edge, with cache re-verification, repair, and outbound gate
+### 4.3 `criticLoop` — the turn driver, and `verifyAndEmit` the single emit edge
+
+`criticLoop` owns the reason/tool loop and consumes `verifyAndEmit`'s `EmitDecision` directly.
+`refine.repairDraft` is **not** used; a `repair` signal fails closed to `abstain` (the rewrite-retry is a
+tracked capability follow-up, not a safety gap — see §7).
 
 ```ts
-function criticLoop(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
+// packages/agent/src/criticLoop.ts
+export function criticLoop(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
   return async (s, ctx) => {
-    let state = s;
-
-    // Cache hits flow through verification, never around it.
-    if (state.cachedDraft !== undefined) {
-      const emitted = await verifyAndEmit(state.cachedDraft, [], state, deps, ctx);
-      if (emitted) return { ...state, halt: emitted };   // verified cache hit → resolved
-      // cache miss on verification: fall through to normal reasoning
+    // Cache-hit candidate → re-verify through the SAME emit edge. A verified hit resolves;
+    // a bad guess (repair/abstain) does NOT abstain the turn — fall through to reasoning.
+    if (s.cachedDraft !== undefined) {
+      const cached = await verifyAndEmit(s.cachedDraft, s, deps);
+      if (cached.kind === 'emit') return { ...s, halt: cached.result };
     }
 
-    for (let turn = 0; turn <= deps.maxAttempts; turn++) {
+    let state = s;
+    for (let turn = 0; turn < deps.maxAttempts; turn++) {
       if (ctx.signal.aborted) return { ...state, halt: abstainResult('aborted') };   // FAIL CLOSED
 
       let decision: ReasonerOutput;
       try { decision = await deps.reasoner.reason(state, ctx.signal); }
-      catch (e) { return { ...state, halt: abstainResult(`reasoner error: ${msg(e)}`) }; } // FAIL CLOSED
+      catch (err) { return { ...state, halt: abstainResult(`reasoner error: ${(err as Error).message}`) }; } // FAIL CLOSED
 
       switch (decision.kind) {
         case 'abstain': return { ...state, halt: abstainResult(decision.reason) };
         case 'handoff': return { ...state, halt: handoffResult(decision.handoff.target, decision.handoff.reason) };
 
         case 'tool': {
-          // Governance gate BEFORE execution (governance PolicyEvaluator.evaluate).
-          const r = await runTools(decision.calls, deps.policy, deps.tools, ctx.signal);
-          if (r.denied) return { ...state, halt: handoffResult('ops', `tool denied: ${r.reason}`) }; // FAIL CLOSED
-          state = { ...state,
-            toolResults: [...(state.toolResults ?? []), ...r.blocks],
-            history: appendToolResults(state.history, r.blocks) };
+          // Governance gates every call BEFORE execution (runTools → PolicyEvaluator.evaluate).
+          const run = await runTools(decision.calls, deps.tools, deps.policy,
+            { tenantId: state.event.tenantId, principalId: state.event.userId }, ctx.signal);
+          if (run.denied) return { ...state, halt: handoffResult('ops', `tool denied: ${run.reason}`) }; // FAIL CLOSED
+          state = { ...state, history: appendToolResults(state.history, run.results) };
           continue; // loop back to reason, capped by maxAttempts
         }
 
         case 'answer': {
-          const emitted = await verifyAndEmit(decision.draft, decision.citations, state, deps, ctx);
-          if (emitted) return { ...state, halt: emitted };                  // ONLY emit edge
-          if (turn < deps.maxAttempts) {
-            // Repair ONLY unsupported claims via refine.repairDraft, then re-verify.
-            const repaired = await repairDraft(decision.draft, state.critique, deps.repair) // refine:139
-              .catch(() => null);
-            if (repaired === null) return { ...state, halt: abstainResult('repair failed') }; // FAIL CLOSED
-            state = { ...state, draft: repaired, attempts: turn + 1 };
-            continue;
-          }
-          return { ...state, halt: abstainResult(`unverified after ${deps.maxAttempts} attempts`) }; // FAIL CLOSED
+          const emit = await verifyAndEmit(decision.draft, state, deps);    // the ONLY emit edge
+          if (emit.kind === 'emit') return { ...state, halt: emit.result };
+          // repair OR abstain → FAIL CLOSED to abstain (rewrite-retry lands in a follow-up).
+          const reason = emit.kind === 'repair' ? `unverified: ${emit.critique}` : emit.reason;
+          return { ...state, halt: abstainResult(reason) };
         }
       }
     }
-    return { ...state, halt: abstainResult('attempts exhausted') };         // FAIL CLOSED default
+    // Exhausted every turn still calling tools without ever drafting an answer → abstain.
+    return { ...state, halt: abstainResult(`no answer within ${deps.maxAttempts} attempts`) }; // FAIL CLOSED
   };
 }
+```
 
-/** Verify (fail-CLOSED verifier config) then run the OUTBOUND leak gate.
- *  Returns a `resolved` Result only if BOTH pass. */
-async function verifyAndEmit(
-  draft: string, citations: ReadonlyArray<Citation>,
-  state: OrchestratorState, deps: AgentDeps, ctx: WorkflowCtx,
-): Promise<Result | null> {
-  let verify: VerifyResult;
+```ts
+// packages/agent/src/emit.ts
+export type EmitDecision =
+  | { readonly kind: 'emit';    readonly result: Result }
+  | { readonly kind: 'repair';  readonly critique: string }   // verify failed → caller may retry
+  | { readonly kind: 'abstain'; readonly reason: string };    // verifier throw / uncited / leak → fail closed
+
+/** The single emit edge. Depends on a NARROW Verifier PORT (deps.verify.check); the concrete
+ *  verifyDraft(model, {...}, { claimPreChecks: defaultPreChecks() }) is adapted behind it at
+ *  composition. There is NO `failClosed` verifier-config field — fail-closed is enforced HERE. */
+export async function verifyAndEmit(
+  draft: string, state: OrchestratorState, deps: AgentDeps,
+): Promise<EmitDecision> {
+  let verdict: VerifierVerdict;
   try {
-    verify = await verifyDraft(deps.model, {
+    verdict = await deps.verify.check({
       sources: knowledgeBlock(state.chunks),
       sourceRecords: (state.chunks ?? []).map((c) => c.source),
       draft,
-    }, {
-      claimPreChecks: defaultPreChecks(),   // deterministic numeric/quote tier
-      failClosed: true,                     // §6 — extractor+judge+zero-claim all fail CLOSED
     });
-  } catch { return null; }                  // verifier THROW → treat as fail (FAIL CLOSED)
+  } catch (err) {
+    return { kind: 'abstain', reason: `verifier error: ${(err as Error).message}` }; // FAIL CLOSED
+  }
 
-  if (!verify.pass) { /* caller records critique for repair */ (state as any).critique = verify.critique; return null; }
+  if (!verdict.pass) return { kind: 'repair', critique: verdict.critique };
 
-  // OUTBOUND system-prompt / constitution leak gate (review §5).
+  // FAIL-CLOSED GUARD: emit only if ≥1 approved citation is genuinely grounded (non-blank
+  // sourceId AND quote). Catches the zero-claim pass=true AND a blank custom sourcePicker.
+  const grounded = verdict.approvedCitations.some((c) => c.sourceId.trim() !== '' && c.quote.trim() !== '');
+  if (!grounded) return { kind: 'abstain', reason: 'verified but no grounded citation' };
+
+  // OUTBOUND system-prompt / constitution leak gate (review §5): a leaked draft never emits.
   const out = runFilterChain(draft, deps.outboundFilters);  // includes systemPromptLeakFilter()
-  if (out.verdict.kind === 'block') return null;            // FAIL CLOSED: leaked draft never emits
+  if (out.verdict.kind === 'block') {
+    return { kind: 'abstain', reason: `outbound gate blocked by ${out.filterId}: ${out.verdict.reason}` };
+  }
 
-  // Write-through: only VERIFIED answers enter the cache, so future hits are safe.
-  await deps.cache.store(state.event.text, draft).catch(() => {});
-  return emitResult(draft, verify.approvedCitations);
+  // (Cache write-through of verified answers is deferred — the AnswerCache port is lookup-only;
+  //  a store port + query embedding land with the write-through increment.)
+  return { kind: 'emit', result: emitResult(draft, verdict.approvedCitations) };
 }
 ```
 
@@ -481,17 +521,18 @@ async function verifyAndEmit(
 |---|------|-------------------|---------|-----------|
 | A | injection gate | inbound `runFilterChain` → `block` | `handed_off` (security), via `state.halt` | guardrails/filters.ts:64 |
 | B | retrieve | `knowledgeBoundaryGate.proceed=false` **or** query throws (timeout) | `disqualified` (abstain) | refine/index.ts:77-82 |
-| C | cache | lookup throws | continue (no hit); **hits never emit here** | router SemanticAnswerCache |
+| C | cache | lookup throws | continue (no hit); **hits never emit here** | `AnswerCache` port (`deps.cache`) |
 | C→D | cache hit | candidate draft fails verify **or** outbound gate | fall through to reasoning (no emit) | §4.3 |
 | D | reasoner | throw / parse-fail / `tool_use`-with-no-tools / refusal / aborted | `disqualified` (abstain) | §3 |
 | D | tool | `PolicyEvaluator` deny / approval unmet | `handed_off` (ops) | governance evaluate |
-| D | verify | `verifyDraft` **throws** | `disqualified` (abstain) — orchestrator never trusts internal fail-open | verifier.ts:30 |
-| D | verify | `failClosed` verifier returns `pass=false` (incl. zero-claim, judge/extractor throw) | repair→re-verify; abstain after `maxAttempts` | §6 |
-| D.emit | outbound leak | `systemPromptLeakFilter` → `block` | `disqualified` (abstain) — leaked draft never emits | promptInjection.ts:50-67 |
-| F | top-level | any `WorkflowError` (timeout/aborted/retry_exhausted) or crash | `disqualified` (abstain) | orchestrator catch |
-| **emit** | reached **only** when verify `pass===true` **and** outbound gate passes | — | `resolved` | single emit edge |
+| D | verify | `deps.verify.check` **throws** | `abstain` (`EmitDecision`) — orchestrator never trusts internal fail-open | emit.ts (Verifier port) |
+| D | verify | verdict `pass=false` | `EmitDecision:'repair'` → criticLoop `abstain` (rewrite-retry deferred — §7) | emit.ts |
+| D.emit | uncited pass | verdict `pass=true` but no citation with non-blank `sourceId`+`quote` (incl. zero-claim) | `abstain` — an uncited answer never ships | emit.ts (grounded-citation guard) |
+| D.emit | outbound leak | `runFilterChain(draft, outboundFilters)` → `block` (incl. `systemPromptLeakFilter`) | `abstain` — leaked draft never emits | promptInjection.ts:66 |
+| F | top-level | any `WorkflowError` (timeout/aborted/retry_exhausted) or uncaught node throw | `disqualified` (abstain) | orchestrator catch |
+| **emit** | reached **only** when verify `pass===true` **and** ≥1 grounded citation **and** outbound gate passes | — | `resolved` | single emit edge |
 
-**Invariant (now true against the code):** `NormalizedReply.text` carrying a fact is produced at exactly one call site — `emitResult` inside `verifyAndEmit`, reachable only past a fail-closed verifier and an outbound leak gate. Cache hits, tool paths, reasoner ambiguity, and crashes cannot reach it.
+**Invariant (true against the code):** `NormalizedReply.text` carrying a fact is produced at exactly one call site — `emitResult` inside `verifyAndEmit`, reachable only past a fail-closed verifier, a grounded-citation guard, and an outbound leak gate. Cache hits, tool paths, reasoner ambiguity, and crashes cannot reach it. `criticLoop` never imports `emitResult`, so it cannot mint a `resolved` result itself.
 
 ---
 
@@ -562,17 +603,24 @@ Each adapter unit test asserts the mapping table above.
 
 ---
 
-## 6. Verifier fail-CLOSED changes (blocking — review §3, §4)
+## 6. Verifier fail-CLOSED changes (Phase 3 — PROPOSED, not yet built)
 
-The proposal's original invariant ("nothing else can produce a fact") was false because two fail-**open** paths bypass the verifier without throwing. This PR closes them; this is *in scope*, not follow-up.
+> **AS-BUILT status.** This section is forward-looking. The verifier-internal `failClosed` field below does
+> **not** yet exist in `@tenet/verifier`. What DOES ship (2.1b) is the enforcement at the ORCHESTRATOR's emit
+> edge: `verifyAndEmit` (§4.3) wraps the narrow `deps.verify.check` in `try/catch` → abstain, requires ≥1
+> grounded citation (so a `pass=true` with zero/blank citations cannot emit — closing the zero-claim path from
+> the *consumer* side today), and runs the outbound leak gate. Making the verifier fail closed *internally* (so
+> it never returns a spurious `pass`) is the additional defense-in-depth below, and remains Phase 3.
 
-Add `VerifierConfig.failClosed?: boolean` (default `false` to preserve existing callers; the orchestrator sets `true`). When `failClosed === true`:
+The proposal's original invariant ("nothing else can produce a fact") was false because two fail-**open** paths bypass the verifier without throwing. The proposed verifier-internal change closes them at the source.
+
+Add `VerifierConfig.failClosed?: boolean` (default `false` to preserve existing callers; the composition would set `true` when adapting `verifyDraft` behind the `Verifier` port). When `failClosed === true`:
 
 1. **`claimExtractor.ts:38`** — on throw, do **not** return `[]`. Propagate a typed `ExtractorError` (verifier converts to `pass:false`). A slow/broken extractor can no longer yield zero claims → auto-pass.
 2. **`verifier.ts:38-40`** — zero extracted claims returns `pass:false` (was `pass:true`). No claims ⇒ nothing verified ⇒ cannot emit.
 3. **`judge.ts:113-116`** — on judge throw, return `supported:false` for the affected claims (was all-supported).
 
-The orchestrator additionally wraps `verifyDraft` in `try/catch` → abstain (§4.3), so a *thrown* verifier and a *fail-closed* verifier both resolve to non-emit.
+Until that lands, the orchestrator's emit edge already wraps the verifier port in `try/catch` → abstain and enforces the grounded-citation guard (§4.3), so a *thrown* verifier and a zero-claim/uncited `pass` both resolve to non-emit from the consumer side.
 
 **Consequence, stated plainly:** because no real judge/extractor model ships today, `failClosed:true` means the default runtime state abstains on any non-deterministic claim, emitting only what the deterministic tier (quote-grounding / numeric) can support. This is the intended north-star behavior: the system stays silent rather than fabricating.
 
