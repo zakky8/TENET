@@ -213,3 +213,44 @@ describe('RestSurface — streaming', () => {
     expect(body).toContain('event: done');
   });
 });
+
+describe('RestSurface — grounded-render gate (groundedFallback)', () => {
+  const FALLBACK = "I can't back that up with a source.";
+  const auth = (): Record<string, string> => ({
+    Authorization: `Bearer ${makeJwt({ sub: 'u-1', tnt: 't-1', exp: NOW + 60 })}`,
+  });
+
+  it('REFUSES an uncited fact-bearing reply — returns the fallback, never the ungrounded text', async () => {
+    const s = makeSurface({
+      groundedFallback: FALLBACK,
+      handle: async () => ({ text: 'The price is $499 and the CEO is Jane Doe.', citations: [] }),
+    });
+    const r = await s.handle({ method: 'POST', path: '/v1/converse', headers: auth(), body: { text: 'hi' } });
+    expect(r.status).toBe(200);
+    const parsed = JSON.parse(await readBody(r.body));
+    expect(parsed.reply).toBe(FALLBACK);
+    expect(parsed.reply).not.toContain('Jane Doe'); // the ungrounded fact did NOT leak
+    expect(parsed.citations).toEqual([]);
+  });
+
+  it('renders a GROUNDED reply as-is (a non-blank citation)', async () => {
+    const s = makeSurface({
+      groundedFallback: FALLBACK,
+      handle: async () => ({
+        text: 'Refunds take 14 days.',
+        citations: [{ sourceId: 'kb', quote: 'refunds are processed within 14 days' }],
+      }),
+    });
+    const r = await s.handle({ method: 'POST', path: '/v1/converse', headers: auth(), body: { text: 'hi' } });
+    const parsed = JSON.parse(await readBody(r.body));
+    expect(parsed.reply).toBe('Refunds take 14 days.');
+    expect(parsed.citations).toHaveLength(1);
+  });
+
+  it('is OPT-IN: without groundedFallback an uncited reply is still rendered as-is', async () => {
+    const s = makeSurface({ handle: async () => ({ text: 'ungrounded but rendered', citations: [] }) });
+    const r = await s.handle({ method: 'POST', path: '/v1/converse', headers: auth(), body: { text: 'hi' } });
+    const parsed = JSON.parse(await readBody(r.body));
+    expect(parsed.reply).toBe('ungrounded but rendered');
+  });
+});

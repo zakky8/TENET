@@ -6,6 +6,23 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — REST surface enforces the grounded-render gate (5.3, Phase-5 gate MET, 2026-07-18)
+`RestSurface` gains an opt-in `groundedFallback?: string`. When set, the surface REFUSES to render a
+non-stream `/v1/converse` reply that carries no grounded citation — it returns the safe fallback (citations
+zeroed) INSTEAD of the possibly-ungrounded reply text, so no ungrounded fact reaches a client even if a reply
+reached the wire bypassing the agent's emit edge. Opt-in on purpose (an echo/passthrough deployment isn't
+making grounded claims; a grounded-or-abstain deployment turns it on), so existing behavior is unchanged when
+unset. This satisfies the Phase-5 gate: "a surface refuses to render an ungrounded factual reply." Streaming
+(`/v1/converse/stream`) is NOT gated — grounding a token stream before its citations are known is a distinct
+problem (buffer or post-verify), flagged for later. 3 E2E tests through the HTTP handle (refuses an uncited
+fact-bearing reply → fallback; renders a grounded reply as-is; opt-in when unset); mutation probe non-vacuous
+(bypassing the gate leaks the fact and reddens the refusal test).
+
+**Relocated `@tenet/surface-core` → `surfaces/core/`** (from `packages/surface-core/`): the `@tenet/surface-*`
+name maps to `surfaces/*` in jest's moduleNameMapper, so the package could not be imported from `packages/`.
+The move makes it convention-correct (resolves automatically, no config hack). Same name, same 63-package
+count. Suite 1275 → 1278 (+3).
+
 ### Added — `@tenet/surface-core` grounded-render gate (5.3 partial, 2026-07-18)
 A new package with `groundedRenderGate(reply, { fallback })` — a fail-closed, last-mile grounding guard for
 the surface send path. The agent's single emit edge already refuses to ship an uncited fact, but a surface

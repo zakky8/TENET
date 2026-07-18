@@ -15,6 +15,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { NormalizedEvent, NormalizedReply } from '@tenet/core';
+import { groundedRenderGate } from '@tenet/surface-core';
 
 // ── HTTP types ─────────────────────────────────────────────────────────
 
@@ -130,6 +131,16 @@ export interface RestSurfaceOptions {
   /** Optional streaming handler — yields text chunks for /converse/stream. */
   stream?: (event: NormalizedEvent, signal?: AbortSignal) => AsyncIterable<string>;
   /**
+   * When set, the surface REFUSES to render a non-stream reply that carries no
+   * grounded citation: it returns this safe message instead of the (possibly
+   * ungrounded) reply text, with citations zeroed. Defense in depth for
+   * grounded-or-abstain AT THE WIRE — even a reply that reached here bypassing
+   * the agent's emit edge cannot leak an ungrounded fact. Absent → the reply
+   * text is rendered as-is. (Applies to /v1/converse; streaming is not gated —
+   * see the note on the stream path.)
+   */
+  groundedFallback?: string;
+  /**
    * Optional readiness probes. Each runs on /readyz; ALL must report ready
    * for /readyz to return 200. Empty/absent → always ready.
    */
@@ -221,6 +232,17 @@ export class RestSurface {
 
     try {
       const reply = await this.opts.handle(event, req.signal);
+      const fallback = this.opts.groundedFallback;
+      if (fallback !== undefined) {
+        // Fail CLOSED at the wire: an uncited fact-bearing reply is refused —
+        // the safe fallback is sent (with no citations), never the ungrounded text.
+        const decision = groundedRenderGate(reply, { fallback });
+        return jsonResponse(200, {
+          reply: decision.text,
+          citations: decision.grounded ? reply.citations : [],
+          conversationId,
+        });
+      }
       return jsonResponse(200, {
         reply: reply.text,
         citations: reply.citations,
