@@ -97,6 +97,19 @@ export function criticLoop(deps: AgentDeps): Step<OrchestratorState, Orchestrato
           // Unreachable (the loop returns on every path), but fail closed by construction.
           return { ...state, halt: abstainResult('repair budget exhausted') };
         }
+
+        default: {
+          // Exhaustiveness guard (CLAUDE.md §4): a new ReasonerOutput variant must be
+          // handled above — else this fails to COMPILE, forcing a conscious decision.
+          // At runtime any unexpected decision fails CLOSED to abstain IMMEDIATELY (not
+          // after burning maxAttempts model calls). The turn driver never falls through
+          // to another reasoning pass on a decision it cannot map.
+          const unexpected: never = decision;
+          return {
+            ...state,
+            halt: abstainResult(`unexpected reasoner decision: ${(unexpected as ReasonerOutput).kind}`),
+          };
+        }
       }
     }
 

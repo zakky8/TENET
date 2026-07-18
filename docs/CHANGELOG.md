@@ -6,6 +6,22 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Changed — the turn driver's reasoner-decision switch is now exhaustiveness-guarded + fails closed on an unmappable decision (2026-07-18)
+`criticLoop` (the central turn driver) `switch`es on `ReasonerOutput.kind` (`abstain | handoff | tool |
+answer`) — the point where a model decision becomes an outcome. It had no `default`, so an unexpected variant
+fell through to the next loop iteration: today that *incidentally* fails closed via the `maxAttempts` abstain,
+but it's not enforced — a loop refactor could turn it fail-OPEN, and meanwhile it burns `maxAttempts` model
+calls on a decision it can't map. Added an exhaustiveness `default`:
+- **Compile-enforced (CLAUDE.md §4):** `const unexpected: never = decision;` — a future `ReasonerOutput`
+  variant that isn't handled above now fails `tsc`, forcing a conscious decision (illegal states
+  unrepresentable). Verified it compiles today (the switch *is* exhaustive over the 4 variants).
+- **Runtime fail-closed:** any unmappable decision abstains IMMEDIATELY (`unexpected reasoner decision: …`),
+  not after looping `maxAttempts` times — never a shipped answer, never wasted model calls.
+1 regression test (an unmappable decision kind → abstain with `reasonCalls === 1`). Mutation probe
+non-vacuous: reverting the `default` to fall-through reddens it (`"no answer within 5 attempts"` + 5 reason
+calls instead of 1). Docs synced (ARCHITECTURE turn-driver line; counts 1300→1301). `pnpm -r build` green;
+suite 1300 → **1301** (+1).
+
 ### Added — `pnpm inventory:check`: docs' surface/model adapter counts are gated against the filesystem (2026-07-18)
 A structural count in the repo's own voice ("9 surface adapters", "6 model adapters") is held to §1 like the
 test count — the only witness is the tree. This drift is REAL: `AGENTS.md` had said "Surfaces (12)" while

@@ -17,7 +17,7 @@ is actually in the tree on branch `upgrade/top-1pct`, so the proposal is not rea
 a description of shipped code. Numbers are measured, not aspirational.
 
 - **Repo:** 63 workspace packages (every `package.json` under the `pnpm-workspace.yaml`
-  globs). Test suite: **97 suites / 1300 tests, all green** (was 83 / 1051 at the start
+  globs). Test suite: **97 suites / 1301 tests, all green** (was 83 / 1051 at the start
   of this upgrade). All figures are from the **hermetic stub plane** — no real-model
   access exists in this environment, so no real-model benchmark numbers are claimed here.
 - **Phase 1 — canonical model contract (complete):** one `ChatModel` in `@tenet/core`
@@ -310,7 +310,7 @@ The smallest end-to-end vertical that proves the spine works:
 - `models/bedrock` only (gpt-oss-120b, matching TENET's current setup)
 - `stores/vector/pgvector` + `stores/state/redis`
 - `apps/community-bot` — port TENET's current behavior to the new framework
-- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 97 suites / 1300 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
+- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 97 suites / 1301 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
 
 Success criteria for MVP:
 1. TENET's golden conversations replay through the new runtime with **same or better** accuracy
@@ -428,10 +428,11 @@ halting(withTimeout(cacheNode)), halting(withTimeout(compactNode)), halting(crit
   history that overflows the window is summarized to fit BEFORE the reasoner reads it; a
   compaction error → abstain, so a silently truncated prompt is never sent; no compactor
   configured → pass through untouched).
-- **`criticLoop`** (`agent/src/criticLoop.ts`): reason → `abstain | handoff | tool | answer`; a
-  tool runs through governance (`runTools`, `agent/src/tools.ts` — gate-all-before-executing-any,
-  deny/`require_approval` → ops handoff) and its results fold back into history; an answer goes
-  through the single emit edge.
+- **`criticLoop`** (`agent/src/criticLoop.ts`): reason → `abstain | handoff | tool | answer` (an
+  exhaustiveness `default` makes any unmappable decision abstain immediately — compile-enforced, so a
+  new variant can't be silently forgotten); a tool runs through governance (`runTools`,
+  `agent/src/tools.ts` — gate-all-before-executing-any, deny/`require_approval` → ops handoff) and its
+  results fold back into history; an answer goes through the single emit edge.
 - **`verifyAndEmit`** (`agent/src/emit.ts`) is the ONLY emit edge: verify (fail-closed) → require
   ≥1 grounded citation → outbound leak gate → emit. A verify failure, uncited pass, or leak → abstain.
 - **Two fail-closed backstops:** `finalize` abstains if the graph ever returns without a carried

@@ -271,4 +271,21 @@ describe('criticLoop — the turn driver', () => {
     expect(out.halt?.reason).toContain('no answer within 2 attempts');
     expect(exec.ran).toHaveLength(2); // EXACTLY maxAttempts passes — not maxAttempts+1 (off-by-one guard)
   });
+
+  it('an UNEXPECTED reasoner decision kind → abstain IMMEDIATELY (fail closed, does not burn maxAttempts)', async () => {
+    // A buggy/future ReasonerOutput variant the switch cannot map must fail CLOSED at once —
+    // never ship, and never fall through to re-reason (which would waste maxAttempts model
+    // calls on the same unmappable decision). The exhaustiveness `default` guarantees this.
+    let reasonCalls = 0;
+    const unmappable: Reasoner = {
+      async reason() {
+        reasonCalls++;
+        return { kind: 'telepathy', draft: 'ungrounded' } as unknown as ReasonerOutput;
+      },
+    };
+    const out = await criticLoop(makeDeps({ reasoner: unmappable, maxAttempts: 5 }))(makeState(), ctxWith());
+    expect(out.halt?.outcome).toBe('disqualified'); // abstain, never resolved
+    expect(out.halt?.reason).toContain('unexpected reasoner decision');
+    expect(reasonCalls).toBe(1); // IMMEDIATE — did not loop 5 times before abstaining
+  });
 });
