@@ -112,7 +112,10 @@ describe('verifyDraft — URL pre-pass', () => {
     );
     expect(out.pass).toBe(true);
     expect(judgeCalls).toBe(0);
-    expect(out.verdicts.every((v) => v.supported)).toBe(true);
+    // Pin that a claim WAS extracted and auto-passed — a regression yielding ZERO
+    // claims would make pass=true, judgeCalls=0, AND `.every()` vacuously true.
+    expect(out.verdicts).toHaveLength(1);
+    expect(out.verdicts[0]!.supported).toBe(true);
   });
 
   it('still judges non-URL claims when a mix exists', async () => {

@@ -111,8 +111,12 @@ describe('judgeOneBatch', () => {
     ]);
   });
 
-  it('handles unbracketed format "1 SUPPORTED"', async () => {
-    const model = mockModel('1 SUPPORTED\n2 SUPPORTED');
+  it('handles unbracketed format ("1 SUPPORTED" / "2 UNSUPPORTED")', async () => {
+    // A MIX is deliberate: if unbracketed parsing regressed to unparseable, the fail-OPEN
+    // fallback (no lines parsed → supported) would mark BOTH supported — so a SUPPORTED-only
+    // reply cannot distinguish real parsing from a masked failure. The UNSUPPORTED line
+    // makes the assertion bite, and toEqual pins the count + order + reason.
+    const model = mockModel('1 SUPPORTED\n2 UNSUPPORTED: missing detail');
     const out = await judgeOneBatch(
       model,
       'sources',
@@ -120,7 +124,10 @@ describe('judgeOneBatch', () => {
       false,
       DEFAULT_VERIFIER_CONFIG,
     );
-    expect(out.every((v) => v.supported)).toBe(true);
+    expect(out).toEqual([
+      { claim: 'a', supported: true, reason: '' },
+      { claim: 'b', supported: false, reason: 'missing detail' },
+    ]);
   });
 
   it('fails open on judge timeout — marks all supported', async () => {
@@ -143,7 +150,13 @@ describe('judgeOneBatch', () => {
       false,
       DEFAULT_VERIFIER_CONFIG,
     );
-    expect(out.every((v) => v.supported)).toBe(true);
+    // Fail-OPEN: ONE supported verdict PER claim, in input order. The COUNT is the
+    // contract — it keeps the caller's index→claim mapping aligned. An empty/short
+    // array would let the old `.every()` pass vacuously.
+    expect(out).toEqual([
+      { claim: 'x', supported: true, reason: '' },
+      { claim: 'y', supported: true, reason: '' },
+    ]);
   });
 
   it('partial-parse: missing indices default to UNSUPPORTED when SOME lines parsed (fail-closed)', async () => {
