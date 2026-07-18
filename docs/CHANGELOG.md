@@ -6,6 +6,21 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `pnpm links:check`: every internal doc link must resolve to a file that exists (2026-07-18)
+A markdown link to a doc that isn't there is the repo referencing something that doesn't exist — a stale
+reference in its own voice, the same §9 defect class as a stale number. `scripts/check-doc-links.mjs`
+(`pnpm links:check`, now a CI step) scans every tracked `.md`, extracts relative links, and fails on any whose
+target is missing. Correctness: it strips fenced (```` ``` ````) and inline (`` ` ``) code BEFORE extraction, so
+an illustrative `[label](url)` inside code isn't mistaken for a real link (this was a real false positive in
+`surfaces/discord/README.md`); external (`http(s):`/`mailto:`) and anchor-only (`#…`) links are skipped, a
+trailing `#anchor`/`?query` is stripped, and a Jekyll `.html` target also resolves via its sibling `.md`.
+Audited the tree first — **61 relative links across 59 md files all resolve** (0 broken; `SKILL.md` →
+`docs/design/agent-turn.md` confirmed present). Mutation probe non-vacuous in both directions: a broken link in
+prose fails the gate (exit 1), the SAME broken link inside inline code passes (exit 0, correctly skipped).
+Wired into `package.json` + `ci.yml` + AGENTS.md. Tooling/docs only — no TypeScript source or test changed, so
+`pnpm -r build`/`pnpm test` are unaffected (green at parent `3e9d5c0`, suite unchanged 1302/97); counts/
+inventory/jsonld gates all still green.
+
 ### Added — regression test for `runTools` batch atomicity (a denied tool must not let allowed siblings run first) (2026-07-18)
 `runTools` is two-phase by design — gate ALL calls, THEN execute ANY — so a forbidden call in a batch never
 lets its allowed siblings cause side effects first (e.g. a batch `[read-secret, exfiltrate]` where only

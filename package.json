@@ -28,7 +28,8 @@
     "counts:check": "node scripts/check-counts.mjs",
     "readme:check": "node scripts/check-readme-ts.mjs",
     "jsonld:check": "node scripts/check-jsonld.mjs",
-    "inventory:check": "node scripts/check-inventory.mjs"
+    "inventory:check": "node scripts/check-inventory.mjs",
+    "links:check": "node scripts/check-doc-links.mjs"
   },
   "devDependencies": {
     "@types/jest": "^29.5.13",
