@@ -6,6 +6,19 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — regression test for `runTools` batch atomicity (a denied tool must not let allowed siblings run first) (2026-07-18)
+`runTools` is two-phase by design — gate ALL calls, THEN execute ANY — so a forbidden call in a batch never
+lets its allowed siblings cause side effects first (e.g. a batch `[read-secret, exfiltrate]` where only
+`exfiltrate` is denied must run NOTHING). The existing "deny executes nothing" test used a rule that denied
+*every* call, so the FIRST call was denied and the batch stopped there — it never exercised the load-bearing
+case: an ALLOWED first call followed by a DENIED second. A single-loop refactor (gate-then-execute per call)
+would pass every existing test yet run the allowed sibling before reaching the deny — a real fail-open the
+suite did not catch. Added the missing test (allow `kb.lookup`, deny `kb.write` via `allowListRule`; assert
+`exec.ran === []`). **Mutation probe proves the gap was real:** under a single-loop `runTools`, the new test
+fails (`exec.ran === ["kb.lookup"]`) while the other 6 tests still pass — so without this test the atomicity
+invariant was unprotected. Test-only; `pnpm -r build` green, suite 1301 → **1302** (+1). No source change —
+`runTools` was already correct; this makes its most important property regression-proof.
+
 ### Fixed — Open Graph image is now a real PNG (`og:image` unfurls; SVG never did) (2026-07-18)
 `og:image` pointed at `docs/assets/og-image.svg`, but X / Slack / Discord / LinkedIn / Facebook unfurlers do
 NOT render SVG — so every shared link showed a blank preview, a silent AEO/discoverability defect. Rasterized

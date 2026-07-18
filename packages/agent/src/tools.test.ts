@@ -7,7 +7,7 @@
  * autonomous turn cannot approve), and a throwing tool becomes an isError result
  * rather than a dropped call or a fake success. Each test reddens if that regresses.
  */
-import { PolicyEvaluator, type PolicyRule } from '@tenet/governance';
+import { PolicyEvaluator, allowListRule, type PolicyRule } from '@tenet/governance';
 import type { ToolExecutor } from './deps.js';
 import type { ToolCall } from './types.js';
 import { runTools, type ToolRunContext } from './tools.js';
@@ -64,6 +64,22 @@ describe('runTools — governance-gated, two-phase, fail closed', () => {
     if (!out.denied) throw new Error('unreachable');
     expect(out.reason).toContain('not allowed');
     expect(exec.ran).toEqual([]); // phase-1 gate ran before ANY execution
+  });
+
+  it('an ALLOWED-then-DENIED batch executes NOTHING — the allowed sibling never runs first (phase-1 atomicity)', async () => {
+    // The load-bearing invariant of the two-phase design: gate ALL before executing ANY.
+    // Here the FIRST call is allowed and only the SECOND is denied — a single-loop
+    // (gate-then-execute per call) would run the allowed first call before ever reaching
+    // the deny, a real fail-open (think a batch [read-secret, exfiltrate] where only
+    // exfiltrate is denied — read-secret must NOT execute). allowListRule permits only
+    // kb.lookup, so kb.write is denied on the second gate.
+    const exec = recordingExecutor();
+    const policy = new PolicyEvaluator([allowListRule(['kb.lookup'])]);
+    const out = await runTools([call('t1', 'kb.lookup'), call('t2', 'kb.write')], exec, policy, RUN_CTX);
+    expect(out.denied).toBe(true);
+    if (!out.denied) throw new Error('unreachable');
+    expect(out.reason).toContain('kb.write'); // the deny was on the second call...
+    expect(exec.ran).toEqual([]); // ...yet the ALLOWED kb.lookup did NOT run before it was caught
   });
 
   it('require_approval is treated as DENIED (an autonomous turn cannot approve)', async () => {
