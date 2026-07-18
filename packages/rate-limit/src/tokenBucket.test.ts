@@ -63,11 +63,23 @@ describe('TokenBucket.acquire — blocking variant', () => {
     await expect(b.acquire(6)).rejects.toThrow(/exceeds capacity/);
   });
 
-  it('returns immediately when tokens are available', async () => {
-    const b = new TokenBucket({ capacity: 3, refillTokensPerSec: 1 });
-    const start = Date.now();
+  it('returns immediately (never sleeps) when tokens are available', async () => {
+    // Deterministic: "returns immediately" MEANS the fast path took the token without
+    // waiting — assert the sleep hook is never called. The old wall-clock bound
+    // (`Date.now() - start < 20ms`) flaked under parallel worker load: the async
+    // continuation after `await` can be scheduled >20ms later even though acquire()
+    // itself never slept. Time is injectable precisely so tests don't race the clock.
+    let slept = false;
+    const b = new TokenBucket({
+      capacity: 3,
+      refillTokensPerSec: 1,
+      now: () => 1_000_000,
+      sleep: async () => {
+        slept = true;
+      },
+    });
     await b.acquire(1);
-    expect(Date.now() - start).toBeLessThan(20);
+    expect(slept).toBe(false); // tokens available → taken without a refill wait
   });
 
   it('waits for refill when out of tokens', async () => {
