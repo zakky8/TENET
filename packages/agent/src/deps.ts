@@ -107,4 +107,12 @@ export interface AgentDeps {
   readonly policy: PolicyEvaluator;
   /** Tool-execution port (only ever handed policy-allowed calls). */
   readonly tools: ToolExecutor;
+  /** Per-node wall-clock budgets (ms) for the deterministic pre-reasoning nodes. A
+   *  node that exceeds its budget aborts and the turn fails closed (top-level → abstain).
+   *  criticLoop is NOT timed here — it self-bounds via maxAttempts + per-turn abort checks. */
+  readonly timeouts: {
+    readonly gate: number;
+    readonly retrieve: number;
+    readonly cache: number;
+  };
 }

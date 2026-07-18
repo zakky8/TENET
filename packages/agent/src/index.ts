@@ -24,7 +24,7 @@ export {
   ABSTAIN_REPLY,
   HANDOFF_REPLY,
 } from './terminals.js';
-export { halting, finalize } from './orchestrator.js';
+export { halting, finalize, runAgent } from './orchestrator.js';
 
 export type {
   AgentDeps,
