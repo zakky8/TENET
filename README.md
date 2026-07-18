@@ -47,6 +47,29 @@ The differentiator is pre-tool-call governance. `@tenet/governance` ships three 
 
 The hermetic CI gate measures the **framework's measurement plane** (verifier contract, guardrail patterns, retriever scoring, gate logic) on bundled fixtures with a deterministic stub SUT. Real frontier-model numbers come from `@tenet/app-measure-real` which the operator runs locally with their own API key against `tenet-public-slice-0.1.0` or any swap-in dataset. The split is deliberate and the BENCHMARKS doc spells it out.
 
+## How a turn works
+
+`runAgent` (`packages/agent/src/orchestrator.ts`) drives every turn as a fail-closed graph. Every non-emit edge resolves to **abstain** or **handoff**; a fact reaches the member at exactly one guarded edge — `emit`, reachable only past the verifier, the grounded-citation guard, and the outbound leak gate. Terminals are carried as values (never thrown), and a top-level catch turns any error into an abstain.
+
+```mermaid
+flowchart TD
+  E([inbound event]) --> IG{injection gate}
+  IG -->|blocked or filter error| HO[[handoff to a human]]
+  IG -->|clear| RN{retrieve + knowledge boundary}
+  RN -->|thin evidence or retriever error| AB[[abstain]]
+  RN -->|grounded| CN{cache lookup}
+  CN -->|hit, re-verified| EM[[emit — grounded answer]]
+  CN -->|miss| RS{reason}
+  RS -->|abstain| AB
+  RS -->|handoff| HO
+  RS -->|tool call| GV{governance gate}
+  GV -->|deny or require-approval| HO
+  GV -->|allow, run, loop back| RS
+  RS -->|answer draft| VE{verify + citation guard + leak gate}
+  VE -->|fail, uncited, leak, or repair-exhausted| AB
+  VE -->|pass| EM
+```
+
 ## What you can build
 
 - **Community moderation + Q&A bots** for Telegram / Discord servers — verified answers with citations, no hallucinated URLs.

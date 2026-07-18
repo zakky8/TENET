@@ -6,6 +6,13 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — mermaid architecture diagram of the fail-closed turn (7.3, 2026-07-18)
+A "How a turn works" section in the README with a mermaid flowchart of `runAgent`'s graph: injection gate →
+retrieve + knowledge boundary → cache re-verify → reason → (tool via governance | answer) → verify + citation
+guard + leak gate → the single `emit` edge, with every non-emit edge resolving to abstain or handoff. Traced
+against the actual `orchestrator.ts` + `criticLoop`; mermaid syntax structurally validated (bracket balance,
+edge count). Renders natively on GitHub.
+
 ### Fixed — accurate site SEO meta + robots.txt (7.3, 2026-07-18)
 `docs/_config.yml`'s `description` (the Google snippet + `og:description` that `jekyll-seo-tag` emits) was
 stale/inaccurate: "10 surfaces" but listed 8, and the bare "0 high-severity CVEs" boast. Corrected to the
