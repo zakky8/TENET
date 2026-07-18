@@ -6,6 +6,15 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `llms.txt` AEO index for AI agents / crawlers (7.3, 2026-07-18)
+A repo-root `llms.txt` (llmstxt.org format): one-line guarantee, an honest-read context paragraph,
+and linked sections (Documentation, Core concepts, What ships today) so an LLM or agent can navigate
+TENET without scraping. Every fact is measured — the test count is the live-suite number, and `llms.txt`
+was added to `scripts/check-counts.mjs`'s source-of-truth list so its "N tests across M suites" claim is
+now gated by `pnpm counts:check` too (proven: a wrong count fails CI). No cross-project content, no
+unsourced claims. Remaining 7.3: `llms-full.txt`, JSON-LD (SoftwareSourceCode + FAQPage), `docs/FAQ.md`,
+OG image + `og:image`, `robots.txt`, Pages deploy workflow.
+
 ### Fixed — reconcile the ROADMAP phase tables to the as-built monorepo (7.2, 2026-07-18)
 The ROADMAP's Phase 2/3 tables still said "not started" for surfaces, connectors, stores, the MCP
 gateway, WASM sandbox, enterprise-support app, and the Helm chart — all of which actually ship in the

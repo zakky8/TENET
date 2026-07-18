@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs';
 
 const DOCS = [
   'README.md',
+  'llms.txt',
   'docs/ARCHITECTURE.md',
   'docs/ROADMAP.md',
   'docs/marketing/LAUNCH-COPY.md',
