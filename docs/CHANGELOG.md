@@ -6,6 +6,25 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — reconcile SECURITY enforcement claims (template-injection + deserialization) to the code (2026-07-18)
+Follow-up to the supply-chain reconciliation: three more enforcement claims in the security tables didn't match
+the code (§9 — no capability that isn't in the code; a security doc that overclaims a control is worse than a
+stale count). Trust-code review:
+- **`SECURITY.md`:35 + `docs/ARCHITECTURE.md`:219 (template injection)** claimed prompts use "tagged-template
+  literals only" enforced by a "custom ESLint rule". Neither is true: `buildSystem` assembles the prompt via
+  `[…].join('\n')` (array-join, not tagged templates), and there is NO ESLint installed at all. Corrected to
+  the real posture: no Jinja2/template engine — prompts are plain TypeScript built from literal strings +
+  controlled interpolation of retrieved sources (no user input is evaluated as a template); a lint rule
+  (`eslint-plugin-prompt-safety`) is planned, not yet written (ARCHITECTURE already stated this honestly in its
+  enforcement column).
+- **`SECURITY.md`:34 (unsafe deserialization)** claimed "all persisted state is Zod-schema-typed" — but there
+  is NO Zod anywhere. Corrected to the real posture: JSON only (no `pickle`/`eval`, so loading state can't
+  execute code); the durable store `JSON.parse`s to `unknown` and shape-guards before use (a journal must be an
+  array, else throw); no schema-validation library.
+Docs-only; every retained claim verified this fire against `buildSystem`, the durable store, and the absence of
+ESLint/Zod. Post-edit grep for `tagged-template`/`Zod-schema-typed`/`custom ESLint rule` → nothing. `pnpm -r
+build`/`pnpm test` unaffected (green at parent `925b3ef`, 1325/98); counts/jsonld/inventory/links green.
+
 ### Fixed — reconcile supply-chain SECURITY claims to what CI actually runs (removed SBOM/Dependabot/Snyk/provenance) (2026-07-18)
 A security doc that overclaims controls is worse than a stale feature count — an operator could rely on
 protections that aren't there (§9: no capability that isn't in the code). Trust-code review of `.github/

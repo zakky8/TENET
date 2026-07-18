@@ -31,8 +31,8 @@ TENET is designed to avoid entire categories of known agent-framework vulnerabil
 
 | Risk | Policy | Enforcement |
 |------|--------|-------------|
-| Unsafe deserialization | No `pickle`-equivalent, no free-form `JSON.parse` of persisted state | All persisted state is Zod-schema-typed |
-| Template injection | No Jinja2 or equivalent string-templated prompts | Tagged-template literals only; custom ESLint rule rejects string-built prompts |
+| Unsafe deserialization | JSON only — no `pickle`/`eval`-style deserialization, so loading persisted state cannot execute code | Persisted state (the framework's own checkpoints) is `JSON.parse`d to `unknown` and shape-guarded before use (e.g. a journal must be an array, else throw); no schema-validation library |
+| Template injection | No Jinja2 or template engine — prompts are TypeScript, assembled from literal strings + controlled interpolation of retrieved sources; no user input is evaluated as a template | By construction (there is no template-eval path). A lint rule to enforce the convention (`eslint-plugin-prompt-safety`) is planned, not yet written |
 | Path traversal | No raw filesystem paths in public APIs | `PathHandle` type opened against allow-list root |
 | SQL injection | All store queries parameterized; metadata filter keys validated `/^[a-zA-Z0-9_.-]+$/` | Store-adapter type signatures take `Filter<T>`, not strings |
 | Secret leakage | Secrets are an opaque `Secret<T>` type, never serialized | Custom `toJSON()` rejects |
