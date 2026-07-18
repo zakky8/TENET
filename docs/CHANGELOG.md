@@ -77,7 +77,7 @@ de-fork of the two now-parallel verifiers into a shared `@tenet/surface-core` (a
 both surfaces — its own increment), and moving the grounding gate into the surface send path.
 
 ### Added — README fenced-TypeScript gate + fixed the measure-real usage example (4.gate, 2026-07-18)
-`pnpm readme:check` (`scripts/check-readme-ts.mjs`, now a CI step + in CLAUDE.md's gate) extracts every
+`pnpm readme:check` (`scripts/check-readme-ts.mjs`, now a CI step + in the repo's gate list) extracts every
 ` ```ts ` block from a tracked README, writes it into the owning package's `examples/` dir (so workspace
 `@tenet/*` imports and ESM top-level `await` resolve as an operator's copy would), and typechecks it with
 `tsc --noEmit`. A usage example that no longer compiles is stale code in the repo's own voice; the gate fails

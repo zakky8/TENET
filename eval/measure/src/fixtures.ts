@@ -6,7 +6,7 @@
  * representative shapes the framework's contracts must hold for. The
  * BENCHMARKS doc cites the public datasets these fixtures model.
  *
- * Discipline (CLAUDE.md):
+ * Discipline (AGENTS.md):
  *   - every fixture says what real dataset it models
  *   - numbers measured against these are framework-behavior numbers,
  *     not frontier-model numbers

@@ -1,6 +1,6 @@
 # Research Pass 3 — open questions, structured for operator fetch
 
-**Status:** scaffolded 2026-06-04. Every row below is `UNVERIFIED — pending operator-led fetch` per the source-hierarchy rule in `CLAUDE.md`. Numbers without an `accessed_at_utc` + archive URL are not shipped here. This document is the **list of questions** + **methodology** + **verification template** for the next research pass. A second-pass author fills in the answers with citations; we never paraphrase a search-result snippet as proof.
+**Status:** scaffolded 2026-06-04. Every row below is `UNVERIFIED — pending operator-led fetch` per the source-hierarchy rule in `AGENTS.md`. Numbers without an `accessed_at_utc` + archive URL are not shipped here. This document is the **list of questions** + **methodology** + **verification template** for the next research pass. A second-pass author fills in the answers with citations; we never paraphrase a search-result snippet as proof.
 
 Companion docs:
 - [`docs/RESEARCH-PICKS.md`](RESEARCH-PICKS.md) — pass 1 verified picks (eval layer, OTel version, judge model)

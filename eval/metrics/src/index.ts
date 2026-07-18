@@ -13,7 +13,7 @@
  *     replayed against the same algorithm.
  *   - Hermetic in CI. No network. Same input → same number, always.
  *
- * Per CLAUDE.md source-hierarchy rule: a number produced by this
+ * Per AGENTS.md source-hierarchy rule: a number produced by this
  * package is Tier-1 evidence *for the framework's behavior on the
  * given dataset*. It is not a claim about the underlying model.
  */

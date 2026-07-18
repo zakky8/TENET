@@ -37,4 +37,4 @@ Measured, not marketed: every capability below is code in the monorepo, every be
 ## Optional
 
 - [Contributing](CONTRIBUTING.md): how to contribute code, docs, and eval cases.
-- [Operating manual](CLAUDE.md): the repository's own working contract — fail-closed accuracy, the gate, code style, and the docs-in-sync rules.
+- [Operating manual](AGENTS.md): the repository's own working contract for AI agents — the stack, binding discipline, the gate, code style, and the docs-in-sync rules.

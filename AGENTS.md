@@ -15,11 +15,10 @@ Telegraph style. Root rules only. Read scoped `AGENTS.md` before subtree work.
 
 ## Required reading order
 
-1. `CLAUDE.md` (root persona + standing instructions) — overrides everything else
-2. This file (`AGENTS.md`) — operational rules for any agent
-3. `docs/ARCHITECTURE.md` — component map + altitude principles
-4. `docs/BENCHMARKS.md` — measured gate, every PR re-runs
-5. Subtree `AGENTS.md` if present in the package you're touching
+1. This file (`AGENTS.md`) — the root operating rules for any agent working in this repo
+2. `docs/ARCHITECTURE.md` — component map + altitude principles
+3. `docs/BENCHMARKS.md` — measured gate, every PR re-runs
+4. Subtree `AGENTS.md` if present in the package you're touching
 
 ## Discipline (binding)
 
@@ -36,7 +35,7 @@ Telegraph style. Root rules only. Read scoped `AGENTS.md` before subtree work.
 ```bash
 pnpm install                # installs all workspace deps
 pnpm typecheck              # tsc --noEmit per package (topological)
-pnpm test                   # full Jest suite (~800 tests)
+pnpm test                   # full Jest suite (count gated by `pnpm counts:check`)
 pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL/MISSING)
 pnpm benchmarks:json        # JSON report for CI artefacts
 pnpm lint                   # per-package lint (currently no-op; oxlint coming via pre-commit)

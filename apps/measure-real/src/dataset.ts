@@ -7,7 +7,7 @@
  * inheriting that dataset's license. Operators who want real
  * TruthfulQA / HaluEval / HELM numbers swap this loader.
  *
- * Discipline (CLAUDE.md source hierarchy):
+ * Discipline (AGENTS.md source hierarchy):
  *   - the slice's authorship + license is THIS repo, Apache-2.0
  *   - a measurement number from this slice is reported as "TENET +
  *     <model> on tenet-public-slice-0.1.0", NOT "on TruthfulQA"

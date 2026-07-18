@@ -20,3 +20,6 @@ storage/
 .cache/
 # transient snippet written by scripts/check-readme-ts.mjs (README fenced-TS gate)
 **/examples/__readme_check__.ts
+
+# operating manual kept local-only (like .upgrade/) — not pushed
+CLAUDE.md
