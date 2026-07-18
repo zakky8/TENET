@@ -6,6 +6,19 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — quickstart README + network-gated real-model smoke test (4.1, 2026-07-18)
+`apps/quickstart` gains a real `README.md`: the true three steps (`pnpm install` → `pnpm quickstart`
+zero-key → `ANTHROPIC_API_KEY=… pnpm quickstart`) and **real captured output** (not fabricated — produced
+by running the built agent), plus an honest note that the offline `StubChatModel` always grounds its draft
+in the top chunk and always judges `SUPPORTED`, so genuine abstention needs a real model (or the liar-model
+test). Added a **network-gated real-model smoke test** to `index.test.ts` that runs the same
+retrieve→draft→verify pipeline against a real Anthropic model and asserts a verified, cited (non-abstained)
+answer. It is registered ONLY when `ANTHROPIC_API_KEY` is set, so the hermetic suite is unchanged (1219/92,
+still all green) and its count does not drift; verified BOTH directions (absent with no key, registers +
+attempts the real call with a key). Its real-model assertion is un-run in CI (no key) — flagged in code +
+PLAN; only its gating + compilation are checked here. TRUST-CODE note: the item's "invalid default model id"
+was stale — `main.ts` already defaults to the valid `claude-sonnet-4-6` (`TENET_MODEL` overridable).
+
 ### Added — `groundedOrAbstain` reference orchestrator wires `@tenet/refine` fail-closed (3.4, 2026-07-18)
 `@tenet/refine` gains `groundedOrAbstain(input, opts)` — the canonical chain of its levers into one
 fail-closed grounded-or-abstain turn: knowledge-boundary gate → draft → verify + bounded `repairDraft` →

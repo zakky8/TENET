@@ -52,3 +52,30 @@ describe('QuickstartAgent abstention (verification-first behaviour)', () => {
     expect(res.citations).toEqual([]);
   });
 });
+
+// ── Real-model smoke test (network-gated) ─────────────────────────────
+// Runs the SAME retrieve→draft→verify pipeline against a real Anthropic
+// model and asserts an in-scope question yields a VERIFIED, CITED answer
+// (never a bare ungrounded string). Registered ONLY when ANTHROPIC_API_KEY
+// is set, so the offline suite stays hermetic and its count is unchanged;
+// with no key the block does not exist in the run (not even as a skip).
+// NOTE: un-validated against a live model in CI (no key there) — only its
+// gating + compilation are checked offline.
+const apiKey = process.env['ANTHROPIC_API_KEY'];
+if (apiKey !== undefined && apiKey.length > 0) {
+  describe('QuickstartAgent against a real Anthropic model (network-gated)', () => {
+    it('answers an in-scope question with a verified, cited result', async () => {
+      if (apiKey === undefined) throw new Error('unreachable: gated on apiKey');
+      const { AnthropicChatModel } = await import('@tenet/models-anthropic');
+      const model = new AnthropicChatModel(
+        { fetch: (input, init) => fetch(input, init) },
+        { apiKey, model: process.env['TENET_MODEL'] ?? 'claude-sonnet-4-6' },
+      );
+      const agent = new QuickstartAgent({ model });
+      const res = await agent.ask('What does the TENET verifier do?');
+      expect(res.abstained).toBe(false);
+      expect(res.verified).toBe(true);
+      expect(res.citations.length).toBeGreaterThan(0);
+    }, 30_000);
+  });
+}
