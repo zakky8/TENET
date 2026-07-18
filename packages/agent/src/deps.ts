@@ -13,7 +13,7 @@
  * loop's fields (reasoner, policy, tools, maxAttempts, timeouts) are added with
  * `criticLoop`/`runAgent` in 2.1b-iii/iv.
  */
-import type { Source } from '@tenet/core';
+import type { Citation, Source } from '@tenet/core';
 import type { Filter } from '@tenet/guardrails';
 import type { BoundaryGateOptions } from '@tenet/refine';
 
@@ -44,6 +44,31 @@ export interface AnswerCache {
   lookup(text: string, signal?: AbortSignal): Promise<{ readonly answer: string } | null>;
 }
 
+/** Input to the verification port. `sources` is the KNOWLEDGE string the model was
+ *  shown (the deterministic tier greps it for verbatim grounding); `sourceRecords`
+ *  back the approved citations. */
+export interface VerifierInput {
+  readonly sources: string;
+  readonly sourceRecords: ReadonlyArray<Source>;
+  readonly draft: string;
+}
+
+/** The verifier's verdict. `approvedCitations` are the ONLY citations allowed to
+ *  emit — an empty list means nothing was grounded, so the draft must NOT ship.
+ *  Structurally satisfied by `@tenet/verifier`'s `VerifyResult` (adapted with a model
+ *  + deterministic pre-checks at composition). */
+export interface VerifierVerdict {
+  readonly pass: boolean;
+  readonly critique: string;
+  readonly approvedCitations: ReadonlyArray<Citation>;
+}
+
+/** Narrow verification port — the fail-closed grounding check that stands in front of
+ *  every emit. The concrete atomic-claim multi-judge verifier lives behind it. */
+export interface Verifier {
+  check(input: VerifierInput): Promise<VerifierVerdict>;
+}
+
 /** Everything the orchestrator injects into the turn's nodes. */
 export interface AgentDeps {
   /** Inbound filter chain (guardrails). An empty chain means no inbound blocking. */
@@ -56,4 +81,9 @@ export interface AgentDeps {
   readonly boundary: BoundaryGateOptions;
   /** Answer-cache port. A hit is a candidate draft, never emitted directly. */
   readonly cache: AnswerCache;
+  /** Verification port — the fail-closed grounding check before the single emit edge. */
+  readonly verify: Verifier;
+  /** Outbound leak-filter chain (guardrails). Includes `systemPromptLeakFilter()`.
+   *  An empty chain means no outbound gating (not recommended in production). */
+  readonly outboundFilters: ReadonlyArray<Filter>;
 }
