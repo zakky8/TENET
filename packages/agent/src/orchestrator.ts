@@ -13,7 +13,7 @@ import { runWorkflow, sequential, withTimeout, type Step } from '@tenet/workflow
 import type { OrchestratorState, Result } from './types.js';
 import type { AgentDeps } from './deps.js';
 import { abstainResult } from './terminals.js';
-import { cacheNode, injectionGate, retrieveNode } from './nodes.js';
+import { cacheNode, compactNode, injectionGate, retrieveNode } from './nodes.js';
 import { criticLoop } from './criticLoop.js';
 
 /** Wrap a graph node so that, once `state.halt` is set, the node is skipped and the
@@ -36,7 +36,7 @@ export function finalize(state: OrchestratorState): Result {
  * The composition root: drive `OrchestratorState` through the labeled graph
  * (design gate §4.1) and return the terminal `Result`.
  *
- *   injectionGate → retrieveNode → cacheNode → criticLoop
+ *   injectionGate → retrieveNode → cacheNode → compactNode → criticLoop
  *
  * Each pre-reasoning node runs under a wall-clock budget and behind `halting`, so a
  * terminal set upstream short-circuits the rest. Two independent fail-closed layers
@@ -55,6 +55,7 @@ export async function runAgent(
     halting(withTimeout(injectionGate(deps), deps.timeouts.gate)),
     halting(withTimeout(retrieveNode(deps), deps.timeouts.retrieve)),
     halting(withTimeout(cacheNode(deps), deps.timeouts.cache)),
+    halting(withTimeout(compactNode(deps), deps.timeouts.compact ?? deps.timeouts.retrieve)),
     halting(criticLoop(deps)),
   );
   try {

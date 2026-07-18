@@ -2,7 +2,7 @@
 
 > Verification-first, open-source TypeScript AI agent framework. Its guarantee: an agent turn either answers with a grounded, verified citation, or it abstains / hands off to a human — it never states a fact it cannot ground in a source (grounded-or-abstain). Anti-hallucination, source-grounding, capability-token tool sandboxing, and pre-tool-call governance are first-class layers, not bolt-ons. Apache-2.0, pre-1.0.
 
-This is the fuller companion to [llms.txt](llms.txt): it inlines the answers an LLM most often needs so the whole project can be understood from one file. Measured, not marketed — every capability here is code in the monorepo, doc numbers (1294 tests across 97 suites, all green, over 63 workspace packages) are checked against the live jest suite in CI (`pnpm counts:check`), and README code examples are typecheck-gated (`pnpm readme:check`).
+This is the fuller companion to [llms.txt](llms.txt): it inlines the answers an LLM most often needs so the whole project can be understood from one file. Measured, not marketed — every capability here is code in the monorepo, doc numbers (1300 tests across 97 suites, all green, over 63 workspace packages) are checked against the live jest suite in CI (`pnpm counts:check`), and README code examples are typecheck-gated (`pnpm readme:check`).
 
 ## What TENET is
 

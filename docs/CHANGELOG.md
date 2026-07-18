@@ -6,6 +6,32 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — long-history compaction is now a fail-closed pre-step in the agent turn (2.4, 2026-07-18)
+`@tenet/harness` shipped a `ContextCompactor` (summarize the middle of an overflowing conversation to fit a
+token budget) but nothing consumed it — `git grep ContextCompactor` outside `packages/harness/` returned
+nothing, so a long conversation history was sent to the model verbatim, risking a silently truncated prompt
+that drops the grounding sources. Wired it into the turn as an OPT-IN pre-step:
+- **`HistoryCompactor` port + `compaction?` on `AgentDeps`** — a narrow port over `ConversationMessage`
+  (structurally satisfied by a concrete `ContextCompactor` at composition, since `Role` ==
+  `HarnessMessage`'s roles). Absent = history used verbatim, so every existing caller is unchanged.
+- **`compactNode`** runs at `injectionGate → retrieveNode → cacheNode → **compactNode** → criticLoop` —
+  after the fail-closed pre-nodes (so `halting` skips it on a blocked/thin-retrieval turn; it only pays the
+  summarizer cost when the turn will actually reason) and before the reasoner reads `history`. **FAILS
+  CLOSED:** a compaction error → abstain, never a truncated prompt; `withTimeout` bounds a hung summarizer.
+  The compacted history is not trusted — it still flows through the same verify/emit edge, so a summarizer
+  hallucination cannot emit (the verifier checks the draft against *sources*, not history).
+- **`@tenet/workflow` `sequential`** gained a 5-step typed overload (the runtime was already variadic; this
+  is a pure-type addition so the now-5-stage graph type-checks) — a green `tsc` is its proof.
+
+6 new tests (4 `compactNode`: opt-in passthrough / replaces history / **error→abstain** / signal-threaded;
+2 `runAgent` E2E: the compactor runs on the full 40-message history then the turn still emits, and a
+compaction error abstains the WHOLE turn before the reasoner is reached). Mutation probe non-vacuous:
+flipping the catch to fail-open reddens both fail-closed tests — the E2E even distinguishes it (fail-open
+reaches the exploding reasoner → `"reasoner error"`, not `"compaction error"`). Docs synced (ARCHITECTURE
+pipeline snippet + node list, ROADMAP + PENDING graph strings). `pnpm -r build` green; suite 1294 → **1300**
+(+6). Composition note: the concrete `ContextCompactor`→`HistoryCompactor` adapter (with a model summarizer)
+is app-level wiring, same as the other ports; this ships the CAPABILITY, fake-proven end to end.
+
 ### Changed — purge cross-project references + a fabricated star-count from tracked files (2026-07-18)
 TENET ships nothing that isn't its own: every lesson is generalized, no other project's brand/words are
 imported (a hard rule), and no number lives in the repo unless it traces to a source (§1/§9). A tree sweep

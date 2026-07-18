@@ -17,7 +17,7 @@ is actually in the tree on branch `upgrade/top-1pct`, so the proposal is not rea
 a description of shipped code. Numbers are measured, not aspirational.
 
 - **Repo:** 63 workspace packages (every `package.json` under the `pnpm-workspace.yaml`
-  globs). Test suite: **97 suites / 1294 tests, all green** (was 83 / 1051 at the start
+  globs). Test suite: **97 suites / 1300 tests, all green** (was 83 / 1051 at the start
   of this upgrade). All figures are from the **hermetic stub plane** — no real-model
   access exists in this environment, so no real-model benchmark numbers are claimed here.
 - **Phase 1 — canonical model contract (complete):** one `ChatModel` in `@tenet/core`
@@ -310,7 +310,7 @@ The smallest end-to-end vertical that proves the spine works:
 - `models/bedrock` only (gpt-oss-120b, matching TENET's current setup)
 - `stores/vector/pgvector` + `stores/state/redis`
 - `apps/community-bot` — port TENET's current behavior to the new framework
-- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 97 suites / 1294 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
+- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 97 suites / 1300 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
 
 Success criteria for MVP:
 1. TENET's golden conversations replay through the new runtime with **same or better** accuracy
@@ -417,12 +417,17 @@ were deleted — every consumer speaks the canonical contract, no bridges remain
 
 **Shipped — `runAgent` (`agent/src/orchestrator.ts`)** wires these into the end-to-end loop:
 `sequential(halting(withTimeout(injectionGate)), halting(withTimeout(retrieveNode)),
-halting(withTimeout(cacheNode)), halting(criticLoop))` run via `runWorkflow`.
+halting(withTimeout(cacheNode)), halting(withTimeout(compactNode)), halting(criticLoop))` run via
+`runWorkflow`.
 
 - **Pre-reasoning nodes** (`agent/src/nodes.ts`): `injectionGate` (a blocked/throwing inbound
   filter → security handoff), `retrieveNode` (thin evidence / retriever error → abstain; feeds
   retrieval *relevance*, not `Source.confidence`, to the knowledge-boundary gate), `cacheNode`
-  (a hit is a CANDIDATE only — re-verified, never emitted here; miss/error → continue).
+  (a hit is a CANDIDATE only — re-verified, never emitted here; miss/error → continue), and
+  `compactNode` (OPT-IN long-history compaction via the injected `HistoryCompactor` port — a
+  history that overflows the window is summarized to fit BEFORE the reasoner reads it; a
+  compaction error → abstain, so a silently truncated prompt is never sent; no compactor
+  configured → pass through untouched).
 - **`criticLoop`** (`agent/src/criticLoop.ts`): reason → `abstain | handoff | tool | answer`; a
   tool runs through governance (`runTools`, `agent/src/tools.ts` — gate-all-before-executing-any,
   deny/`require_approval` → ops handoff) and its results fold back into history; an answer goes

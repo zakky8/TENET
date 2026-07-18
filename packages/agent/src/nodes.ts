@@ -82,3 +82,26 @@ export function cacheNode(deps: AgentDeps): Step<OrchestratorState, Orchestrator
     return hit ? { ...s, cachedDraft: hit.answer } : s;
   };
 }
+
+/** (D) Optional long-history compaction. When a compactor is injected AND the history
+ *  overflows the model's window, it is summarized to fit BEFORE the reasoner reads it —
+ *  so a long conversation cannot silently overflow the prompt and drop the grounding
+ *  context. This runs behind `halting`, AFTER the fail-closed pre-nodes, so it is
+ *  skipped entirely on a blocked/thin-retrieval turn and only pays the summarizer cost
+ *  when the turn will actually reason. A compaction error FAILS CLOSED to abstain — a
+ *  truncated prompt is never sent. No compactor configured → pass through untouched
+ *  (opt-in; existing callers are unchanged). The compacted history is not trusted to be
+ *  grounded; it still flows through the same verify/emit edge. */
+export function compactNode(deps: AgentDeps): Step<OrchestratorState, OrchestratorState> {
+  return async (s, ctx) => {
+    if (deps.compaction === undefined) return s;
+    try {
+      const { messages } = await deps.compaction.compact(s.history, ctx.signal);
+      return { ...s, history: messages };
+    } catch (err) {
+      // Cannot bound the prompt → cannot safely reason on it. Abstain, never send a
+      // silently truncated context that could drop the grounding sources.
+      return { ...s, halt: abstainResult(`compaction error: ${(err as Error).message}`) };
+    }
+  };
+}

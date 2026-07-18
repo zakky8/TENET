@@ -13,7 +13,7 @@
  * loop's fields (reasoner, policy, tools, maxAttempts, timeouts) are added with
  * `criticLoop`/`runAgent` in 2.1b-iii/iv.
  */
-import type { Citation, Source } from '@tenet/core';
+import type { Citation, ConversationMessage, Source } from '@tenet/core';
 import type { Filter } from '@tenet/guardrails';
 import type { PolicyEvaluator } from '@tenet/governance';
 import type { BoundaryGateOptions } from '@tenet/refine';
@@ -89,6 +89,21 @@ export interface RewriteFn {
   (args: { readonly draft: string; readonly critique: string; readonly signal?: AbortSignal }): Promise<string>;
 }
 
+/** Narrow history-compaction port — the long-horizon layer that keeps a growing
+ *  conversation inside the model's context window. Given the turn's message history it
+ *  returns a (possibly summarized) history plus whether it folded anything. A concrete
+ *  `ContextCompactor` (`@tenet/harness`, with an injected model summarizer) satisfies
+ *  this structurally at composition — the agent depends on the PORT, not the class, so
+ *  the turn stays fully fake-testable. The returned history is NOT trusted to be
+ *  grounded — it still flows through the same fail-closed verify/emit edge; compaction
+ *  only bounds the prompt, it never adds facts. */
+export interface HistoryCompactor {
+  compact(
+    messages: ReadonlyArray<ConversationMessage>,
+    signal?: AbortSignal,
+  ): Promise<{ readonly messages: ReadonlyArray<ConversationMessage>; readonly compacted: boolean }>;
+}
+
 /** Everything the orchestrator injects into the turn's nodes. */
 export interface AgentDeps {
   /** Inbound filter chain (guardrails). An empty chain means no inbound blocking. */
@@ -121,6 +136,11 @@ export interface AgentDeps {
   readonly policy: PolicyEvaluator;
   /** Tool-execution port (only ever handed policy-allowed calls). */
   readonly tools: ToolExecutor;
+  /** OPT-IN long-history compaction. When set, a conversation history that overflows
+   *  the model's window is summarized to fit BEFORE the reasoner drafts. A compaction
+   *  error FAILS CLOSED to abstain — the turn never silently sends a truncated prompt
+   *  (which would drop context and risk an ungrounded answer). Absent = history verbatim. */
+  readonly compaction?: HistoryCompactor;
   /** Per-node wall-clock budgets (ms) for the deterministic pre-reasoning nodes. A
    *  node that exceeds its budget aborts and the turn fails closed (top-level → abstain).
    *  criticLoop is NOT timed here — it self-bounds via maxAttempts + per-turn abort checks. */
@@ -128,5 +148,8 @@ export interface AgentDeps {
     readonly gate: number;
     readonly retrieve: number;
     readonly cache: number;
+    /** Wall-clock budget (ms) for the optional compaction pre-step. Only consulted when
+     *  `compaction` is configured; defaults to the retrieve budget when unset. */
+    readonly compact?: number;
   };
 }

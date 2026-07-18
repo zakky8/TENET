@@ -10,7 +10,7 @@
 import type { Citation, Source } from '@tenet/core';
 import type { Filter } from '@tenet/guardrails';
 import { PolicyEvaluator } from '@tenet/governance';
-import type { AgentDeps, AnswerCache, Retriever, ScoredResult, Verifier, VerifierVerdict } from './deps.js';
+import type { AgentDeps, AnswerCache, HistoryCompactor, Retriever, ScoredResult, Verifier, VerifierVerdict } from './deps.js';
 import type { OrchestratorState, Reasoner } from './types.js';
 import { runAgent } from './orchestrator.js';
 
@@ -111,6 +111,39 @@ describe('runAgent — the composition root, end to end', () => {
     const out = await runAgent(makeState(), makeDeps({ boundary: { minHits: -1 } }), signal);
     expect(out.outcome).toBe('disqualified');
     expect(out.reason).toContain('orchestrator error');
+  });
+});
+
+// ── Long-history compaction pre-step (2.4) ────────────────────────────────────
+// The compaction node sits at injectionGate → retrieve → cache → COMPACT → critic.
+// These prove it is really wired into the turn (not a dangling function) and that a
+// compaction failure fails the WHOLE turn closed, before the model is ever called.
+
+describe('runAgent — long-history compaction pre-step', () => {
+  it('a configured compactor runs inside the turn on the full history, then the turn still EMITS', async () => {
+    let sawHistoryLen: number | undefined;
+    const compactor: HistoryCompactor = {
+      async compact(messages) {
+        sawHistoryLen = messages.length;
+        return { messages: [{ role: 'system', content: '[summary]' }], compacted: true };
+      },
+    };
+    const longHistory = Array.from({ length: 40 }, (_, i) => ({ role: 'user' as const, content: `turn ${i}` }));
+    const out = await runAgent(makeState({ history: longHistory }), makeDeps({ compaction: compactor }), signal);
+    expect(sawHistoryLen).toBe(40); // the pre-step actually ran, on the full pre-compaction history
+    expect(out.outcome).toBe('resolved'); // and the turn still reached the single emit edge
+  });
+
+  it('a compaction error abstains the whole turn BEFORE reasoning (fail-closed end to end)', async () => {
+    const boom: HistoryCompactor = {
+      async compact() {
+        throw new Error('summarizer unavailable');
+      },
+    };
+    // explodingReasoner throws if reached — proving compaction failure short-circuits to abstain first.
+    const out = await runAgent(makeState(), makeDeps({ compaction: boom, reasoner: explodingReasoner() }), signal);
+    expect(out.outcome).toBe('disqualified'); // abstain — never reasoned, never emitted
+    expect(out.reason).toContain('compaction error');
   });
 });
 

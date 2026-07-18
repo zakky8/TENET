@@ -7,12 +7,12 @@
  * Each test is written to FAIL if its node stopped failing closed (or started failing
  * closed where it must not).
  */
-import type { Source } from '@tenet/core';
+import type { ConversationMessage, Source } from '@tenet/core';
 import type { StepContext } from '@tenet/workflow';
 import type { Filter } from '@tenet/guardrails';
-import type { AgentDeps, Retriever, AnswerCache, ScoredResult } from './deps.js';
+import type { AgentDeps, Retriever, AnswerCache, HistoryCompactor, ScoredResult } from './deps.js';
 import type { OrchestratorState } from './types.js';
-import { cacheNode, injectionGate, retrieveNode } from './nodes.js';
+import { cacheNode, compactNode, injectionGate, retrieveNode } from './nodes.js';
 
 function makeState(overrides: Partial<OrchestratorState> = {}): OrchestratorState {
   return {
@@ -191,5 +191,68 @@ describe('cacheNode — candidate draft only, does NOT fail closed', () => {
     const out = await cacheNode(makeDeps({ cache: throwingCache() }))(makeState(), ctx);
     expect(out.halt).toBeUndefined(); // the cache is an optimization; its failure must not abstain
     expect(out.cachedDraft).toBeUndefined();
+  });
+});
+
+// ── (D) compactNode ───────────────────────────────────────────────────────────
+
+const HISTORY: ReadonlyArray<ConversationMessage> = [
+  { role: 'user', content: 'q1' },
+  { role: 'assistant', content: 'a1' },
+  { role: 'user', content: 'q2' },
+];
+const fixedCompactor = (out: ReadonlyArray<ConversationMessage>): HistoryCompactor => ({
+  async compact() {
+    return { messages: out, compacted: true };
+  },
+});
+const throwingCompactor = (message: string): HistoryCompactor => ({
+  async compact() {
+    throw new Error(message);
+  },
+});
+
+describe('compactNode — OPT-IN long-history compaction, FAIL CLOSED on error', () => {
+  it('no compactor configured → passes the state through untouched (opt-in no-op)', async () => {
+    const state = makeState({ history: HISTORY });
+    const out = await compactNode(makeDeps())(state, ctx);
+    expect(out).toBe(state); // same object; history not touched, no summarizer call
+    expect(out.halt).toBeUndefined();
+  });
+
+  it('a configured compactor replaces history with the compacted messages (no halt)', async () => {
+    const compacted: ReadonlyArray<ConversationMessage> = [
+      { role: 'system', content: '[conversation summary] q1/a1' },
+      { role: 'user', content: 'q2' },
+    ];
+    const out = await compactNode(makeDeps({ compaction: fixedCompactor(compacted) }))(
+      makeState({ history: HISTORY }),
+      ctx,
+    );
+    expect(out.halt).toBeUndefined();
+    expect(out.history).toEqual(compacted); // the reasoner will now read the shortened history
+    expect(out.history).toHaveLength(2);
+  });
+
+  it('a compactor error → abstain (FAIL CLOSED): a silently truncated prompt is never sent', async () => {
+    const out = await compactNode(makeDeps({ compaction: throwingCompactor('summarizer 500') }))(
+      makeState({ history: HISTORY }),
+      ctx,
+    );
+    expect(out.halt?.outcome).toBe('disqualified'); // abstain, never proceed to reason on an over-budget prompt
+    expect(out.halt?.reason).toContain('compaction error');
+    expect(out.halt?.reason).toContain('summarizer 500');
+  });
+
+  it('threads the turn AbortSignal through to the compactor (contract conformance)', async () => {
+    let received: AbortSignal | undefined;
+    const capturing: HistoryCompactor = {
+      async compact(messages, sig) {
+        received = sig;
+        return { messages, compacted: false };
+      },
+    };
+    await compactNode(makeDeps({ compaction: capturing }))(makeState({ history: HISTORY }), ctx);
+    expect(received).toBe(ctx.signal); // the SAME signal object reached the compactor (cancellable)
   });
 });

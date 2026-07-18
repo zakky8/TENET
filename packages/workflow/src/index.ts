@@ -72,6 +72,13 @@ export function sequential<I, A, B, C, D>(
   s3: Step<B, C>,
   s4: Step<C, D>,
 ): Step<I, D>;
+export function sequential<I, A, B, C, D, E>(
+  s1: Step<I, A>,
+  s2: Step<A, B>,
+  s3: Step<B, C>,
+  s4: Step<C, D>,
+  s5: Step<D, E>,
+): Step<I, E>;
 export function sequential(...steps: ReadonlyArray<Step<unknown, unknown>>): Step<unknown, unknown> {
   return async (input, ctx) => {
     let current: unknown = input;
