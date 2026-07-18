@@ -3,6 +3,7 @@ import {
   repairDraft,
   bestOfN,
   selfConsistency,
+  groundedOrAbstain,
   type VerifyFn,
   type VerifyResultLike,
 } from './index.js';
@@ -184,5 +185,105 @@ describe('selfConsistency', () => {
   it('validates threshold', () => {
     expect(() => selfConsistency([], { threshold: 0 })).toThrow();
     expect(() => selfConsistency([], { threshold: 1.5 })).toThrow();
+  });
+});
+
+describe('groundedOrAbstain (reference orchestrator)', () => {
+  it('abstains BEFORE drafting when retrieval coverage is thin', async () => {
+    let drafted = false;
+    const d = await groundedOrAbstain({
+      hits: [], // 0 hits, minHits default 1
+      draft: async () => { drafted = true; return 'x'; },
+      verify: async () => pass(),
+      rewrite: async () => 'y',
+    });
+    expect(d.status).toBe('abstained');
+    expect(drafted).toBe(false); // the cheapest place to stop wrong info: no draft, no cost
+    if (d.status === 'abstained') expect(d.stage).toBe('boundary');
+  });
+
+  it('answers when the first draft verifies (no repair)', async () => {
+    const d = await groundedOrAbstain({
+      hits: [{ score: 1 }],
+      draft: async () => 'Refunds take 14 days.',
+      verify: async () => pass([['Refunds take 14 days.', true]]),
+      rewrite: async () => { throw new Error('rewrite must not run on a passing draft'); },
+    });
+    expect(d.status).toBe('answered');
+    if (d.status === 'answered') {
+      expect(d.rounds).toBe(0);
+      expect(d.repaired).toBe(false);
+      expect(d.draft).toBe('Refunds take 14 days.');
+    }
+  });
+
+  it('repairs an unsupported first draft, then answers (consumes repairDraft)', async () => {
+    let rewrites = 0;
+    const d = await groundedOrAbstain({
+      hits: [{ score: 1 }],
+      draft: async () => 'v0',
+      // supported only once the rewrite has produced the fixed draft
+      verify: async (draft) => (draft.includes('fixed') ? pass([['c', true]]) : pass([['c', false]])),
+      rewrite: async () => { rewrites++; return 'fixed draft'; },
+    });
+    expect(d.status).toBe('answered');
+    if (d.status === 'answered') {
+      expect(d.repaired).toBe(true);
+      expect(d.rounds).toBe(1);
+      expect(d.draft).toBe('fixed draft');
+    }
+    expect(rewrites).toBe(1);
+  });
+
+  // THE 3.4 GATE: absence of X in the sources does NOT support "we do not
+  // offer X" — the verifier fails it, repair keeps asserting it, and the
+  // turn must ABSTAIN, never emit the unsupported negative.
+  it('abstains on an unsupported scope claim ("we do not offer X"), never passes it', async () => {
+    const claim = 'We do not offer weekend support.';
+    const d = await groundedOrAbstain(
+      {
+        hits: [{ score: 1 }],
+        draft: async () => claim,
+        verify: async () => pass([[claim, false]]),
+        rewrite: async () => claim, // still unsupported after every rewrite
+      },
+      { maxRepairRounds: 2 },
+    );
+    expect(d.status).toBe('abstained');
+    if (d.status === 'abstained') {
+      expect(d.stage).toBe('verify');
+      expect(d.verify?.pass).toBe(false);
+    }
+  });
+
+  it('fails CLOSED when verification throws — never ships the draft', async () => {
+    const d = await groundedOrAbstain({
+      hits: [{ score: 1 }],
+      draft: async () => 'some draft',
+      verify: async () => { throw new Error('judge exploded'); },
+      rewrite: async () => 'x',
+    });
+    expect(d.status).toBe('abstained');
+    if (d.status === 'abstained') {
+      expect(d.stage).toBe('error');
+      expect(d.reason).toMatch(/judge exploded/);
+    }
+  });
+
+  it('abstains without drafting when the signal is already aborted', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    let drafted = false;
+    const d = await groundedOrAbstain(
+      {
+        hits: [{ score: 1 }],
+        draft: async () => { drafted = true; return 'x'; },
+        verify: async () => pass(),
+        rewrite: async () => 'y',
+      },
+      { signal: ac.signal },
+    );
+    expect(d.status).toBe('abstained');
+    expect(drafted).toBe(false);
   });
 });

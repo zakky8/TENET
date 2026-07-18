@@ -292,4 +292,111 @@ export function selfConsistency(
   return { stable, unstable, fractions };
 }
 
+// ── Reference orchestrator: grounded-or-abstain ───────────────────────
+//
+// The four levers above are independent by design; this is the canonical
+// way to CHAIN them into one fail-closed turn, and the reference a real
+// app copies. It consumes injected functions only (no provider, no
+// @tenet/verifier import) — a caller backs `verify` with the verifier's
+// verifyDraft and `draft` / `rewrite` with its model. Gives repairDraft
+// its first in-repo consumer.
+
+export type GroundedStage = 'boundary' | 'verify' | 'error';
+
+export type GroundedDecision =
+  | {
+      status: 'answered';
+      draft: string;
+      verify: VerifyResultLike;
+      /** Repair rounds taken (0 = passed on the first verification). */
+      rounds: number;
+      repaired: boolean;
+    }
+  | {
+      status: 'abstained';
+      reason: string;
+      /** Which stage stopped the turn: boundary (pre-draft), verify (unsupported after repair), or error. */
+      stage: GroundedStage;
+      /** The final verifier result, when the turn got far enough to produce one. */
+      verify?: VerifyResultLike;
+    };
+
+export interface GroundedOrAbstainInput {
+  /** Retrieval hits, already scored in the caller's own scale. */
+  hits: ReadonlyArray<RetrievalHitLike>;
+  /** Produce the initial draft — only called once the boundary gate proceeds. */
+  draft: DraftFn;
+  /** Verify a draft — back this with @tenet/verifier's verifyDraft. */
+  verify: VerifyFn;
+  /** Rewrite the unsupported claims given the verifier critique. */
+  rewrite: RewriteFn;
+}
+
+export interface GroundedOrAbstainOptions {
+  boundary?: BoundaryGateOptions;
+  /** Max claim-repair rounds after the first verification. Default 2 (repairDraft's default). */
+  maxRepairRounds?: number;
+  signal?: AbortSignal;
+}
+
+/**
+ * Grounded-or-abstain in one call: knowledge-boundary gate → draft →
+ * verify + bounded claim-repair → answer or abstain. Fails CLOSED at
+ * every edge — thin retrieval abstains BEFORE drafting (no draft, no
+ * cost), an unsupported draft that repair cannot rescue abstains, and
+ * ANY thrown error (draft / verify / rewrite failure) resolves to
+ * abstain, never a shipped answer. The safety bar is the verifier's:
+ * `status: 'answered'` is returned ONLY when the FINAL verifier passes.
+ */
+export async function groundedOrAbstain(
+  input: GroundedOrAbstainInput,
+  opts: GroundedOrAbstainOptions = {},
+): Promise<GroundedDecision> {
+  // 1. Knowledge boundary — the cheapest place to stop wrong info.
+  const gate = knowledgeBoundaryGate(input.hits, opts.boundary);
+  if (!gate.proceed) {
+    return { status: 'abstained', reason: gate.reason, stage: 'boundary' };
+  }
+  if (opts.signal?.aborted) {
+    return { status: 'abstained', reason: 'aborted before drafting', stage: 'boundary' };
+  }
+
+  try {
+    // 2. Draft, then 3. verify + bounded repair (rewrite only the
+    //    unsupported claims and re-verify, up to maxRepairRounds).
+    const initial = await input.draft(opts.signal);
+    const repairOpts: RepairOptions = {
+      ...(opts.maxRepairRounds !== undefined ? { maxRounds: opts.maxRepairRounds } : {}),
+      ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
+    };
+    const repaired = await repairDraft(initial, input.verify, input.rewrite, repairOpts);
+
+    // 4. Emit ONLY past a passing verifier; otherwise abstain with the
+    //    critique so the caller can hand off with full diagnostics.
+    if (!repaired.result.pass) {
+      return {
+        status: 'abstained',
+        reason: repaired.result.critique || 'draft unsupported after repair',
+        stage: 'verify',
+        verify: repaired.result,
+      };
+    }
+    return {
+      status: 'answered',
+      draft: repaired.draft,
+      verify: repaired.result,
+      rounds: repaired.rounds,
+      repaired: repaired.repaired,
+    };
+  } catch (err) {
+    // FAIL CLOSED: a draft / verify / rewrite throw must NEVER surface as
+    // a non-decision the caller could mistake for an answer.
+    return {
+      status: 'abstained',
+      reason: `error: ${(err as Error).message}`,
+      stage: 'error',
+    };
+  }
+}
+
 export const VERSION = '0.0.0';

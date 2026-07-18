@@ -57,6 +57,38 @@ const final = best.result.pass
       }));
 ```
 
+## One call: the grounded-or-abstain orchestrator
+
+`groundedOrAbstain` chains the boundary gate → draft → verify + bounded
+`repairDraft` into a single fail-closed decision — the reference a real
+app copies. It takes injected functions only (no provider, no verifier
+import); back `verify` with `verifyDraft`. It **fails closed at every
+edge**: thin retrieval abstains before drafting, an unsupported draft
+that repair can't rescue abstains, and any draft/verify/rewrite throw
+resolves to abstain. `status: 'answered'` is returned ONLY past a
+passing verifier — including for a "we do not offer X" scope claim the
+sources don't positively support, which abstains rather than shipping.
+
+```ts
+import { groundedOrAbstain } from '@tenet/refine';
+import { verifyDraft, defaultPreChecks } from '@tenet/verifier';
+
+const decision = await groundedOrAbstain(
+  {
+    hits: index.query({ text: question, k: 5 }),
+    draft: (signal) => model.chat({ system, user, maxTokens: 512, signal }),
+    verify: (draft, signal) =>
+      verifyDraft(model, { sources, draft }, { claimPreChecks: defaultPreChecks(), signal }),
+    rewrite: ({ draft, critique, signal }) =>
+      model.chat({ system: rewriteSystem, user: `SOURCES:\n${sources}\n\nDRAFT:\n${draft}\n\nCRITIQUE:\n${critique}`, signal }),
+  },
+  { boundary: { minTopScore: 1.0 }, maxRepairRounds: 2 },
+);
+
+if (decision.status === 'answered') send(decision.draft);
+else handoff(decision.reason); // stage: 'boundary' | 'verify' | 'error'
+```
+
 ## Cost/speed model
 
 | Lever | Extra model calls | Wall-clock |

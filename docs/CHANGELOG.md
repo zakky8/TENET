@@ -6,6 +6,21 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `groundedOrAbstain` reference orchestrator wires `@tenet/refine` fail-closed (3.4, 2026-07-18)
+`@tenet/refine` gains `groundedOrAbstain(input, opts)` — the canonical chain of its levers into one
+fail-closed grounded-or-abstain turn: knowledge-boundary gate → draft → verify + bounded `repairDraft` →
+answer or abstain. It returns a discriminated `GroundedDecision` (`answered` | `abstained` with a
+`boundary` / `verify` / `error` stage), takes injected functions only (no provider, no `@tenet/verifier`
+import — a caller backs `verify` with `verifyDraft`), and fails CLOSED at every edge: thin retrieval
+abstains BEFORE drafting (no draft, no cost), an unsupported draft that repair cannot rescue abstains, and
+any draft/verify/rewrite throw resolves to abstain — `status: 'answered'` is returned ONLY past a passing
+verifier. This gives `repairDraft` its first in-repo consumer and satisfies the Phase-3 gate: an unsupported
+"we do not offer X" scope claim ABSTAINS, never ships (absence of X in sources ≠ positive support for the
+negative). 6 E2E tests with fakes (thin-retrieval, first-pass, repair-then-answer, scope-claim-abstain,
+verify-throws-fail-closed, aborted-before-draft); 4 mutation probes non-vacuous (gut the emit-only-on-pass
+guard, re-throw instead of abstain, drop the boundary/abort early-returns). Suite 1213 → 1219 (+6); no live
+model needed (deterministic ChatResponse→decision mapping). refine README + llms.txt updated.
+
 ### Added — deterministic check for spelled-out fabricated amounts (3.3, 2026-07-18)
 The numeric fabrication pre-check now catches numbers spelled out in words, not just digits: a claim asserting
 a currency- or percent-marked spelled amount absent from the sources ("the fee is **five hundred dollars**"
