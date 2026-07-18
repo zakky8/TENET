@@ -113,3 +113,49 @@ describe('runAgent — the composition root, end to end', () => {
     expect(out.reason).toContain('orchestrator error');
   });
 });
+
+// ── AbortSignal conformance (2.4) ─────────────────────────────────────────────
+// The canonical @tenet/core contract makes AbortSignal REQUIRED so a cancelled turn
+// releases the in-flight model call and never ships. These prove the turn honors it
+// end to end. A reasoner that must NOT run is `explodingReasoner` (throws if called).
+
+describe('runAgent — AbortSignal conformance', () => {
+  it('a PRE-aborted signal → abstain, and no node ever runs (cancelled turn never ships)', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    let retrieverRan = false;
+    const retriever: Retriever = { async query() { retrieverRan = true; return HITS; } };
+    // explodingReasoner would throw 'should not be reached' if the graph reached it.
+    const out = await runAgent(makeState(), makeDeps({ retriever, reasoner: explodingReasoner() }), ac.signal);
+    expect(out.outcome).toBe('disqualified'); // abstain, never resolved
+    expect(out.reason).toContain('aborted');
+    expect(retrieverRan).toBe(false); // sequential short-circuits on the aborted signal before any node
+  });
+
+  it('threads the CALLER AbortSignal through to the reasoner (contract conformance)', async () => {
+    let received: AbortSignal | undefined;
+    const capturing: Reasoner = {
+      async reason(_state, sig) {
+        received = sig;
+        return { kind: 'answer', draft: 'The limit is 5%.', citations: [CITATION] };
+      },
+    };
+    const ac = new AbortController();
+    const out = await runAgent(makeState(), makeDeps({ reasoner: capturing }), ac.signal);
+    expect(out.outcome).toBe('resolved'); // sanity: happy path
+    expect(received).toBe(ac.signal); // the SAME signal object reached the model turn
+  });
+
+  it('an abort DURING the turn stops it and abstains (in-flight cancellation, never ships)', async () => {
+    const ac = new AbortController();
+    const abortingReasoner: Reasoner = {
+      async reason() {
+        ac.abort(); // the caller cancels mid-turn
+        return { kind: 'tool', calls: [{ id: 't1', name: 'kb.lookup', input: {} }] };
+      },
+    };
+    const out = await runAgent(makeState(), makeDeps({ reasoner: abortingReasoner }), ac.signal);
+    expect(out.outcome).toBe('disqualified'); // the next loop check sees the abort → abstain
+    expect(out.reason).toContain('aborted');
+  });
+});
