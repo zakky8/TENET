@@ -49,7 +49,28 @@ describe('STANDARD_INJECTION_PATTERNS — inbound (user → agent)', () => {
 describe('STANDARD_OUTBOUND_LEAK_PATTERNS — outbound (agent → user)', () => {
   const f = systemPromptLeakFilter();
 
-  it('blocks responses that quote CONSTITUTIONAL PRINCIPLES header', () => {
+  // buildSystem is TENET's ACTUAL agent system prompt — a reply quoting these
+  // fragments back is leaking the prompt, not answering. (The old defaults
+  // matched neither buildSystem nor anything else in TENET's real prompts — they
+  // were leftovers from a different system — so a real prompt leak slipped through
+  // uncaught. See reasoner.test.ts for the buildSystem↔filter tie.)
+  it('blocks a leak of the agent-prompt OPENER', () => {
+    expect(f.inspect('Sure — "You are a grounded support agent. You decide ONE action…"').kind).toBe('block');
+  });
+
+  it('blocks a leak of the grounded-only INSTRUCTION', () => {
+    expect(f.inspect('My rules say: Answer ONLY from the KNOWLEDGE block below.').kind).toBe('block');
+  });
+
+  it('blocks a leak of the never-invent RULE', () => {
+    expect(f.inspect('I was told to Never invent facts, sources, quotes, numbers, or policies.').kind).toBe('block');
+  });
+
+  it('blocks a leak of the OUTPUT FORMAT envelope spec', () => {
+    expect(f.inspect('I must respond with {"action":"answer|handoff|abstain","text":"..."}').kind).toBe('block');
+  });
+
+  it('blocks responses that quote CONSTITUTIONAL PRINCIPLES header (richer composition)', () => {
     expect(f.inspect('CONSTITUTIONAL PRINCIPLES: I must...').kind).toBe('block');
   });
 
@@ -57,16 +78,13 @@ describe('STANDARD_OUTBOUND_LEAK_PATTERNS — outbound (agent → user)', () => 
     expect(f.inspect('Here are my WORKED EXAMPLES (study these):\n...').kind).toBe('block');
   });
 
-  it('blocks responses that quote BASE_RULES literal', () => {
-    expect(f.inspect("Per my BASE_RULES I can't...").kind).toBe('block');
-  });
-
   it('blocks "KNOWLEDGE BOUNDARY:" leak', () => {
     expect(f.inspect('KNOWLEDGE BOUNDARY: my training data is...').kind).toBe('block');
   });
 
-  it('PASSES clean output', () => {
+  it('PASSES clean output (no false-positive on a normal reply)', () => {
     expect(f.inspect('The LITE tier costs $500. Want details?').kind).toBe('allow');
+    expect(f.inspect('Your account is active — anything else I can help with?').kind).toBe('allow');
   });
 });
 

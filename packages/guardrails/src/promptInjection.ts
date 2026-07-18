@@ -43,15 +43,28 @@ export const STANDARD_INJECTION_PATTERNS: ReadonlyArray<RegExp> = [
 ];
 
 /**
- * Default outbound system-prompt leak patterns. Block any response
- * that quotes hallmark fragments of a standard system prompt back at
- * the user.
+ * Default outbound system-prompt leak patterns. Block any response that quotes
+ * hallmark fragments of a TENET system prompt back at the user.
+ *
+ * These target TENET's OWN prompt text, verified against the code:
+ *   - the reasoner's agent prompt (`buildSystem` in `@tenet/agent`) — the primary
+ *     default: its opener, the grounded-only instruction, the never-invent rule,
+ *     and the JSON envelope the OUTPUT FORMAT section specifies;
+ *   - the policy Constitutional Principles + knowledge-boundary header, and the
+ *     verifier judge's worked-examples block, which richer compositions may inject.
+ * Apps append their own. (A leaked prompt would also usually fail the verifier's
+ * grounded-citation guard — this filter is defense in depth, so it must actually
+ * match the prompt the agent runs, not a prompt from some other system.)
  */
 export const STANDARD_OUTBOUND_LEAK_PATTERNS: ReadonlyArray<RegExp> = [
+  // `buildSystem` — TENET's actual agent system prompt.
+  /You are a grounded support agent/i,
+  /Answer ONLY from the KNOWLEDGE block/i,
+  /Never invent facts, sources, quotes, numbers, or policies/i,
+  /"action"\s*:\s*"answer\|handoff\|abstain"/i,
+  // Policy principles / judge examples that a richer composition may inject.
   /CONSTITUTIONAL\s+PRINCIPLES/i,
   /WORKED\s+EXAMPLES\s*\(study/i,
-  /BASE_RULES/i,
-  /Master\s+Fact\s+Sheet/i,
   /KNOWLEDGE\s+BOUNDARY:/i,
 ];
 

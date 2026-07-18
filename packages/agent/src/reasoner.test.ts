@@ -9,6 +9,7 @@
  * (e.g. if an uncited answer shipped as `kind: 'answer'`).
  */
 import type { ChatModel, ChatRequest, ChatResponse } from '@tenet/core';
+import { systemPromptLeakFilter } from '@tenet/guardrails';
 import type { OrchestratorState } from './types.js';
 import { buildSystem, modelReasoner, parseEnvelope } from './reasoner.js';
 
@@ -428,5 +429,12 @@ describe('buildSystem (FIRST-DRAFT prompt — structure only, efficacy unvalidat
     expect(buildSystem(makeState())).toContain(
       '{"action":"answer|handoff|abstain","text":"...","citations":[{"sourceId":"...","quote":"..."}],"target":"...","reason":"..."}',
     );
+  });
+
+  it('its OWN output is caught by the default outbound leak filter (patterns match the REAL prompt)', () => {
+    // Guards the class of bug where the leak filter's patterns drift from the actual
+    // system prompt (they once matched neither buildSystem nor anything in TENET). A
+    // full leak of the real prompt MUST be blocked; reddens if either side drifts.
+    expect(systemPromptLeakFilter().inspect(buildSystem(makeState())).kind).toBe('block');
   });
 });

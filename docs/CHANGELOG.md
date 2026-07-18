@@ -6,6 +6,27 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — the outbound system-prompt-leak filter now matches TENET's ACTUAL prompt (it didn't) (2026-07-18)
+`systemPromptLeakFilter`'s default patterns are supposed to block a reply that quotes the agent's system prompt
+back at the user (defense in depth behind the verifier's grounded-citation guard). But trust-code review found
+they matched NONE of `buildSystem` — the reasoner's real agent prompt (`packages/agent/src/reasoner.ts`):
+simulating a full leak against the old defaults returned "no match", so a genuine prompt leak would slip
+through the filter uncaught. Two of the old patterns matched nothing anywhere in TENET at all — leftovers from
+a different system's prompt (a hard-rule violation: TENET ships nothing that isn't its own). Fixed:
+- **Added patterns for `buildSystem`'s distinctive lines** — the opener, the "Answer ONLY from the KNOWLEDGE
+  block" instruction, the "Never invent facts, sources, quotes, numbers, or policies" rule, and the
+  `{"action":"answer|handoff|abstain"…}` OUTPUT-FORMAT envelope. Verified they do NOT false-positive on normal
+  replies.
+- **Removed the two foreign/dead patterns** (they matched no TENET prompt).
+- **Kept** the real TENET fragments (`CONSTITUTIONAL PRINCIPLES`, `KNOWLEDGE BOUNDARY:`, judge worked-examples)
+  that a richer composition may inject.
+- **Added a `buildSystem`↔filter integration test** in `reasoner.test.ts`: `buildSystem`'s real output MUST be
+  blocked by `systemPromptLeakFilter()`'s defaults — the strongest guard against the patterns drifting from the
+  prompt again (it's what would have caught this).
+Mutation probe: reverting to the old patterns reddens the integration test + the four buildSystem-fragment
+tests (the gap was real, the tests are non-vacuous). Fail-closed-adjacent behavior change; `pnpm -r build`
+green; suite 1312 → **1316** (+4 tests).
+
 ### Fixed — `@tenet/verifier` now re-exports ALL composable deterministic pre-checks (public-API completeness) (2026-07-18)
 The package entry exported `numericFabricationCheck` + `quoteGroundingCheck` (plus `ClaimPreCheck` +
 `runPreChecks`), so composing a CUSTOM deterministic tier is clearly a supported use case — but

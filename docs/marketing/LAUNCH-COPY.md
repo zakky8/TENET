@@ -54,7 +54,7 @@ audit sink you get without wiring anything up. Three things I'd point at:
 9 channel surfaces (Discord/Slack/Telegram/Teams/Matrix/Twilio/web/REST/
 gRPC) + 4 ticketing connectors (Zendesk/Intercom/Freshdesk/ServiceNow),
 6 model adapters (Anthropic, Bedrock, OpenAI, Google, Mistral, Ollama).
-1312 tests across 98 suites, all green. Apache-2.0.
+1316 tests across 98 suites, all green. Apache-2.0.
 
 Things I cut from the headline that someone will ask about:
 - It's a framework, not a model. It calls Claude/GPT/Gemini, it doesn't
@@ -115,7 +115,7 @@ whatever you're comparing to):
 
 Stack: TypeScript strict + exactOptionalPropertyTypes + ES2024 target,
 Node 22 LTS, pnpm workspaces, Jest, no SDK lock-in (every provider
-fetch-injected). 1312 tests across 98 suites. Apache-2.0.
+fetch-injected). 1316 tests across 98 suites. Apache-2.0.
 
 The repo also ships @tenet/distillation (verified flagship trace capture
 → LoRA JSONL emit), @tenet/eval-mining (assertion miner + cosine dedup
@@ -213,7 +213,7 @@ Intercom, Freshdesk, ServiceNow.
 ```
 5/ 6 model adapters (Anthropic-direct, Bedrock, OpenAI, Google, Mistral,
 Ollama). All fetch-injected, no SDK lock-in. Streaming on every one.
-1312 tests, 98 suites, all green. CI runs the BENCHMARKS gate every PR.
+1316 tests, 98 suites, all green. CI runs the BENCHMARKS gate every PR.
 
 github.com/zakky8/TENET
 ```
@@ -267,7 +267,7 @@ OpenAI, Google Gemini, Mistral, Ollama. Streaming everywhere.
 execution, a pre-tool-call policy check, and a redacting audit sink,
 all on by default rather than opt-in.
 
-Apache-2.0. 1312 tests across 98 suites. CI green.
+Apache-2.0. 1316 tests across 98 suites. CI green.
 
 Repository: github.com/zakky8/TENET
 ```
