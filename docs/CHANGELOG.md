@@ -6,6 +6,27 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — FAQ page emits `FAQPage` JSON-LD, now gated by `pnpm jsonld:check` (2026-07-18)
+Structured data is machine-readable content the repo emits in its own voice, so it is held to §1 like any
+other claim: a malformed or empty block is a broken promise to crawlers shipped silently. Two parts:
+- **`FAQPage` JSON-LD on `docs/FAQ.md`** — a `<script type="application/ld+json">` block with 12 `Question`
+  entries whose `name`s match the page's 12 visible `##` headings verbatim and whose `acceptedAnswer.text`
+  is a faithful plain-text rendering of each visible answer (Google requires JSON-LD FAQ content to match
+  the visible content). Completes the 7.3 AEO pairing (`SoftwareSourceCode` on `docs/index.md` landed
+  earlier; `FAQPage` was the remaining half).
+- **`scripts/check-jsonld.mjs` (`pnpm jsonld:check`, now a CI step)** — parses every `application/ld+json`
+  block in the tracked docs and FAILS on a parse error, a wrong `@context`, a missing `@type`, or a
+  `FAQPage` with an empty `mainEntity` / a blank `acceptedAnswer.text`. Mutation probe non-vacuous: an
+  unquoted JSON value (parse break), a wrong `@context`, and a blanked answer each redden the gate; the
+  file restores byte-identical afterward.
+
+Also purged a residual unsourced comparative the owner-session audit missed on this page: the "Does TENET
+run the model" answer claimed the framework makes a model "more grounded, cheaper per resolution, and
+harder to jailbreak" — an unsourced performance/security claim (§9). Rewritten to the guarantee it can
+actually keep: "answer only with a source-grounded, verified citation or abstain." Docs-only + a new
+standalone gate script; no TypeScript source or test changed, so `pnpm -r build`/`pnpm test` are unaffected
+(green at parent `8472666`). Suite unchanged at 1294/97.
+
 ### Security — `MistralApiError` now scrubs secrets from its message + body (2026-07-18)
 `MistralApiError` stored and echoed the RAW Mistral error-response body (`.body` unredacted, message =
 `body.slice(0,200)`), so a Mistral error that echoed the request's `Bearer` token / `authorization` header /

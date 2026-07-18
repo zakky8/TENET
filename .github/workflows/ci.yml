@@ -39,6 +39,8 @@ jobs:
         run: pnpm counts:check
       - name: README code examples compile against the real API
         run: pnpm readme:check
+      - name: AEO structured data (JSON-LD) parses and is well-formed
+        run: pnpm jsonld:check
 
   audit:
     name: pnpm audit (informational pre-1.0)

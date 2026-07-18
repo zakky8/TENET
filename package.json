@@ -26,7 +26,8 @@
     "audit": "pnpm audit --prod --audit-level high",
     "clean": "pnpm -r exec rimraf dist .turbo node_modules",
     "counts:check": "node scripts/check-counts.mjs",
-    "readme:check": "node scripts/check-readme-ts.mjs"
+    "readme:check": "node scripts/check-readme-ts.mjs",
+    "jsonld:check": "node scripts/check-jsonld.mjs"
   },
   "devDependencies": {
     "@types/jest": "^29.5.13",
