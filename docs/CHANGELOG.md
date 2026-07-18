@@ -6,6 +6,22 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Changed — de-tautologize the eval's QA grounding metric (4.2 partial, 2026-07-18)
+The measurement plane's Dim-1 QA path was an **identity pass**: `stubAnswer` cited exactly
+`relevantSourceIds` and `stubVerify` checked `cited ⊆ relevant`, so `hallucination_rate` (0.0) and
+`groundedness_rate` (1.0) were true *by construction* — no possible input could fail them, yet they are
+gated in hermetic CI. A vacuous number reported as a measurement is a hallucination in the repo's own
+voice. Fixed: every `QAFixture` now carries a **distractor-bearing corpus** (the relevant chunk plus
+topically-adjacent distractors missing the answer's distinctive term), and `stubAnswer` **selects** its
+citation by real term-overlap retrieval over that corpus instead of echoing ground truth. The stub still
+scores 0.0 / 1.0 — but now as a MEASURED result: a distractor out-overlapping the relevant chunk cites an
+ungrounded id and fails verification. Proven non-vacuous: a distractor-dominant fixture makes `stubVerify`
+return false (impossible under the old identity), and mutation-reverting `stubAnswer` to the echo reddens
+the new tests. Fail-closed: no overlap / empty corpus → no cite → unsupported (never a spurious pass).
+All 20 bundled fixtures verified to ground correctly (relevant chunk strictly wins overlap). BENCHMARKS
+Dim 1/1b annotated. Suite 1219 → 1222 (+3). STILL OPEN in 4.2: real independent judge, true-TTFT via
+`chatStream`, temp>0 determinism split (real-model measurement concerns, deferred).
+
 ### Added — quickstart README + network-gated real-model smoke test (4.1, 2026-07-18)
 `apps/quickstart` gains a real `README.md`: the true three steps (`pnpm install` → `pnpm quickstart`
 zero-key → `ANTHROPIC_API_KEY=… pnpm quickstart`) and **real captured output** (not fabricated — produced

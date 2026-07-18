@@ -37,6 +37,8 @@ node eval/measure/dist/cli.js
 
 Measured against stub SUT + bundled fixtures on 2026-06-04, scorer `@tenet/eval-metrics@0.1.0`. `n` = sample size for that scorer.
 
+> **Dim 1 / 1b are measured, not an identity pass.** Each QA fixture carries a distractor-bearing corpus, and the stub *selects* its citation by term-overlap retrieval over it — a distractor out-overlapping the relevant chunk would cite an ungrounded id and push these off 0.00000 / 1.00000. The tests include a distractor-dominant case that makes verification fail, proving the metric has teeth.
+
 | # | Dimension | Target | Measured (v0.0.0 stub) | n | Verdict | Phase |
 |---|-----------|--------|------------------------|---|---------|-------|
 | 1 | **Hallucination rate** (1 - groundedness on cited-claim contract) | < 0.001 | **0.00000** | 20 | PASS | MVP gate |

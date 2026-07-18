@@ -31,7 +31,20 @@ export interface QAAnswer {
 }
 
 export function stubAnswer(c: QAFixture): QAAnswer {
-  return { caseId: c.id, text: c.reference, citedSourceIds: c.relevantSourceIds };
+  // Select the citation by REAL term-overlap retrieval over the fixture's
+  // corpus (relevant chunk + adversarial distractors) — NOT by echoing the
+  // ground-truth relevantSourceIds. A retriever that fell for a distractor
+  // cites an id absent from relevantSourceIds, and stubVerify (correctly)
+  // fails it — so hallucination_rate / groundedness_rate MEASURE grounding
+  // instead of being 1.0 by construction. No overlap / empty corpus → no
+  // cite → unsupported (fail-closed, never a spurious pass).
+  const qTokens = new Set(tokens(c.question));
+  const ranked = c.corpus
+    .map((chunk) => ({ id: chunk.id, score: tokens(chunk.text).filter((t) => qTokens.has(t)).length }))
+    .toSorted((a, b) => b.score - a.score);
+  const top = ranked[0];
+  const citedSourceIds = top !== undefined && top.score > 0 ? [top.id] : [];
+  return { caseId: c.id, text: c.reference, citedSourceIds };
 }
 
 /** Atomic-claim-style verifier: supported iff cited ids ⊆ relevant ids. */

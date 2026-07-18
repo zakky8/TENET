@@ -1,6 +1,14 @@
 import { measureAll, DEFAULT_TARGETS } from './runner.js';
-import { FIXTURE_MANIFEST, QA_FIXTURES, INJECTION_FIXTURES } from './fixtures.js';
-import { stubGuardrail, stubInvokeTool, stubRetrieve, stubRoute, stubDetectPii } from './stubSut.js';
+import { FIXTURE_MANIFEST, QA_FIXTURES, INJECTION_FIXTURES, type QAFixture } from './fixtures.js';
+import {
+  stubAnswer,
+  stubVerify,
+  stubGuardrail,
+  stubInvokeTool,
+  stubRetrieve,
+  stubRoute,
+  stubDetectPii,
+} from './stubSut.js';
 
 describe('fixtures shape', () => {
   it('manifest counts add up', () => {
@@ -15,10 +23,16 @@ describe('fixtures shape', () => {
     expect(FIXTURE_MANIFEST.total).toBeGreaterThanOrEqual(80);
   });
 
-  it('every QA fixture has a reference + ≥1 relevant source', () => {
+  it('every QA fixture has a reference + ≥1 relevant source in a distractor-bearing corpus', () => {
     for (const c of QA_FIXTURES) {
       expect(c.reference.length).toBeGreaterThan(0);
       expect(c.relevantSourceIds.length).toBeGreaterThanOrEqual(1);
+      // Every relevant id must be retrievable from this fixture's corpus,
+      // and the corpus must carry ≥1 distractor (else the selection is
+      // trivial and the QA metric would be vacuous again).
+      const corpusIds = c.corpus.map((chunk) => chunk.id);
+      for (const rid of c.relevantSourceIds) expect(corpusIds).toContain(rid);
+      expect(c.corpus.length).toBeGreaterThan(c.relevantSourceIds.length);
     }
   });
 
@@ -71,6 +85,49 @@ describe('stub SUT contract', () => {
   });
 });
 
+describe('QA grounding is MEASURED, not identity (de-tautologized)', () => {
+  it('cites the highest term-overlap chunk, resisting an adjacent distractor', () => {
+    const fx: QAFixture = {
+      id: 'x', question: 'What is the capital of France?', reference: 'Paris',
+      relevantSourceIds: ['s_paris'],
+      corpus: [
+        { id: 'd_berlin', text: 'Berlin is the capital of Germany.' }, // listed FIRST — order must not save it
+        { id: 's_paris', text: 'Paris is the capital of France.' },
+      ],
+    };
+    expect(stubAnswer(fx).citedSourceIds).toEqual(['s_paris']);
+    expect(stubVerify(fx, stubAnswer(fx))).toBe(true);
+  });
+
+  // The metric has TEETH: when a distractor out-overlaps the relevant chunk,
+  // the stub cites it and verification FAILS — impossible under the old
+  // identity-pass, where every cite was ground truth by construction.
+  it('a distractor-dominant fixture makes stubVerify FAIL (the tautology is gone)', () => {
+    const fx: QAFixture = {
+      id: 'adv', question: 'What is the capital of France?', reference: 'Paris',
+      relevantSourceIds: ['s_right'],
+      corpus: [
+        { id: 's_right', text: 'Paris.' }, // low overlap with the question
+        { id: 'd_wrong', text: 'What is the capital of France capital France?' }, // higher overlap, wrong id
+      ],
+    };
+    expect(stubAnswer(fx).citedSourceIds).toEqual(['d_wrong']);
+    expect(stubVerify(fx, stubAnswer(fx))).toBe(false);
+  });
+
+  it('no overlap / empty corpus → no cite → unsupported (fail-closed, not a spurious pass)', () => {
+    const empty: QAFixture = { id: 'e', question: 'anything', reference: 'x', relevantSourceIds: ['s'], corpus: [] };
+    expect(stubAnswer(empty).citedSourceIds).toEqual([]);
+    expect(stubVerify(empty, stubAnswer(empty))).toBe(false);
+    const noOverlap: QAFixture = {
+      id: 'n', question: 'zzz qqq', reference: 'x', relevantSourceIds: ['s'],
+      corpus: [{ id: 's', text: 'entirely unrelated tokens here' }],
+    };
+    expect(stubAnswer(noOverlap).citedSourceIds).toEqual([]);
+    expect(stubVerify(noOverlap, stubAnswer(noOverlap))).toBe(false);
+  });
+});
+
 describe('measureAll', () => {
   it('emits one MetricResult per dimension', () => {
     const report = measureAll();
@@ -105,10 +162,16 @@ describe('measureAll', () => {
     expect(JSON.stringify(a.metrics)).toBe(JSON.stringify(b.metrics));
   });
 
-  it('hallucination on stub SUT is exactly 0 (every cite is in-set)', () => {
+  it('hallucination is 0 and groundedness 1 — MEASURED (real retrieval grounds every fixture)', () => {
+    // Not tautological: the stub selects citations by term overlap over each
+    // fixture's distractor-bearing corpus. This asserts it grounds ALL 20 —
+    // an authoring regression (a distractor out-overlapping the relevant
+    // chunk) would push hallucination > 0 and fail here.
     const report = measureAll();
-    const m = report.metrics.find((x) => x.metric === 'hallucination_rate')!;
-    expect(m.value).toBe(0);
+    const hall = report.metrics.find((x) => x.metric === 'hallucination_rate')!;
+    const ground = report.metrics.find((x) => x.metric === 'groundedness_rate')!;
+    expect(hall.value).toBe(0);
+    expect(ground.value).toBe(1);
   });
 
   it('determinism on stub SUT is 1', () => {
