@@ -42,6 +42,7 @@ pnpm readme:check           # README ts fences must compile against the real API
 pnpm jsonld:check           # AEO JSON-LD blocks in docs parse + are well-formed
 pnpm inventory:check        # docs' surface/model adapter counts must equal the filesystem
 pnpm links:check            # every relative link in a tracked .md must resolve to a file
+pnpm examples:check         # doc ts fences must not import a removed export or misuse a typed value
 pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL/MISSING)
 pnpm benchmarks:json        # JSON report for CI artefacts
 pnpm lint                   # per-package lint (currently a no-op stub in every package)

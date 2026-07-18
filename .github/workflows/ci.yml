@@ -45,6 +45,8 @@ jobs:
         run: pnpm inventory:check
       - name: Internal doc links resolve (no dangling references)
         run: pnpm links:check
+      - name: Doc code examples don't drift from the real API (imports/exports + typed values)
+        run: pnpm examples:check
 
   audit:
     name: pnpm audit (informational pre-1.0)
