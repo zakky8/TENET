@@ -24,7 +24,8 @@
     "benchmarks:json": "node eval/measure/dist/cli.js --json",
     "quickstart": "pnpm -r build && node apps/quickstart/dist/main.js",
     "audit": "pnpm audit --prod --audit-level high",
-    "clean": "pnpm -r exec rimraf dist .turbo node_modules"
+    "clean": "pnpm -r exec rimraf dist .turbo node_modules",
+    "counts:check": "node scripts/check-counts.mjs"
   },
   "devDependencies": {
     "@types/jest": "^29.5.13",

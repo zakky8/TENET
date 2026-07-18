@@ -34,6 +34,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - name: Doc counts match the live suite (no stale numbers)
+        run: pnpm counts:check
 
   audit:
     name: pnpm audit (informational pre-1.0)

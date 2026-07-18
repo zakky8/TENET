@@ -6,6 +6,13 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `counts:check`: the live suite is the single source of truth for doc counts (2026-07-18)
+`scripts/check-counts.mjs` (`pnpm counts:check`, now a CI step) runs the suite, reads the real
+`numTotalTests`/`numTotalTestSuites`, and fails if any tracked doc's count-claim disagrees — so a
+hard-coded "N tests across M suites" in a README can never silently fall behind the suite again (a
+stale number is a hallucination in the repo's own voice). Fixed the current drift in the same change:
+the README badge/status and several docs still said **1174**; the live suite is **1193 / 92**.
+
 ### Fixed — Reasoner abstains on `max_tokens` (truncation → never ship, 2026-07-18)
 The decides-and-drafts Reasoner (`packages/agent/src/reasoner.ts`) handled `refusal` and
 `aborted` stop reasons but fell through to envelope-parsing on `max_tokens`, so a truncated
