@@ -6,6 +6,25 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — cross-provider `failover` chain, fail-closed (5.1 complete, 2026-07-18)
+`failover(providers, opts)` in `@tenet/rate-limit` runs providers in order and moves to the next ONLY on a
+transient failure — the fail-over decision is the `isRetryable` taxonomy, so it fails over on a 5xx/429/network
+error (the current provider is unhealthy) but NEVER on a fatal class: an AbortError (a cancelled turn must stay
+cancelled, not silently re-issued elsewhere) or a 4xx (a bad request/auth fails identically on every provider).
+This is the "router MUST NOT fail over on AbortError/4xx" rule as a one-line predicate. Orthogonal to
+`retryWithBackoff` — wrap each provider callable in it to retry transient errors on that provider first, then
+let `failover` move on once its retries exhaust; the two compose without either knowing about the other. On
+exhaustion or a fatal error it re-throws the ORIGINAL error, never a shipped fallback. 9 tests (fail-closed
+AbortError/4xx no-failover front and centre; a real composition test with `retryWithBackoff`); mutation probe
+non-vacuous (a blind-failover default reddens both fail-closed tests). This completes 5.1's resilience family
+(taxonomy → retry-with-backoff → circuit breaker → failover). Suite 1260 → 1269 (+9), 94 → 95 suites.
+
+### Hardened — `counts:check` now also gates the landing page + `llms-full.txt`
+Added `docs/index.md` and `llms-full.txt` to the tracked-docs list in `scripts/check-counts.mjs` — both carry
+the live test-count claim now, and neither was gated, so the public landing page could silently go stale (the
+exact hallucination-in-the-repo's-voice the gate exists to catch). Verified non-vacuous: a planted drift in
+`docs/index.md`'s count now fails `pnpm counts:check`.
+
 ### Added — wire the CircuitBreaker into `retryWithBackoff` (5.1 partial, 2026-07-18)
 `retryWithBackoff` gains an optional `breaker?: CircuitBreakerLike`. When the breaker is OPEN the call is
 short-circuited with a `CircuitOpenError` **before `fn` runs** — the retry layer never hammers a failing
