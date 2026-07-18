@@ -6,6 +6,17 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Changed — replace competitor ✓/✗ grids with TENET-only capability tables (7.2, 2026-07-18)
+Both README comparison tables ("Where TENET focuses" and "Quick comparison") asserted specific, unverified
+capabilities about ~7 named competitors — including "maintenance" (implying AutoGen is abandoned), dated
+release claims ("✅ (2026-04)"), and per-vendor pricing ("$0.99 / resolution") that cannot be sourced from
+this repo. For an anti-hallucination framework that is the exact unsourced-claim class it exists to prevent.
+Replaced both with TENET-ONLY tables that assert only this repo's own capabilities, each backed by a named
+package verified to exist in the tree (`@tenet/governance`, `@tenet/verifier`, `@tenet/refine`,
+`@tenet/durable`, `@tenet/a2a`, `@tenet/ag-ui`, `@tenet/harness`, `@tenet/judge-hhem`, `@tenet/telemetry`,
+`@tenet/tools-mcp-gateway`, `@tenet/tools-wasm-sandbox`, `infra/helm/tenet`, …), with a clear note on WHY.
+Also fixed the stale "Multi-surface (10)" / "10 shipped" → 9 surface adapters. No per-competitor grid remains.
+
 ### Added — mermaid architecture diagram of the fail-closed turn (7.3, 2026-07-18)
 A "How a turn works" section in the README with a mermaid flowchart of `runAgent`'s graph: injection gate →
 retrieve + knowledge boundary → cache re-verify → reason → (tool via governance | answer) → verify + citation

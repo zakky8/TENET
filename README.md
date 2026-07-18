@@ -21,29 +21,30 @@ This is a *framework*, not a model. It does not train, fine-tune, or distill a f
 
 ## Where TENET focuses
 
-The differentiator is pre-tool-call governance. `@tenet/governance` ships three things together: per-tool policy rules with deny/allow/require_approval, an idempotent approval gate with cache, and an AuditSink emitting policy.allow / policy.deny / policy.require_approval / approval.decision / tool.invoked / override events. The table below maps capabilities against other OSS frameworks; treat competitor cells as a starting point for your own verification, not as audited claims.
+The differentiator is pre-tool-call governance. `@tenet/governance` ships three things together: per-tool policy rules with deny/allow/require_approval, an idempotent approval gate with cache, and an AuditSink emitting policy.allow / policy.deny / policy.require_approval / approval.decision / tool.invoked / override events.
 
-| Capability | TENET | LangChain | Mastra | CrewAI | Pydantic-AI | OpenAI Agents | AutoGen | LlamaIndex |
-|---|---|---|---|---|---|---|---|---|
-| Pre-tool-call policy | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Approval gates (HITL) | **✅** | ✅ interrupt() | ✅ suspend/resume | partial | partial | ✅ (2026-04) | maintenance | ✗ |
-| Structured audit trail | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Durable execution (step-level replay) | **✅** `@tenet/durable` | partial (workflow checkpoints) | ✅ | partial | ✅ via Temporal | ✗ | maintenance | ✗ |
-| A2A protocol v1 (server + client) | **✅** | tbd | tbd | enterprise | tbd | ✗ | maintenance | tbd |
-| AG-UI streaming frontend protocol | **✅** | ✅ | tbd | ✅ | ✅ | ✗ | maintenance | tbd |
-| Agent harness (compaction · todos · subagents) | **✅** | ✅ Deep Agents | tbd | tbd | tbd | ✅ (2026-04) | maintenance | tbd |
-| Multi-judge verifier | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Deterministic claim pre-checks (numeric fabrication · quote grounding) | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Claim repair loop + best-of-N verifier-ranked | **✅** `@tenet/refine` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Independent hallucination judge (HHEM-2.1) | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| BENCHMARKS gated in CI on every PR | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| WASM sandbox + capability tokens | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Read-after-write memory consistency contract | **✅** | n/a | n/a | n/a | n/a | n/a | n/a | n/a |
-| Streaming (token + structured) | **✅** | partial | ✅ | partial | ✅ | ✅ | ✗ | ✗ |
-| Workflow DAG | **✅** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | partial |
-| Multi-surface (10) one config | **✅** | ✗ | partial | ✗ | ✗ | ✗ | ✗ | ✗ |
-| On-prem Helm with security defaults | **✅** | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Pricing | free Apache-2.0 | free | free | free | free | free | free | free |
+The capabilities below ship as **first-class layers in TENET** — built in, not bolted on, each backed by a package in this repo. We deliberately do **not** publish a per-competitor ✓/✗ grid: this is an anti-hallucination framework, and asserting specific, unverified capabilities about other named projects is exactly the kind of unsourced claim it exists to prevent. Compare against your own shortlist and their current docs.
+
+| Capability | Ships in TENET |
+|---|---|
+| Pre-tool-call policy (deny / allow / require-approval) | ✅ `@tenet/governance` |
+| Approval gates (HITL) + idempotent approval cache | ✅ `@tenet/governance` |
+| Structured audit trail | ✅ `@tenet/governance` |
+| Durable execution (step-level replay + `interrupt()` HITL) | ✅ `@tenet/durable` |
+| A2A protocol v1 (server + client) | ✅ `@tenet/a2a` |
+| AG-UI streaming frontend protocol | ✅ `@tenet/ag-ui` |
+| Agent harness (compaction · todos · subagents) | ✅ `@tenet/harness` |
+| Atomic-claim multi-judge verifier | ✅ `@tenet/verifier` |
+| Deterministic claim pre-checks (numeric fabrication · quote grounding) | ✅ `@tenet/verifier` |
+| Claim repair loop + best-of-N verifier-ranked | ✅ `@tenet/refine` |
+| Independent hallucination judge (HHEM-2.1 adapter) | ✅ `@tenet/judge-hhem` |
+| BENCHMARKS gated in CI on every PR | ✅ |
+| WASM tool sandbox + capability tokens | ✅ `@tenet/tools-wasm-sandbox` |
+| Streaming (token + structured) | ✅ `@tenet/streaming` |
+| Workflow DAG | ✅ `@tenet/workflow` |
+| Multi-surface (9 adapters) from one config | ✅ |
+| On-prem Helm with security defaults | ✅ `infra/helm/tenet` |
+| License | Apache-2.0 (free) |
 
 The hermetic CI gate measures the **framework's measurement plane** (verifier contract, guardrail patterns, retriever scoring, gate logic) on bundled fixtures with a deterministic stub SUT. Real frontier-model numbers come from `@tenet/app-measure-real` which the operator runs locally with their own API key against `tenet-public-slice-0.1.0` or any swap-in dataset. The split is deliberate and the BENCHMARKS doc spells it out.
 
@@ -116,24 +117,25 @@ ANTHROPIC_API_KEY=sk-ant-... \
 
 Method-of-attack per dimension + the honest stub-vs-real target split: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 
-## Quick comparison
+## Posture at a glance
 
-| | TENET | LangChain / LangGraph | Mastra | CrewAI | Intercom Fin | Decagon / Sierra |
-|---|---|---|---|---|---|---|
-| License | Apache-2.0 | MIT | MIT | MIT | proprietary | proprietary |
-| Verification by default | ✅ multi-judge + 13 starter Principles | opt-in | opt-in | opt-in | opaque | opaque |
-| Source-grounded URL allow-list | ✅ enforced at decode | manual | manual | manual | yes | yes |
-| Hallucination judge (independent) | ✅ HHEM-2.1 adapter ships | DIY | DIY | DIY | opaque | opaque |
-| Multi-surface, one config | ✅ 10 shipped | DIY | partial | DIY | their UI only | their UI only |
-| OpenTelemetry GenAI semconv | ✅ native | partial | partial | partial | no | no |
-| Outcome events (resolved / handed-off / disqualified / qualified) | ✅ first-class | DIY | DIY | DIY | yes (closed) | yes (closed) |
-| Prompt-injection + system-prompt-leak guards | ✅ ship by default | opt-in | opt-in | opt-in | opaque | opaque |
-| WASM-sandboxed tool execution | ✅ shipped (reference + wasmtime adapter) | no | no | no | n/a | n/a |
-| MCP-native tools + OAuth gateway | ✅ shipped | partial | partial | no | no | no |
-| BENCHMARKS rows gated in CI | ✅ every PR | no | no | no | n/a (closed) | n/a (closed) |
-| Self-host / on-prem | ✅ Helm chart ships | ✅ | ✅ | ✅ | no | enterprise add-on |
-| TypeScript-native | ✅ | partial | ✅ | python-first | n/a | n/a |
-| Pricing | free (Apache-2.0) | free | free | free | $0.99 / resolution | enterprise quote |
+TENET's stance on the things that matter for a support/answering agent — asserted only about TENET (again, no unverified per-competitor claims):
+
+| Aspect | TENET |
+|---|---|
+| License | Apache-2.0 (free, self-hostable) |
+| Verification by default | ✅ atomic-claim multi-judge + Constitutional Principles registry |
+| Source-grounded URL allow-list | ✅ enforced at decode |
+| Independent hallucination judge | ✅ HHEM-2.1 adapter (`@tenet/judge-hhem`) |
+| Multi-surface, one config | ✅ 9 surface adapters |
+| OpenTelemetry GenAI semconv | ✅ native (`@tenet/telemetry`) |
+| Outcome events (resolved / handed-off / disqualified / qualified) | ✅ first-class |
+| Prompt-injection + system-prompt-leak guards | ✅ ship by default (`@tenet/guardrails`) |
+| WASM-sandboxed tool execution | ✅ reference + wasmtime adapter |
+| MCP-native tools + OAuth gateway | ✅ `@tenet/tools-mcp` + `@tenet/tools-mcp-gateway` |
+| BENCHMARKS rows gated in CI | ✅ every PR |
+| Self-host / on-prem | ✅ Helm chart (`infra/helm/tenet`) |
+| TypeScript-native | ✅ |
 
 ## 12 differentiators
 
