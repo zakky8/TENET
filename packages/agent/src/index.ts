@@ -26,4 +26,7 @@ export {
 } from './terminals.js';
 export { halting, finalize } from './orchestrator.js';
 
+export type { AgentDeps, Retriever, AnswerCache, ScoredResult } from './deps.js';
+export { injectionGate, retrieveNode, cacheNode } from './nodes.js';
+
 export const VERSION = '0.0.0';

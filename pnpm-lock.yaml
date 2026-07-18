@@ -153,9 +153,15 @@ importers:
       '@tenet/core':
         specifier: workspace:*
         version: link:../core
+      '@tenet/guardrails':
+        specifier: workspace:*
+        version: link:../guardrails
       '@tenet/harness':
         specifier: workspace:*
         version: link:../harness
+      '@tenet/refine':
+        specifier: workspace:*
+        version: link:../refine
       '@tenet/workflow':
         specifier: workspace:*
         version: link:../workflow
