@@ -6,6 +6,21 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `@tenet/surface-core` grounded-render gate (5.3 partial, 2026-07-18)
+A new package with `groundedRenderGate(reply, { fallback })` — a fail-closed, last-mile grounding guard for
+the surface send path. The agent's single emit edge already refuses to ship an uncited fact, but a surface
+can be handed a reply from a path that bypassed it (a cache, a fast-path, a bug); this gate is the belt-and-
+suspenders: a reply renders as-is only if it carries a **grounded citation** (non-blank source id AND quote —
+the same bar the emit edge applies); a fact-bearing reply with no grounded citation is **refused**, rendering
+the operator's safe `fallback` INSTEAD of the ungrounded text; a blank reply carries no fact and passes
+through. Citation-based on purpose: it does not try to tell a legitimate abstention from a fabricated fact
+that lost its citation — it treats both as not-renderable-as-an-answer and substitutes the fallback, which is
+strictly safe. Pure, no provider deps (`@tenet/core` `Citation` only). 6 tests (the refusal of an ungrounded
+fact-bearing reply front and centre); mutation probe non-vacuous (rendering the ungrounded text reddens it).
+Also establishes the shared `@tenet/surface-core` home the JWT de-fork (5.3a) will move into. STILL OPEN in
+5.3: wire the gate into a surface send path (E2E "a surface refuses"), and the JWT de-fork. Workspace now 63
+packages; suite 1269 → 1275 (+6), 95 → 96 suites.
+
 ### Added — cross-provider `failover` chain, fail-closed (5.1 complete, 2026-07-18)
 `failover(providers, opts)` in `@tenet/rate-limit` runs providers in order and moves to the next ONLY on a
 transient failure — the fail-over decision is the `isRetryable` taxonomy, so it fails over on a 5xx/429/network

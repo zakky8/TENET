@@ -4,7 +4,7 @@
 
 TENET is a framework, not a model: it does not train or fine-tune an LLM, it *calls* one and makes whichever frontier model you call provably more grounded. The core is a fail-CLOSED agent turn: `runAgent` (`packages/agent/src/orchestrator.ts`) drives `OrchestratorState` through a `@tenet/workflow` graph — inbound injection gate → retrieve + knowledge-boundary gate → cache re-verify → a decides-and-drafts Reasoner (grounded-or-abstain) → governance-gated tools → a fail-closed verifier → a single emit edge — with abstain/handoff carried as values (never thrown) and a top-level catch that fails closed on any error. The worst outcome of a turn is a human handoff, never an ungrounded fact.
 
-Measured, not marketed: every capability below is code in the monorepo, every benchmark row is gated in hermetic CI on each PR, and doc numbers are checked against the live test suite (`pnpm counts:check`). The suite is 1269 tests across 95 suites, all green, over 62 workspace packages.
+Measured, not marketed: every capability below is code in the monorepo, every benchmark row is gated in hermetic CI on each PR, and doc numbers are checked against the live test suite (`pnpm counts:check`). The suite is 1275 tests across 96 suites, all green, over 63 workspace packages.
 
 ## Documentation
 
@@ -30,7 +30,7 @@ Measured, not marketed: every capability below is code in the monorepo, every be
 - Agent turn: `@tenet/agent` (runAgent graph), `@tenet/workflow` (steps/graph), `@tenet/harness` (compaction, todos, subagents).
 - Answer quality/safety: `@tenet/verifier`, `@tenet/refine` (knowledge-boundary gate, repair loop, best-of-N, and a `groundedOrAbstain` reference orchestrator chaining them fail-closed), `@tenet/guardrails`, `@tenet/governance`, `@tenet/policy`, HHEM judge adapters.
 - Retrieval/memory: `@tenet/retrieval` (BM25 + dense + rerank), `@tenet/memory`, `@tenet/memory-adapters` (mem0 / Letta / Zep), `@tenet/rerank-cohere`.
-- Surfaces (adapters, injected transport): Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio. Ticketing connectors: Zendesk, Intercom, Freshdesk, ServiceNow.
+- Surfaces (adapters, injected transport): Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio. Ticketing connectors: Zendesk, Intercom, Freshdesk, ServiceNow. `@tenet/surface-core` adds a fail-closed grounded-render gate (an uncited fact-bearing reply → a safe fallback, never the ungrounded text).
 - Ops: `@tenet/durable` (step-level replay + interrupt() HITL), `@tenet/rate-limit`, `@tenet/telemetry` (OTel GenAI semconv), WASM tool sandbox + wasmtime, on-prem Helm chart (`infra/helm/tenet`).
 - Protocol interop: MCP client + OAuth gateway, A2A v1 (server + client), AG-UI, ACP.
 

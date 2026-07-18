@@ -16,8 +16,8 @@ This document is still the forward-looking proposal. The section below records w
 is actually in the tree on branch `upgrade/top-1pct`, so the proposal is not read as
 a description of shipped code. Numbers are measured, not aspirational.
 
-- **Repo:** 62 workspace packages (every `package.json` under the `pnpm-workspace.yaml`
-  globs). Test suite: **95 suites / 1269 tests, all green** (was 83 / 1051 at the start
+- **Repo:** 63 workspace packages (every `package.json` under the `pnpm-workspace.yaml`
+  globs). Test suite: **96 suites / 1275 tests, all green** (was 83 / 1051 at the start
   of this upgrade). All figures are from the **hermetic stub plane** — no real-model
   access exists in this environment, so no real-model benchmark numbers are claimed here.
 - **Phase 1 — canonical model contract (complete):** one `ChatModel` in `@tenet/core`
@@ -142,7 +142,7 @@ What concretely we ship that the field doesn't, on day 1:
 
 ```
 /
-├── packages/                # (62 workspace packages total; abbreviated list)
+├── packages/                # (63 workspace packages total; abbreviated list)
 │   ├── core/                # canonical ChatModel contract (model.ts), AgentState, openPath, conversation events
 │   ├── agent/               # the driven turn: runAgent graph (nodes → Reasoner → tools → verify → emit), all fail-closed
 │   ├── verifier/            # CoVe, Reflexion, constitutional, citation enforcement
@@ -310,7 +310,7 @@ The smallest end-to-end vertical that proves the spine works:
 - `models/bedrock` only (gpt-oss-120b, matching TENET's current setup)
 - `stores/vector/pgvector` + `stores/state/redis`
 - `apps/community-bot` — port TENET's current behavior to the new framework
-- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 95 suites / 1269 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
+- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 96 suites / 1275 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
 
 Success criteria for MVP:
 1. TENET's golden conversations replay through the new runtime with **same or better** accuracy

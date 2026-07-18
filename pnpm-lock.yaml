@@ -239,6 +239,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/surface-core:
+    dependencies:
+      '@tenet/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/telemetry:
     dependencies:
       '@tenet/core':

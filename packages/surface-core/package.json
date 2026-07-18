@@ -1,0 +1,37 @@
+{
+  "name": "@tenet/surface-core",
+  "version": "0.0.0",
+  "description": "Shared surface-layer primitives. A fail-closed grounded-render gate that refuses to render an ungrounded (uncited) fact-bearing reply, substituting a safe fallback — defense in depth for grounded-or-abstain at the surface send path, so no ungrounded fact reaches a member even if a reply bypassed the agent's emit edge.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "lint": "echo 'no lint yet' && exit 0"
+  },
+  "keywords": [
+    "agent-framework",
+    "ai",
+    "ai-agents",
+    "surface",
+    "grounded-or-abstain",
+    "anti-hallucination",
+    "verification-first"
+  ],
+  "dependencies": {
+    "@tenet/core": "workspace:*"
+  }
+}
