@@ -38,16 +38,34 @@ describe('withTimeoutAndSignal — FIX B3', () => {
     expect(out).toBe('ok');
   });
 
-  it('does not leave a pending timer after a successful resolution', async () => {
-    // If the timer weren't cleared, Node would keep the loop alive.
-    // Indirect check: many successful calls in quick succession should
-    // not accumulate timers (we can't measure handles here, but we
-    // verify resolution stays fast).
-    const start = Date.now();
-    for (let i = 0; i < 50; i++) {
+  it('clears its timer on successful resolution (behavior #3; the exact handle is cleared)', async () => {
+    // DIRECT check of the `finally { clearTimeout(timer) }`: the handle setTimeout
+    // returned is the one passed to clearTimeout. The old test used a wall-clock
+    // "50 calls < 500ms" proxy that was BOTH flaky (the async continuations can be
+    // scheduled late under parallel load → false RED) AND vacuous for its stated
+    // purpose — a LEAKED 30s timer never slows resolution, so it passed whether or
+    // not the timer was cleared. Spy the timer globals to observe the real effect.
+    const realSet = globalThis.setTimeout;
+    const realClear = globalThis.clearTimeout;
+    const created: Array<ReturnType<typeof setTimeout>> = [];
+    const cleared: unknown[] = [];
+    globalThis.setTimeout = ((fn: (...a: unknown[]) => void, ms?: number, ...rest: unknown[]) => {
+      const t = realSet(fn, ms, ...rest);
+      created.push(t);
+      return t;
+    }) as typeof setTimeout;
+    globalThis.clearTimeout = ((t: unknown) => {
+      cleared.push(t);
+      return realClear(t as Parameters<typeof clearTimeout>[0]);
+    }) as typeof clearTimeout;
+    try {
       await withTimeoutAndSignal(async () => 'ok', 30_000, 'test');
+    } finally {
+      globalThis.setTimeout = realSet;
+      globalThis.clearTimeout = realClear;
     }
-    expect(Date.now() - start).toBeLessThan(500);
+    expect(created.length).toBeGreaterThanOrEqual(1); // the timeout timer was created
+    expect(cleared).toContain(created[0]); // …and that exact timer was cleared on success
   });
 
   it('passes a fresh AbortSignal per call', async () => {
