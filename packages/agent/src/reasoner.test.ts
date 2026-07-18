@@ -266,6 +266,17 @@ describe('modelReasoner — stopReason paths', () => {
     const out = await modelReasoner(fakeModel(res), []).reason(makeState(), signal);
     expect(out).toEqual({ kind: 'abstain', reason: 'model aborted' });
   });
+
+  it("stopReason 'max_tokens' -> abstain, even with a VALID answer envelope (truncation must not ship)", async () => {
+    // The response was cut off at the token limit; the draft/citations may be incomplete.
+    // Without the max_tokens guard this valid-looking envelope would ship as an answer.
+    const res: ChatResponse = {
+      content: [{ type: 'text', text: JSON.stringify(VALID_ANSWER) }],
+      stopReason: 'max_tokens',
+    };
+    const out = await modelReasoner(fakeModel(res), []).reason(makeState(), signal);
+    expect(out).toEqual({ kind: 'abstain', reason: 'model max_tokens' });
+  });
 });
 
 // ── modelReasoner: request shape ────────────────────────────────────────────

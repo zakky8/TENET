@@ -289,7 +289,8 @@ export function modelReasoner(model: ChatModel, tools: ReadonlyArray<ToolDef>): 
           ? { kind: 'tool', calls }
           : { kind: 'abstain', reason: 'tool_use stop with no tool blocks' }; // FAIL CLOSED
       }
-      if (res.stopReason === 'refusal' || res.stopReason === 'aborted')
+      // refusal | aborted | max_tokens (TRUNCATED — a cut-off draft must never ship) → abstain
+      if (res.stopReason === 'refusal' || res.stopReason === 'aborted' || res.stopReason === 'max_tokens')
         return { kind: 'abstain', reason: `model ${res.stopReason}` };        // FAIL CLOSED
 
       // Text path: strict JSON envelope. Any parse failure / unknown action /
@@ -536,7 +537,7 @@ export async function verifyAndEmit(
 | B | retrieve | `knowledgeBoundaryGate.proceed=false` **or** query throws (timeout) | `disqualified` (abstain) | refine/index.ts:77-82 |
 | C | cache | lookup throws | continue (no hit); **hits never emit here** | `AnswerCache` port (`deps.cache`) |
 | C→D | cache hit | candidate draft fails verify **or** outbound gate | fall through to reasoning (no emit) | §4.3 |
-| D | reasoner | throw / parse-fail / `tool_use`-with-no-tools / refusal / aborted | `disqualified` (abstain) | §3 |
+| D | reasoner | throw / parse-fail / `tool_use`-with-no-tools / refusal / aborted / `max_tokens` (truncation) | `disqualified` (abstain) | §3 |
 | D | tool | `PolicyEvaluator` deny / approval unmet | `handed_off` (ops) | governance evaluate |
 | D | verify | `deps.verify.check` **throws** | `abstain` (`EmitDecision`) — orchestrator never trusts internal fail-open | emit.ts (Verifier port) |
 | D | verify | verdict `pass=false` | `EmitDecision:'repair'` → rewrite via `deps.rewrite` + re-verify (≤ `maxRepairRounds`), then `abstain` | criticLoop.ts / emit.ts |

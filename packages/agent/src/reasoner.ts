@@ -53,7 +53,14 @@ export function modelReasoner(model: ChatModel, tools: ReadonlyArray<ToolDef>): 
           : { kind: 'abstain', reason: 'tool_use stop with no tool blocks' }; // FAIL CLOSED
       }
 
-      if (res.stopReason === 'refusal' || res.stopReason === 'aborted') {
+      // refusal / aborted / max_tokens all mean the turn cannot be trusted: a refusal is
+      // not an answer, an abort was cancelled, and max_tokens means the response was
+      // TRUNCATED — a cut-off draft/envelope must never ship. All → abstain.
+      if (
+        res.stopReason === 'refusal' ||
+        res.stopReason === 'aborted' ||
+        res.stopReason === 'max_tokens'
+      ) {
         return { kind: 'abstain', reason: `model ${res.stopReason}` }; // FAIL CLOSED
       }
 

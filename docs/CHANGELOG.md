@@ -6,6 +6,13 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — Reasoner abstains on `max_tokens` (truncation → never ship, 2026-07-18)
+The decides-and-drafts Reasoner (`packages/agent/src/reasoner.ts`) handled `refusal` and
+`aborted` stop reasons but fell through to envelope-parsing on `max_tokens`, so a truncated
+response with a parseable-looking answer envelope could ship a cut-off draft. It now abstains
+on `max_tokens` alongside `refusal`/`aborted` — a truncated turn cannot be trusted. Regression
+test asserts a VALID answer envelope with `stopReason:'max_tokens'` → abstain. Suite 1189 → 1190.
+
 ### Added — verifier `failClosed` mode: close the infra fail-open (Phase 3.1, 2026-07-18)
 Branch `upgrade/top-1pct`. Test suite: 1181 → 1189 tests across 92 suites, all green.
 `VerifierConfig.failClosed?: boolean` (default `false`, preserving existing callers).
