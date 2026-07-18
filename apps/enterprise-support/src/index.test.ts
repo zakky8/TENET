@@ -172,3 +172,71 @@ describe('EnterpriseSupportApp — dispatch errors', () => {
     expect(events[0]!.outcome).toBe('disqualified');
   });
 });
+
+describe('EnterpriseSupportApp — honest outcome telemetry (verifierPassed + costUsd)', () => {
+  type Rec = { outcome: Outcome; verifierPassed: boolean | null; costUsd: number };
+  function capture(events: Rec[]): TelemetrySink {
+    return {
+      record(e) {
+        events.push({ outcome: e.outcome, verifierPassed: e.verifierPassed, costUsd: e.costUsd });
+      },
+    };
+  }
+  // An agent whose reply carries a verifier-approved citation (grounded).
+  const groundedAgent = (): AgentRuntime => ({
+    async handle(event) {
+      return { text: `answer:${event.text}`, citations: [{ sourceId: 's1', quote: 'q' }] };
+    },
+  });
+
+  it('records verifierPassed=true ONLY when a grounded, cited answer is emitted', async () => {
+    const events: Rec[] = [];
+    const app = new EnterpriseSupportApp({
+      agent: groundedAgent(), surfaces: [fakeSurface('slack')], connectors: [], telemetry: capture(events),
+    });
+    await app.dispatch(EV('slack'));
+    expect(events[0]!.outcome).toBe('resolved');
+    expect(events[0]!.verifierPassed).toBe(true);
+  });
+
+  it('records verifierPassed=false for an emitted-but-uncited reply — the old code FABRICATED true here', async () => {
+    const events: Rec[] = [];
+    // fakeAgent returns citations:[] → not a grounded, verified answer.
+    const app = new EnterpriseSupportApp({
+      agent: fakeAgent('r'), surfaces: [fakeSurface('slack')], connectors: [], telemetry: capture(events),
+    });
+    await app.dispatch(EV('slack'));
+    expect(events[0]!.outcome).toBe('resolved');
+    expect(events[0]!.verifierPassed).toBe(false);
+  });
+
+  it('records verifierPassed=null on a dispatch error (no reply emitted)', async () => {
+    const events: Rec[] = [];
+    const failing: AgentRuntime = { async handle() { throw new Error('boom'); } };
+    const app = new EnterpriseSupportApp({
+      agent: failing, surfaces: [fakeSurface('slack')], connectors: [], telemetry: capture(events),
+    });
+    await app.dispatch(EV('slack'));
+    expect(events[0]!.outcome).toBe('disqualified');
+    expect(events[0]!.verifierPassed).toBeNull();
+  });
+
+  it('sources costUsd from the injected meter — the old code hardcoded 0', async () => {
+    const events: Rec[] = [];
+    const app = new EnterpriseSupportApp({
+      agent: groundedAgent(), surfaces: [fakeSurface('slack')], connectors: [], telemetry: capture(events),
+      costMeter: { total: () => 0.0123 },
+    });
+    await app.dispatch(EV('slack'));
+    expect(events[0]!.costUsd).toBeCloseTo(0.0123);
+  });
+
+  it('costUsd is 0 only when no meter is wired (unmetered, not a fabricated figure)', async () => {
+    const events: Rec[] = [];
+    const app = new EnterpriseSupportApp({
+      agent: groundedAgent(), surfaces: [fakeSurface('slack')], connectors: [], telemetry: capture(events),
+    });
+    await app.dispatch(EV('slack'));
+    expect(events[0]!.costUsd).toBe(0);
+  });
+});

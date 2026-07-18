@@ -6,6 +6,21 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — enterprise-support telemetry no longer fabricates verifierPassed / costUsd (4.3 partial, 2026-07-18)
+The reference dispatcher recorded a FALSE `verifierPassed = true` on every successful dispatch — set
+unconditionally right after `agent.handle()`, without observing any verification (and, if `send` then
+threw, it recorded `true` alongside a `disqualified` outcome). A telemetry field asserting a verification
+that never happened is a hallucination in the repo's own voice. It also hardcoded `costUsd: 0`, a fabricated
+"free" measurement. Fixed: `verifierPassed` is now derived from what the dispatcher can HONESTLY observe —
+a non-blank reply with ≥1 verifier-approved citation → `true`; an emitted-but-uncited reply (abstention) →
+`false`; a dispatch error (no reply) → `null` — it never claims a verification it didn't see. `costUsd` now
+comes from an injected `costMeter` (structural `{ total(): number }`, satisfied by `@tenet/telemetry`'s
+`CostMeter` with no new dependency); unmetered defaults to 0 explicitly, never a fabricated figure. 5 new
+tests (grounded→true, uncited→false, error→null, metered cost, unmetered 0); the uncited→false and metered
+tests RED on the old fabricating code (mutation-verified). Suite 1222 → 1227 (+5). STILL OPEN in 4.3:
+community-bot has the identical `costUsd:0` / `verifierPassed` pattern (same fix, separate app); the broader
+"genuinely wired real verifier + retrieval + console surface" remains a larger follow-up.
+
 ### Changed — de-tautologize the eval's QA grounding metric (4.2 partial, 2026-07-18)
 The measurement plane's Dim-1 QA path was an **identity pass**: `stubAnswer` cited exactly
 `relevantSourceIds` and `stubVerify` checked `cited ⊆ relevant`, so `hallucination_rate` (0.0) and

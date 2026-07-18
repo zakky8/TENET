@@ -56,11 +56,24 @@ export interface TelemetrySink {
   }) => void;
 }
 
+/**
+ * Reads the cost accrued for the turn at outcome time. Structurally
+ * satisfied by `@tenet/telemetry`'s `CostMeter` (no dependency needed) —
+ * the operator records token usage into the SAME meter from inside the
+ * agent, and the dispatcher reads `total()` here. Absent → cost is
+ * unmetered and recorded as 0 (never a fabricated non-zero figure).
+ */
+export interface CostMeterLike {
+  total(): number;
+}
+
 export interface EnterpriseSupportOptions {
   agent: AgentRuntime;
   surfaces: ReadonlyArray<SurfaceAdapter>;
   connectors: ReadonlyArray<TicketingConnectorAdapter>;
   telemetry?: TelemetrySink;
+  /** Accrued-cost source for outcome telemetry (see CostMeterLike). */
+  costMeter?: CostMeterLike;
   /** Wall-clock now() — injectable for tests. */
   now?: () => number;
 }
@@ -91,11 +104,9 @@ export class EnterpriseSupportApp {
     let reply: NormalizedReply;
     let outcome: Outcome = 'pending';
     let reason: string | undefined;
-    let verifierPassed: boolean | null = null;
 
     try {
       reply = await this.opts.agent.handle(event, signal);
-      verifierPassed = true;
       // Route outbound
       const surface = this.surfaces.get(event.surface);
       if (surface) {
@@ -119,13 +130,27 @@ export class EnterpriseSupportApp {
       reply = { text: '', citations: [] };
     }
 
+    // Honest verifier signal: the dispatcher does NOT run the verifier — the
+    // agent does — so it must never blindly assert `true`. What it CAN observe
+    // is whether a grounded, cited answer was actually emitted (the
+    // grounded-citation guard the agent's emit edge enforces): non-blank text
+    // AND ≥1 verifier-approved citation. An abstention/handoff (empty text or
+    // no citations) did not emit a verified fact → false; a dispatch that
+    // errored emitted no reply → unknown (null).
+    const verifierPassed: boolean | null =
+      outcome === 'disqualified'
+        ? null
+        : reply.text.trim().length > 0 && reply.citations.length > 0;
+
     if (this.opts.telemetry) {
+      // Real accrued cost from the injected meter — never a hardcoded 0.
+      const costUsd = this.opts.costMeter?.total() ?? 0;
       this.opts.telemetry.record({
         outcome,
         conversationId: event.conversationId,
         tenantId: event.tenantId,
         durationMs: this.now() - start,
-        costUsd: 0,
+        costUsd,
         verifierPassed,
         ...(reason !== undefined ? { reason } : {}),
       });
