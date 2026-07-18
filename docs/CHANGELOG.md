@@ -6,6 +6,15 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — accurate site SEO meta + robots.txt (7.3, 2026-07-18)
+`docs/_config.yml`'s `description` (the Google snippet + `og:description` that `jekyll-seo-tag` emits) was
+stale/inaccurate: "10 surfaces" but listed 8, and the bare "0 high-severity CVEs" boast. Corrected to the
+real "9 surface adapters (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice)", led with
+the grounded-or-abstain guarantee, and replaced the CVE boast with "hardened by construction" (consistent
+with the earlier index.md fix; the MEASURED Dim-6 posture stays in BENCHMARKS where it states its method).
+Added `docs/FAQ.md` to the site include list so the answer-shaped FAQ is crawlable, and added `docs/robots.txt`
+(allow all + a Jekyll-rendered `Sitemap:` pointing at the `jekyll-sitemap` output). YAML validated.
+
 ### Added — `docs/FAQ.md` answer-shaped FAQ for AEO/SEO (7.3, 2026-07-18)
 A structured FAQ with answer-shaped questions (how TENET prevents hallucination, what grounded-or-abstain
 means, is-it-a-LangChain-alternative, supported models/surfaces, how the verifier works, is-it-production-ready,

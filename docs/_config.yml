@@ -1,12 +1,13 @@
 title: TENET
 tagline: "Verification-first TypeScript AI agent framework — BENCHMARKS gated in CI on every PR"
 description: >
-  TENET is a TypeScript AI agent framework with multi-judge hallucination
-  verifier, Vectara HHEM-2.1 adapter, pre-tool-call governance + approval gates
-  + audit trail, WASM-sandboxed tools, MCP OAuth gateway, 10 surfaces
-  (Discord/Slack/Telegram/Teams/web/REST/gRPC/ticketing), and BENCHMARKS gated
-  in CI on every pull request. LangChain alternative. 0 high-severity CVEs.
-  Apache-2.0.
+  TENET is a verification-first TypeScript AI agent framework: an agent turn
+  answers with a grounded, verified citation or it abstains — grounded-or-abstain.
+  Multi-judge hallucination verifier, Vectara HHEM-2.1 adapter, pre-tool-call
+  governance + approval gates + audit trail, WASM-sandboxed tools, MCP OAuth gateway,
+  9 surface adapters (Discord, Slack, Telegram, Teams, web widget, REST, gRPC,
+  Matrix, voice), and BENCHMARKS gated in CI on every pull request. LangChain
+  alternative, hardened by construction. Apache-2.0.
 
 remote_theme: pages-themes/cayman@v0.2.0
 plugins:
@@ -32,6 +33,7 @@ include:
   - ARCHITECTURE.md
   - ROADMAP.md
   - CHANGELOG.md
+  - FAQ.md
 
 # Exclude noisy dev artefacts
 exclude:

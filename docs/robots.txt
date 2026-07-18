@@ -1,0 +1,7 @@
+---
+# Rendered by Jekyll so the sitemap URL uses the configured site.url + baseurl.
+---
+User-agent: *
+Allow: /
+
+Sitemap: {{ site.url }}{{ site.baseurl }}/sitemap.xml
