@@ -41,3 +41,12 @@ exclude:
   - "*.test.ts"
   - dist
   - "**/*.lock"
+
+# Default OG/Twitter card image for every page (jekyll-seo-tag reads page.image).
+# SVG brand card in docs/assets/; operators may rasterize to PNG for scrapers that
+# prefer raster (rsvg-convert / sharp) and point this at the .png.
+defaults:
+  - scope:
+      path: ""
+    values:
+      image: /TENET/assets/og-image.svg

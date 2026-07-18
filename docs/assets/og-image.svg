@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="TENET — verification-first AI agent framework">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A0F1A"/>
+      <stop offset="1" stop-color="#0D1526"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4CC9F0"/>
+      <stop offset="1" stop-color="#34D399"/>
+    </linearGradient>
+    <style>
+      text { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+      .wordmark { font-weight: 800; letter-spacing: 6px; }
+      .tag { font-weight: 600; }
+      .mono { font-family: "SFMono-Regular", "Consolas", "Menlo", monospace; }
+    </style>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <!-- faint grid, evokes the verification graph -->
+  <g stroke="#16233B" stroke-width="1" opacity="0.6">
+    <path d="M0 160 H1280 M0 320 H1280 M0 480 H1280"/>
+    <path d="M320 0 V640 M640 0 V640 M960 0 V640"/>
+  </g>
+
+  <!-- accent rail -->
+  <rect x="96" y="150" width="6" height="340" rx="3" fill="url(#accent)"/>
+
+  <!-- eyebrow -->
+  <text x="130" y="188" class="mono" font-size="24" fill="#4CC9F0" letter-spacing="3">OPEN SOURCE · APACHE-2.0 · TYPESCRIPT</text>
+
+  <!-- wordmark -->
+  <text x="128" y="300" class="wordmark" font-size="132" fill="#EAF2FB">TENET</text>
+
+  <!-- tagline -->
+  <text x="130" y="372" class="tag" font-size="40" fill="#B9C7DA">Verification-first AI agent framework</text>
+
+  <!-- the thesis -->
+  <text x="130" y="452" font-size="30" fill="#7E8DA3">An agent turn answers with a grounded, verified citation —</text>
+  <text x="130" y="492" font-size="30" fill="#7E8DA3">or it <tspan fill="#34D399" font-weight="700">abstains</tspan>. Never a fact it cannot ground in a source.</text>
+
+  <!-- footer chips -->
+  <g class="mono" font-size="22" fill="#8FA0B8">
+    <text x="130" y="566">grounded-or-abstain</text>
+    <text x="420" y="566" fill="#3B4A63">·</text>
+    <text x="446" y="566">fail-closed verifier</text>
+    <text x="720" y="566" fill="#3B4A63">·</text>
+    <text x="746" y="566">pre-tool-call governance</text>
+  </g>
+
+  <!-- grounded-or-abstain glyph: a check inside a hexagon (verification seal) -->
+  <g transform="translate(1030,300)">
+    <polygon points="0,-150 130,-75 130,75 0,150 -130,75 -130,-75" fill="none" stroke="url(#accent)" stroke-width="4" opacity="0.9"/>
+    <polygon points="0,-96 83,-48 83,48 0,96 -83,48 -83,-48" fill="#0E1A2E" stroke="#1E2E49" stroke-width="2"/>
+    <path d="M-46 4 L-12 40 L54 -40" fill="none" stroke="url(#accent)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

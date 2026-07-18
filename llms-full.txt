@@ -1,0 +1,54 @@
+# TENET — full LLM-readable index
+
+> Verification-first, open-source TypeScript AI agent framework. Its guarantee: an agent turn either answers with a grounded, verified citation, or it abstains / hands off to a human — it never states a fact it cannot ground in a source (grounded-or-abstain). Anti-hallucination, source-grounding, capability-token tool sandboxing, and pre-tool-call governance are first-class layers, not bolt-ons. Apache-2.0, pre-1.0.
+
+This is the fuller companion to [llms.txt](llms.txt): it inlines the answers an LLM most often needs so the whole project can be understood from one file. Measured, not marketed — every capability here is code in the monorepo, doc numbers (1260 tests across 94 suites, all green, over 62 workspace packages) are checked against the live jest suite in CI (`pnpm counts:check`), and README code examples are typecheck-gated (`pnpm readme:check`).
+
+## What TENET is
+
+A framework, not a model. It does not train or fine-tune an LLM — it *calls* one (you bring the model + API key) and makes that turn provably harder to hallucinate through. The core is a fail-CLOSED agent turn: `runAgent` (`packages/agent/src/orchestrator.ts`) drives `OrchestratorState` through a `@tenet/workflow` graph — inbound injection gate → retrieve + knowledge-boundary gate → cache re-verify → a decides-and-drafts Reasoner (grounded-or-abstain) → governance-gated tools → a fail-closed verifier → a single emit edge — with abstain/handoff carried as values (never thrown) and a top-level catch that fails closed on any error.
+
+## The one rule (grounded-or-abstain)
+
+An agent turn either answers with a grounded, verified citation, or it abstains / hands off. It never states a fact it cannot ground in a source. The worst acceptable outcome of a turn is a human handoff, never a wrong fact. This is enforced in code — the Reasoner's result type has no privileged `answer` variant, and a fact-bearing reply can leave the agent at exactly one call site (`verifyAndEmit`), reachable only past the verifier, a grounded-citation guard (≥1 non-blank citation), and an outbound leak gate.
+
+## How hallucination is prevented (the fail-closed edges)
+
+- **No default answer.** Any ambiguity — a parse failure, an unknown action, a missing field, a refusal, an abort, a `max_tokens` truncation, an uncited draft — resolves to `abstain`, enforced in the parser, not left to the model.
+- **Fail CLOSED on infra failure.** A verifier throw, a judge timeout, a retriever error, or a truncated response all resolve to abstain — never a shipped, unverified answer.
+- **Deterministic pre-checks first.** Before any LLM judge, the verifier settles what it can deterministically: quote-grounding, and fabrication checks for numbers (including spelled-out amounts) and `http(s)://` URLs that appear nowhere in the sources. A number or URL being *present* never passes a claim; only absence can fail it.
+- **Multi-judge, fail-closed mode.** Remaining claims go to a strict-then-permissive atomic-claim multi-judge; an opt-in `failClosed` mode resolves extractor/judge infra failures to not-supported instead of a spurious pass.
+- **Absence is not proof of a negative.** "The sources don't mention X, so we do not offer X" is a fabrication; a negative claim needs positive grounding.
+
+## What models and surfaces are supported
+
+- **6 model adapters**, all speaking one canonical `ChatModel` contract (`packages/core/src/model.ts` — a messages array, a required `AbortSignal`, tool round-trips, a lossless `StopReason` union): Anthropic, OpenAI, Google Gemini, Mistral, Ollama, Amazon Bedrock. Swapping providers does not change agent code.
+- **9 surface adapters** (transport-injected): Discord, Slack, Telegram, Microsoft Teams, an embedded web widget, REST, gRPC, Matrix, and voice over Twilio.
+- **4 ticketing connectors**: Zendesk, Intercom, Freshdesk, ServiceNow.
+
+## The package map (what ships today)
+
+- Agent turn: `@tenet/agent` (runAgent graph), `@tenet/workflow` (steps/graph), `@tenet/harness` (compaction, todos, subagents).
+- Answer quality/safety: `@tenet/verifier` (atomic-claim multi-judge + deterministic pre-checks + failClosed mode), `@tenet/refine` (knowledge-boundary gate, repair loop, best-of-N, `groundedOrAbstain` reference orchestrator), `@tenet/guardrails`, `@tenet/governance`, `@tenet/policy`, HHEM judge adapters (`@tenet/judge-hhem`, `@tenet/judge-hhem-onnx` — a judge harness + pluggable scorer; you bring the HHEM model weights, a deterministic token-overlap scorer ships as the reference).
+- Retrieval/memory: `@tenet/retrieval` (BM25 + dense + rerank), `@tenet/memory`, `@tenet/memory-adapters` (mem0 / Letta / Zep), `@tenet/rerank-cohere`.
+- Tools: `@tenet/tools-mcp` (MCP client), `@tenet/tools-mcp-gateway` (OAuth gateway), `@tenet/tools-wasm-sandbox` + `…-wasmtime` (capability-token-gated WASM tool sandbox).
+- Resilience/ops: `@tenet/rate-limit` (retryable-vs-fatal taxonomy, jittered-backoff retry that fails closed on AbortError/4xx, circuit breaker, token bucket), `@tenet/durable` (step-level replay + `interrupt()` HITL), `@tenet/telemetry` (OTel GenAI semconv), on-prem Helm chart (`infra/helm/tenet`).
+- Protocol interop: MCP, A2A v1 (server + client), AG-UI, ACP.
+
+## The honest read (measured, not marketed)
+
+- **Pre-1.0.** APIs may change. The core is real and code-complete in the monorepo, with a green test suite gated in CI.
+- **Benchmark numbers come from a hermetic CI stub SUT** — they measure the framework's contracts (the verifier, the guardrail patterns, the retriever scoring, the gate logic), NOT a frontier model's behavior. Real-model numbers are produced locally with your own API key (`apps/measure-real`), never asserted in-repo.
+- **Surface adapters take an injected transport** you wire to a concrete client at composition.
+- **The HHEM judge is an adapter**, not the model — you supply the weights.
+
+## Documentation
+
+- [README](README.md): what TENET is, the honest read, the capability map, quickstart.
+- [FAQ](docs/FAQ.md): how it prevents hallucination, grounded-or-abstain, supported models/surfaces, verifier internals, production-readiness.
+- [Architecture](docs/ARCHITECTURE.md): component map, security stance, the as-built `ChatModel` contract + agent turn.
+- [Agent-turn design](docs/design/agent-turn.md): the discriminated `ReasonerOutput`, the single emit edge, the per-edge fail-closed inventory.
+- [BENCHMARKS](docs/BENCHMARKS.md): the measurable targets + the hermetic-stub vs real-model measurement split.
+- [SKILL.md](SKILL.md): a framework-agnostic guide to building a verification-first, grounded-or-abstain agent.
+- [Operating manual](AGENTS.md): the repository's own working contract for AI agents — stack, discipline, the gate, code style, docs-in-sync rules.
+- [Security policy](SECURITY.md): the hardened-by-construction guarantees and how to report a vulnerability.
