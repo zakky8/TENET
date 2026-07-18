@@ -16,15 +16,23 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+// Parity with check-inventory.mjs's DOCS list: every doc that states a repo
+// number in the repo's own voice is gated by BOTH number-gates. AGENTS.md and
+// docs/FAQ.md already carry gated adapter counts; a test-count line added to
+// either (FAQ.md is the natural home for "how many tests?") would otherwise
+// drift UNGATED. The patterns below only match test/suite phrasings, so listing
+// a doc that states no count is inert — it just future-proofs that doc.
 const DOCS = [
   'README.md',
   'llms.txt',
   'llms-full.txt',
   'docs/index.md',
+  'docs/FAQ.md',
   'docs/ARCHITECTURE.md',
   'docs/ROADMAP.md',
   'docs/marketing/LAUNCH-COPY.md',
   'docs/marketing/AWESOME-LIST-SUBMISSIONS.md',
+  'AGENTS.md',
 ];
 
 // Each pattern captures a test-count and/or a suite-count group from the exact phrasings
