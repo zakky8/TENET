@@ -167,9 +167,26 @@ function parseUsage(
   return { inputTokens: inT, outputTokens: outT };
 }
 
+/**
+ * Scrub the secret patterns a Mistral error body could echo back — the auth
+ * Bearer token, an authorization-header value, or an `api_key` JSON field.
+ * A model-adapter error must NEVER surface a credential. Mirrors the openai
+ * adapter's `scrubSecrets` (P8 review) so both adapters have the same posture.
+ */
+function scrubMistralSecrets(s: string): string {
+  return s
+    .replace(/Bearer\s+[A-Za-z0-9._\-+/=]+/gi, 'Bearer [redacted]')
+    .replace(/(authorization\s*:\s*)[^\s,"]+/gi, '$1[redacted]')
+    .replace(/(["']?api[_-]?key["']?\s*[:=]\s*["']?)[A-Za-z0-9._\-]{8,}/gi, '$1[redacted]');
+}
+
 export class MistralApiError extends Error {
-  constructor(public readonly status: number, public readonly body: string) {
-    super(`Mistral API ${status}: ${body.slice(0, 200)}`);
+  /** Scrubbed + bounded body — no raw Bearer / authorization / api_key values. */
+  public readonly body: string;
+  constructor(public readonly status: number, body: string) {
+    const scrubbed = scrubMistralSecrets(body).slice(0, 200);
+    super(`Mistral API ${status}: ${scrubbed}`);
+    this.body = scrubbed;
     this.name = 'MistralApiError';
   }
 }

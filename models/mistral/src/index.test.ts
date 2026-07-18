@@ -130,3 +130,28 @@ describe('MistralChatModel', () => {
     await expect((async () => { for await (const _ of m.chatStream(req({ maxTokens: 1 }))) void _; })()).rejects.toBeInstanceOf(MistralApiError);
   });
 });
+
+describe('MistralApiError — secret scrubbing (a model error must never surface a credential)', () => {
+  it('scrubs a Bearer token + authorization value from the message AND stored .body', () => {
+    const e = new MistralApiError(
+      401,
+      'auth failed for Bearer mst-super-secret-key-abc123def456 with authorization: raw-token-xyz789',
+    );
+    expect(e.message).toContain('Bearer [redacted]');
+    expect(e.message).not.toContain('mst-super-secret-key-abc123def456');
+    expect(e.body).not.toContain('mst-super-secret-key-abc123def456');
+    expect(e.body).not.toContain('raw-token-xyz789');
+  });
+
+  it('scrubs an api_key JSON field', () => {
+    const e = new MistralApiError(400, '{"error":"bad request","api_key":"KEY0123456789abcdef"}');
+    expect(e.message).not.toContain('KEY0123456789abcdef');
+    expect(e.body).not.toContain('KEY0123456789abcdef');
+    expect(e.body).toContain('[redacted]');
+  });
+
+  it('bounds the stored body to 200 chars', () => {
+    const e = new MistralApiError(500, 'x'.repeat(500));
+    expect(e.body.length).toBeLessThanOrEqual(200);
+  });
+});

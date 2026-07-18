@@ -6,6 +6,17 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Security — `MistralApiError` now scrubs secrets from its message + body (2026-07-18)
+`MistralApiError` stored and echoed the RAW Mistral error-response body (`.body` unredacted, message =
+`body.slice(0,200)`), so a Mistral error that echoed the request's `Bearer` token / `authorization` header /
+`api_key` could surface a live credential — the one adapter still missing the scrub the openai + matrix
+adapters already had. Added `scrubMistralSecrets` (Bearer / authorization / `api_key` JSON field → `[redacted]`)
+and applied it to BOTH the message and the stored `.body`, mirroring `OpenAiApiError` exactly. A model-adapter
+error must never surface a credential. 3 regression tests (Bearer + authorization scrubbed from message and
+`.body`; `api_key` JSON scrubbed; body bounded to 200 chars); mutation probe non-vacuous (reverting to the raw
+body reddens both scrub tests). Closes the "MistralApiError does not scrub secrets" security follow-up (found
+by the 1.2b-i review). Suite 1291 → 1294 (+3).
+
 ### Added — Matrix surface is a supervised, deployable `/sync` loop (5.2 COMPLETE → Phase 5 done, 2026-07-18)
 The Matrix surface already had an injected-fetch transport + a `/sync` long-poll, but the loop **threw on any
 non-2xx** — a single 503/429 killed the bot — and it yielded the bot's OWN messages (a reply-loop). Made it
