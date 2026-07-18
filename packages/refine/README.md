@@ -32,6 +32,7 @@ deterministic pre-check tier) and any ChatModel.
 ```ts
 import { knowledgeBoundaryGate, bestOfN, repairDraft } from '@tenet/refine';
 import { verifyDraft, defaultPreChecks } from '@tenet/verifier';
+import { responseText, textMessage } from '@tenet/core';
 
 const hits = index.query({ text: question, k: 5 });
 const gate = knowledgeBoundaryGate(hits, { minTopScore: 1.0 });
@@ -40,21 +41,29 @@ if (!gate.proceed) return "I don't have sources covering that.";
 const verify = (draft: string) =>
   verifyDraft(model, { sources, draft }, { claimPreChecks: defaultPreChecks() });
 
-// 3 parallel samples, winner by supported-claim ratio
+// 3 parallel samples, winner by supported-claim ratio. A DraftFn returns the
+// draft STRING, so pull it off the ChatResponse with responseText. ChatModel
+// takes a messages array and a required AbortSignal (@tenet/core contract).
 const { best } = await bestOfN(
-  [0, 1, 2].map(() => () => model.chat({ system, user, maxTokens: 512 })),
+  [0, 1, 2].map(() => (signal?: AbortSignal) =>
+    model
+      .chat({ system, messages: [textMessage('user', question)], maxTokens: 512, signal: signal ?? new AbortController().signal })
+      .then(responseText)),
   verify,
 );
 
 // If even the winner fails, repair instead of abstaining wholesale
 const final = best.result.pass
   ? best
-  : await repairDraft(best.draft, verify, ({ draft, critique }) =>
-      model.chat({
-        system: 'Rewrite the draft. Remove or correct ONLY the claims listed in the critique. Use ONLY the sources.',
-        user: `SOURCES:\n${sources}\n\nDRAFT:\n${draft}\n\nCRITIQUE:\n${critique}`,
-        maxTokens: 512,
-      }));
+  : await repairDraft(best.draft, verify, ({ draft, critique, signal }) =>
+      model
+        .chat({
+          system: 'Rewrite the draft. Remove or correct ONLY the claims listed in the critique. Use ONLY the sources.',
+          messages: [textMessage('user', `SOURCES:\n${sources}\n\nDRAFT:\n${draft}\n\nCRITIQUE:\n${critique}`)],
+          maxTokens: 512,
+          signal: signal ?? new AbortController().signal,
+        })
+        .then(responseText));
 ```
 
 ## One call: the grounded-or-abstain orchestrator
@@ -72,15 +81,21 @@ sources don't positively support, which abstains rather than shipping.
 ```ts
 import { groundedOrAbstain } from '@tenet/refine';
 import { verifyDraft, defaultPreChecks } from '@tenet/verifier';
+import { responseText, textMessage } from '@tenet/core';
 
 const decision = await groundedOrAbstain(
   {
     hits: index.query({ text: question, k: 5 }),
-    draft: (signal) => model.chat({ system, user, maxTokens: 512, signal }),
-    verify: (draft, signal) =>
-      verifyDraft(model, { sources, draft }, { claimPreChecks: defaultPreChecks(), signal }),
+    draft: (signal) =>
+      model
+        .chat({ system, messages: [textMessage('user', question)], maxTokens: 512, signal: signal ?? new AbortController().signal })
+        .then(responseText),
+    verify: (draft) =>
+      verifyDraft(model, { sources, draft }, { claimPreChecks: defaultPreChecks() }),
     rewrite: ({ draft, critique, signal }) =>
-      model.chat({ system: rewriteSystem, user: `SOURCES:\n${sources}\n\nDRAFT:\n${draft}\n\nCRITIQUE:\n${critique}`, signal }),
+      model
+        .chat({ system: rewriteSystem, messages: [textMessage('user', `SOURCES:\n${sources}\n\nDRAFT:\n${draft}\n\nCRITIQUE:\n${critique}`)], maxTokens: 512, signal: signal ?? new AbortController().signal })
+        .then(responseText),
   },
   { boundary: { minTopScore: 1.0 }, maxRepairRounds: 2 },
 );
