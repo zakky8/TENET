@@ -14,7 +14,22 @@
  * injectable so the schedule is deterministic under test.
  */
 
-import { isRetryable } from './retryClass.js';
+import { isRetryable, isAuthFailure } from './retryClass.js';
+import { CircuitOpenError } from './circuitBreaker.js';
+
+/**
+ * Minimal breaker surface retryWithBackoff consumes — structurally
+ * satisfied by CircuitBreaker. Kept structural so it stays testable with a
+ * fake and never forces a concrete instance on callers who don't want one.
+ */
+export interface CircuitBreakerLike {
+  /** False when the breaker is OPEN — the call must be short-circuited. */
+  allow(): boolean;
+  /** A successful call resets the failure streak / closes a half-open breaker. */
+  recordSuccess(): void;
+  /** An auth failure (401/403) counts toward opening the breaker. */
+  recordAuthFailure(): void;
+}
 
 export interface RetryBackoffOptions {
   /** Total attempts (not extra retries). Default 3. Must be > 0. */
@@ -41,6 +56,12 @@ export interface RetryBackoffOptions {
   random?: () => number;
   /** Observability hook, called once per scheduled retry (before the wait). */
   onRetry?: (info: { attempt: number; delayMs: number; error: unknown }) => void;
+  /**
+   * Optional circuit breaker. When OPEN, a call is short-circuited with a
+   * `CircuitOpenError` BEFORE `fn` runs (never hammering a failing upstream);
+   * a success resets it, and an auth failure (401/403) counts toward opening.
+   */
+  breaker?: CircuitBreakerLike;
 }
 
 function abortError(message: string): Error {
@@ -85,12 +106,23 @@ export async function retryWithBackoff<T>(
   const sleep = opts.sleep ?? defaultSleep;
   const random = opts.random ?? Math.random;
 
+  const breaker = opts.breaker;
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Short-circuit an OPEN breaker BEFORE calling fn — do not hammer a
+    // failing upstream (a blind loop on 401/403 risks an egress-IP ban).
+    // CircuitOpenError is classified fatal, so it is never itself retried.
+    if (breaker !== undefined && !breaker.allow()) {
+      throw new CircuitOpenError();
+    }
     try {
-      return await fn(opts.signal);
+      const result = await fn(opts.signal);
+      breaker?.recordSuccess();
+      return result;
     } catch (e) {
       lastErr = e;
+      // Only an auth failure (401/403) counts toward opening the breaker.
+      if (isAuthFailure(e)) breaker?.recordAuthFailure();
       // Fail CLOSED: a fatal error is re-thrown immediately — no retry, no
       // backoff. Exhausting the attempts also surfaces the ORIGINAL error
       // (more useful than a wrapper), never a shipped fallback.

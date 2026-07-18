@@ -90,3 +90,14 @@ export function classifyError(err: unknown): RetryClassification {
 export function isRetryable(err: unknown): boolean {
   return classifyError(err).retryClass === 'retryable';
 }
+
+/**
+ * True for an AUTH failure (HTTP 401 / 403) — the class the CircuitBreaker
+ * tracks toward opening (a blind retry loop on auth failures risks an
+ * egress-IP ban). 429 is a rate-limit signal, NOT an auth failure, and is
+ * deliberately excluded.
+ */
+export function isAuthFailure(err: unknown): boolean {
+  const status = readNumber(err, 'status');
+  return status === 401 || status === 403;
+}

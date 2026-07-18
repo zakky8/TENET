@@ -6,6 +6,19 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — wire the CircuitBreaker into `retryWithBackoff` (5.1 partial, 2026-07-18)
+`retryWithBackoff` gains an optional `breaker?: CircuitBreakerLike`. When the breaker is OPEN the call is
+short-circuited with a `CircuitOpenError` **before `fn` runs** — the retry layer never hammers a failing
+upstream (a blind loop on 401/403 is the documented Cloudflare egress-IP-ban risk the breaker exists to
+prevent). A success resets the breaker; an AUTH failure (401/403 — via the new `isAuthFailure` predicate)
+counts toward opening it, while a 429 (rate-limit, not auth) and every other error deliberately do NOT. The
+breaker surface is a structural `CircuitBreakerLike { allow / recordSuccess / recordAuthFailure }` (the real
+`CircuitBreaker` satisfies it — testable with a fake, no forced instance). `CircuitOpenError` classifies as
+fatal, so it is never itself retried. 7 tests incl. an integration test with the REAL `CircuitBreaker`
+(consecutive 401s open it → the next call short-circuits, `fn` never called); 2 mutation probes non-vacuous
+(removing the short-circuit or the auth-failure recording each redden 2 tests, incl. the real-breaker case).
+Suite 1254 → 1260 (+6). STILL OPEN in 5.1: the cross-provider failover chain (keyed on `retryClass`).
+
 ### Fixed — refresh the stale Phase-3 status in ARCHITECTURE §0 (docs-sync, 2026-07-18)
 `docs/ARCHITECTURE.md` §0 "Implementation status" claimed Phase-3 "truncation/maxClaims hardening remain" —
 a stale status that shipped fires ago (a stale repo fact is a hallucination in the repo's own voice).

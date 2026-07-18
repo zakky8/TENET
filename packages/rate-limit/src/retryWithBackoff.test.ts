@@ -1,4 +1,5 @@
-import { retryWithBackoff } from './retryWithBackoff.js';
+import { retryWithBackoff, type CircuitBreakerLike } from './retryWithBackoff.js';
+import { CircuitBreaker, CircuitOpenError } from './circuitBreaker.js';
 
 function httpError(status: number): Error & { status: number } {
   return Object.assign(new Error(`HTTP ${status}`), { status });
@@ -136,5 +137,76 @@ describe('retryWithBackoff — options + overrides', () => {
       }),
     ).rejects.toThrow(/aborted/);
     expect(calls).toBe(1); // threw retryable once, then the aborted backoff wait rejected
+  });
+});
+
+describe('retryWithBackoff — circuit breaker', () => {
+  function fakeBreaker(allow: boolean): {
+    breaker: CircuitBreakerLike;
+    calls: { allow: number; success: number; authFailure: number };
+  } {
+    const calls = { allow: 0, success: 0, authFailure: 0 };
+    return {
+      calls,
+      breaker: {
+        allow() { calls.allow++; return allow; },
+        recordSuccess() { calls.success++; },
+        recordAuthFailure() { calls.authFailure++; },
+      },
+    };
+  }
+
+  it('short-circuits an OPEN breaker with CircuitOpenError — never calls fn', async () => {
+    const { breaker, calls } = fakeBreaker(false); // open
+    let fnCalls = 0;
+    await expect(
+      retryWithBackoff(async () => { fnCalls++; return 'x'; }, { breaker }),
+    ).rejects.toBeInstanceOf(CircuitOpenError);
+    expect(fnCalls).toBe(0); // upstream never hit
+    expect(calls.success).toBe(0);
+  });
+
+  it('records success on the breaker when fn succeeds', async () => {
+    const { breaker, calls } = fakeBreaker(true);
+    expect(await retryWithBackoff(async () => 'ok', { breaker })).toBe('ok');
+    expect(calls.success).toBe(1);
+    expect(calls.authFailure).toBe(0);
+  });
+
+  it('records an auth failure (401) and does NOT retry it (fatal)', async () => {
+    const { sleep, delays } = recordingSleep();
+    const { breaker, calls } = fakeBreaker(true);
+    let fnCalls = 0;
+    await expect(
+      retryWithBackoff(async () => { fnCalls++; throw httpError(401); }, { breaker, sleep, maxAttempts: 5 }),
+    ).rejects.toThrow(/HTTP 401/);
+    expect(fnCalls).toBe(1);
+    expect(calls.authFailure).toBe(1);
+    expect(delays).toEqual([]);
+  });
+
+  it('does NOT count a 503 as an auth failure — it retries instead', async () => {
+    const { sleep } = recordingSleep();
+    const { breaker, calls } = fakeBreaker(true);
+    let fnCalls = 0;
+    await retryWithBackoff(async () => { fnCalls++; if (fnCalls === 1) throw httpError(503); return 'ok'; }, {
+      breaker, sleep, random: noJitterRandom,
+    });
+    expect(calls.authFailure).toBe(0);
+    expect(calls.success).toBe(1);
+    expect(fnCalls).toBe(2);
+  });
+
+  it('integrates with the REAL CircuitBreaker: consecutive 401s open it, then calls short-circuit', async () => {
+    const breaker = new CircuitBreaker({ failureThreshold: 2, cooldownMs: 60_000, now: () => 0 });
+    const one = (): Promise<string> =>
+      retryWithBackoff(async () => { throw httpError(401); }, { breaker, maxAttempts: 1 });
+    await expect(one()).rejects.toThrow(/HTTP 401/); // failure 1
+    await expect(one()).rejects.toThrow(/HTTP 401/); // failure 2 → opens
+    let fnCalls = 0;
+    await expect(
+      retryWithBackoff(async () => { fnCalls++; throw httpError(401); }, { breaker, maxAttempts: 1 }),
+    ).rejects.toBeInstanceOf(CircuitOpenError); // open → short-circuit
+    expect(fnCalls).toBe(0);
   });
 });

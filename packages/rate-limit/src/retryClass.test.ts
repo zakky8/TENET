@@ -1,4 +1,4 @@
-import { classifyError, isRetryable, type RetryClass } from './retryClass.js';
+import { classifyError, isRetryable, isAuthFailure, type RetryClass } from './retryClass.js';
 
 /** Build an error-like object with an arbitrary status. */
 function httpError(status: number): Error & { status: number } {
@@ -74,5 +74,19 @@ describe('classifyError — fail CLOSED on the unknown', () => {
     // A cancelled request that also carries a 503 must NOT be retried.
     const e = Object.assign(abortError(), { status: 503 });
     expect(cls(e)).toBe('fatal');
+  });
+});
+
+describe('isAuthFailure — what the CircuitBreaker counts', () => {
+  it('is true for 401/403 ONLY (429 is rate-limit, not auth)', () => {
+    expect(isAuthFailure(httpError(401))).toBe(true);
+    expect(isAuthFailure(httpError(403))).toBe(true);
+    expect(isAuthFailure(httpError(429))).toBe(false);
+    expect(isAuthFailure(httpError(500))).toBe(false);
+    expect(isAuthFailure(httpError(400))).toBe(false);
+    expect(isAuthFailure(httpError(404))).toBe(false);
+    expect(isAuthFailure(abortError())).toBe(false);
+    expect(isAuthFailure(new Error('boom'))).toBe(false);
+    expect(isAuthFailure(null)).toBe(false);
   });
 });
