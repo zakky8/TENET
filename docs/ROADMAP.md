@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status**: pre-1.0, v0.0.0 (branch `upgrade/top-1pct`). Phase 0–1 landed; the canonical `ChatModel` contract is complete and the `@tenet/agent` orchestrator is shipped (`runAgent` drives the fail-closed turn end-to-end). The doc tracks what's done, what's next, and what's deferred. Dates are targets, not promises.
+**Status**: pre-1.0, v0.0.0 (branch `upgrade/top-1pct`). The product-roadmap phases below (0–5) are **code-complete in the monorepo** — scaffold, MVP spine, all surface + connector adapters, the BENCHMARKS gate, and streaming/provider breadth (surfaces take an injected transport; production wiring is per-operator). On top of that, the canonical `ChatModel` contract and the `@tenet/agent` orchestrator (`runAgent` drives the fail-closed turn end-to-end) are shipped. The current-state banner just below is the single canonical live status. Dates are targets, not promises.
 
 Source of detail for each row: [ARCHITECTURE.md](ARCHITECTURE.md) (component map) and [BENCHMARKS.md](BENCHMARKS.md) (measurable targets).
 
@@ -55,32 +55,36 @@ The smallest end-to-end vertical that proves the spine. From [ARCHITECTURE.md §
 4. OTel spans visible in a local Jaeger. → semconv keys defined in `@tenet/telemetry`; exporter wiring pending.
 5. CI runs eval suite as a gate. → `@tenet/eval-harness` + `regressionGate` ship the primitive; CI workflow integration pending.
 
-## Phase 2 — Surfaces + adapters expansion
+## Phase 2 — Surfaces + adapters expansion (SHIPPED except where noted)
+
+> AS-BUILT status, verified against the monorepo 2026-07-18. ✓ = adapter/code present; surfaces take an
+> INJECTED transport (no hard SDK dependency), wired to the concrete client by the operator at composition.
+> The current-state banner at the top of this doc is the single canonical live status.
 
 | | Status |
 |---|---|
-| `surfaces/discord` (discord.js) | not started |
-| `surfaces/slack` (Bolt; Marketplace + internal modes) | not started |
-| `surfaces/web-widget` (SSE + JWT) | not started |
+| `surfaces/discord` (injected client, no discord.js hard dep) | ✓ |
+| `surfaces/slack` | ✓ |
+| `surfaces/web-widget` (SSE + JWT) | ✓ |
 | `models/anthropic` — canonical `ChatModel` + `chatStream` (SSE), StopReason mapping | ✓ |
-| `stores/vector/qdrant` (multi-tenant default) | not started |
-| `@tenet/memory` adapter for mem0 / Letta | not started |
+| `stores/vector/qdrant` | ✓ |
+| `@tenet/memory-adapters` — mem0 / Letta / Zep providers | ✓ |
 | Eval set growth to 1k+ cases via assertion mining | not started |
 
-## Phase 3 — Enterprise
+## Phase 3 — Enterprise (SHIPPED except where noted)
 
 | | Status |
 |---|---|
-| `surfaces/teams` (Bot Framework + Adaptive Cards) | not started |
-| `surfaces/rest` (OpenAPI 3.1) | not started |
-| `surfaces/grpc` | not started |
-| `surfaces/webhook` — ticketing receiver | not started |
-| `connectors/zendesk` / `intercom` / `freshdesk` / `servicenow` | not started |
-| `apps/enterprise-support` — full multi-surface reference | not started |
-| On-prem Helm chart | not started |
-| SOC2 audit prep | not started |
-| MCP tool gateway with OAuth | not started |
-| WASM-sandboxed tool execution | not started |
+| `surfaces/teams` (Bot Framework + Adaptive Cards) | ✓ |
+| `surfaces/rest` (OpenAPI 3.1) | ✓ |
+| `surfaces/grpc` | ✓ |
+| Ticketing webhook receiver (`connectors/ticketing`, HMAC-verified) | ✓ |
+| `connectors/ticketing` — zendesk / intercom / freshdesk / servicenow modules | ✓ |
+| `apps/enterprise-support` — full multi-surface reference | ✓ |
+| On-prem Helm chart (`infra/helm/tenet`) | ✓ |
+| SOC2 audit prep | not started (process; no code artifact) |
+| MCP tool gateway with OAuth (`@tenet/tools-mcp-gateway`) | ✓ |
+| WASM-sandboxed tool execution (`@tenet/tools-wasm-sandbox` + `-wasmtime`) | ✓ |
 
 ## Phase 4 — Beat the benchmarks (DONE)
 

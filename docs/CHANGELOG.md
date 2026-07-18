@@ -6,6 +6,16 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — reconcile the ROADMAP phase tables to the as-built monorepo (7.2, 2026-07-18)
+The ROADMAP's Phase 2/3 tables still said "not started" for surfaces, connectors, stores, the MCP
+gateway, WASM sandbox, enterprise-support app, and the Helm chart — all of which actually ship in the
+tree (verified this change: 9 surface adapters, `connectors/ticketing` with zendesk/intercom/freshdesk/
+servicenow modules, `stores/vector/qdrant`, `@tenet/memory-adapters` with mem0/Letta/Zep providers,
+`@tenet/tools-mcp-gateway`, `@tenet/tools-wasm-sandbox(-wasmtime)`, `apps/enterprise-support`,
+`infra/helm/tenet`). A "not started" claim for shipped code is a stale-status hallucination in the repo's
+own voice. Flipped the stale cells to ✓ with an as-built note (surfaces take an injected transport; the
+current-state banner is canonical); kept the genuinely-open items honest (eval-set 1k growth, SOC2 prep).
+
 ### Changed — remove unsourced competitor security claims (measured, not marketed; 7.2, 2026-07-18)
 An anti-hallucination framework must not ship unsourced attacks on named competitors — that is the
 exact self-contradiction it exists to prevent. Generalized every named-competitor CVE/vulnerability
