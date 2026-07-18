@@ -22,13 +22,14 @@
  *     object passed to an imported/constructed value (e.g. `new AnthropicChatModel(
  *     wrongArgs)`), since the type flows from the import.
  *
- * KNOWN GAP (documented follow-up in .upgrade/PLAN.md): a method call on an
- * UNDECLARED illustrative context var — e.g. refine's `model.chat({ … })` where
- * `model` is undeclared — is typed `any`, so its argument shape is NOT checked.
- * Catching that class needs a per-README declare-sidecar (`declare const model:
- * ChatModel; …`) that types the context; this gate deliberately does not guess
- * those types (a wrong guess would false-FAIL a valid example). Until then, that
- * class is caught only by the manual audit / `readme:check`'s self-contained target.
+ * DEEP-CHECK via declare-sidecar: a method call on an UNDECLARED context var —
+ * e.g. refine's `model.chat({ … })` where `model` would otherwise be `any` — is
+ * checked ONLY when the doc has a co-located `<doc>.examples.d.ts` sidecar that
+ * types the context (`declare const model: ChatModel; …`). The gate prepends it to
+ * each fence. Docs WITHOUT a sidecar get the shallow check above (import/export +
+ * typed-value drift). Sidecars are opt-in per doc so the gate never GUESSES a
+ * context type (a wrong guess would false-FAIL a valid example); add one when a
+ * doc's fences call the API on reader-supplied vars. `packages/refine/` ships one.
  *
  * Requires the workspace BUILT first (the imported packages' dist `.d.ts` must
  * exist) — run after `pnpm -r build`, like `readme:check`.
@@ -114,17 +115,23 @@ const tscBin = join(REPO, 'node_modules/typescript/bin/tsc');
 
 let checked = 0;
 let failed = 0;
+let deepChecked = 0;
 for (const doc of gatedDocs()) {
+  // Optional per-doc declare-sidecar: `<doc>.examples.d.ts` types the vars a README
+  // leaves undeclared, so `model.chat({ … })`-style calls get DEEP-checked (not `any`).
+  const sidecarPath = doc.replace(/\.md$/, '.examples.d.ts');
+  const sidecar = existsSync(sidecarPath) ? `${readFileSync(sidecarPath, 'utf8')}\n` : '';
   const fences = [...readFileSync(doc, 'utf8').matchAll(FENCE)].map((m) => m[1]);
   fences.forEach((body, i) => {
     checked++;
-    // Hoist imports to module top; wrap the rest in an async fn (fences use top-level
-    // `return`/`await` that are illegal at module scope). A wrap that mis-parses only
-    // yields TS1xxx, which the DRIFT filter ignores — so it can never false-FAIL.
+    if (sidecar) deepChecked++;
+    // Sidecar (if any) + hoisted imports go to module top; wrap the rest in an async fn
+    // (fences use top-level `return`/`await` that are illegal at module scope). A wrap
+    // that mis-parses only yields TS1xxx, which the DRIFT filter ignores — never false-FAILs.
     const lines = body.split('\n');
     const imports = lines.filter((l) => /^\s*import\s/.test(l)).join('\n');
     const rest = lines.filter((l) => !/^\s*import\s/.test(l)).join('\n');
-    writeFileSync(join(tmp, 'CHECK.ts'), `${imports}\nasync function __fence${i}() {\n${rest}\n}\n`);
+    writeFileSync(join(tmp, 'CHECK.ts'), `${sidecar}${imports}\nasync function __fence${i}() {\n${rest}\n}\n`);
     let out = '';
     try {
       execFileSync(process.execPath, [tscBin, '-p', tsconfig], {
@@ -155,4 +162,7 @@ if (failed > 0) {
   console.error('Fix the example to match the current API (or fix the export it names).');
   process.exit(1);
 }
-console.log(`✓ all ${checked} doc ts fence(s) match the real API (no drift-class type errors)`);
+console.log(
+  `✓ all ${checked} doc ts fence(s) match the real API (no drift-class type errors)` +
+    (deepChecked > 0 ? ` — ${deepChecked} deep-checked via a declare-sidecar` : ''),
+);
