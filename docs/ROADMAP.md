@@ -119,7 +119,7 @@ Fresh A-to-Z audit (3 parallel reviewers) + live June-2026 market research ident
 - `@tenet/ag-ui` — AG-UI event protocol + `streamChunksToAgUi` bridge from all 6 streaming model adapters.
 - `@tenet/harness` — context compaction + todo ledger + bounded-concurrency subagents + handoff.
 - `apps/quickstart` — `pnpm quickstart` zero-key REPL through the full retrieve→draft→verify pipeline.
-- Truth restoration: Bedrock streaming actually shipped (task #83 had claimed it falsely), `stores/state/postgres` filled (was an empty dir), empty `surfaces/webhook` removed, README counts reconciled (see the current-state banner above for the live 1325 tests / 98 suites / 63 packages).
+- Truth restoration: Bedrock streaming actually shipped (task #83 had claimed it falsely), `stores/state/postgres` filled (was an empty dir), empty `surfaces/webhook` removed, README counts reconciled (see the current-state banner above for the live 1325 tests / 98 suites / 63 workspace packages).
 
 ---
 
