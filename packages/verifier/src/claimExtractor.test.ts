@@ -10,6 +10,13 @@ function mockModel(reply: string): ChatModel {
   return { chat: async () => textResponse(reply) };
 }
 
+/** A model whose extraction response was CUT OFF at the token cap (stopReason max_tokens)
+ *  — the claim list is partial. Resolves normally (no throw), so only a stopReason check
+ *  can tell it apart from a complete list. */
+function truncatedModel(reply: string): ChatModel {
+  return { chat: async () => ({ content: [{ type: 'text', text: reply }], stopReason: 'max_tokens' }) };
+}
+
 describe('extractClaims — basic behavior', () => {
   it('parses one claim per line', async () => {
     const out = await extractClaims(
@@ -61,6 +68,24 @@ describe('extractClaims — basic behavior', () => {
   it('default (fail-open): over-cap silently slices to maxClaims — unchanged behavior', async () => {
     const out = await extractClaims(mockModel(manyClaims), 'd', { ...DEFAULT_VERIFIER_CONFIG, maxClaims: 8 });
     expect(out).toHaveLength(8); // extras dropped, no throw
+  });
+
+  it('failClosed: a TRUNCATED (max_tokens) extraction → throws (a cut-off list is not complete)', async () => {
+    // The extractor hit the token cap mid-enumeration: the draft's later claims were never
+    // emitted, so verifying only this partial list would ship them unchecked. The over-cap
+    // guard cannot catch this (truncation yields FEWER lines) — only the stopReason does.
+    await expect(
+      extractClaims(
+        truncatedModel('claim one is a real assertion\nclaim two is a real assertion'),
+        'a claim-dense draft',
+        { ...DEFAULT_VERIFIER_CONFIG, failClosed: true },
+      ),
+    ).rejects.toBeInstanceOf(ClaimExtractionError);
+  });
+
+  it('default (fail-open): a truncated extraction returns the partial list — unchanged behavior', async () => {
+    const out = await extractClaims(truncatedModel('claim one is a real assertion'), 'd', DEFAULT_VERIFIER_CONFIG);
+    expect(out).toEqual(['claim one is a real assertion']); // default stays fail-open, no throw
   });
 
   it('filters claims by length window (>=8, <=240)', async () => {

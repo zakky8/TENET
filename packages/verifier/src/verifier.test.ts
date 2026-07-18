@@ -90,6 +90,29 @@ describe('verifyDraft — failClosed (3.1)', () => {
     expect(out.pass).toBe(false);
     expect(out.critique).toContain('exceeds maxClaims'); // the exact overflow signal (non-vacuous)
   });
+
+  it('failClosed: a TRUNCATED (max_tokens) extraction → pass:false end-to-end (never ships the cut-off claims)', async () => {
+    // The extractor response is CUT OFF (max_tokens) → its claim list is partial. Crucially
+    // the judge WOULD clear the extracted claims, so WITHOUT the truncation guard the draft
+    // ships (pass:true) with the un-emitted claims unchecked — this scripting makes the test
+    // bite only on the guard, not on a judge that happens to fail closed on garbage.
+    const replies: Array<{ text: string; stop: 'max_tokens' | 'end_turn' }> = [
+      { text: 'claim one is a real assertion\nclaim two is a real assertion', stop: 'max_tokens' }, // extract, truncated
+      { text: '[1] SUPPORTED\n[2] SUPPORTED', stop: 'end_turn' }, // strict judge would clear them
+    ];
+    let i = 0;
+    const model: ChatModel = {
+      chat: async () => {
+        const r = replies[Math.min(i, replies.length - 1)]!;
+        i++;
+        return { content: [{ type: 'text', text: r.text }], stopReason: r.stop };
+      },
+    };
+    const out = await verifyDraft(model, { sources: 's', draft: 'a claim-dense draft' }, { failClosed: true });
+    expect(out.pass).toBe(false);
+    expect(out.approvedCitations).toEqual([]);
+    expect(out.critique).toContain('truncated'); // the exact truncation signal (non-vacuous)
+  });
 });
 
 describe('verifyDraft — URL pre-pass', () => {

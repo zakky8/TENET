@@ -6,12 +6,12 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node 22+](https://img.shields.io/badge/node-22+-43853d.svg)](.nvmrc)
 [![TypeScript Strict](https://img.shields.io/badge/typescript-strict-3178c6.svg)](tsconfig.base.json)
-[![Tests](https://img.shields.io/badge/tests-1325%20passing-success)](packages)
+[![Tests](https://img.shields.io/badge/tests-1328%20passing-success)](packages)
 [![BENCHMARKS gated](https://img.shields.io/badge/BENCHMARKS-gated_in_CI-success)](docs/BENCHMARKS.md)
 [![ES2024](https://img.shields.io/badge/target-ES2024-yellow.svg)](tsconfig.base.json)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-purple.svg)](CODE_OF_CONDUCT.md)
 
-> **Status:** **1325 tests across 98 suites, all green** (63 workspace packages). Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming, all on ONE canonical `ChatModel` contract (messages-array + required `AbortSignal` + tool round-trips; `@tenet/core/model.ts`). 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). The end-to-end orchestrator (`@tenet/agent`) is **shipped**: `runAgent` drives the fail-closed turn as a `@tenet/workflow` graph — injection gate → retrieve + knowledge-boundary → cache re-verify → decides-and-drafts Reasoner → governance-gated tools → fail-closed verify → single emit edge, with abstain/handoff carried as values and a top-level catch that fails closed on any error. Pre-1.0; APIs may change.
+> **Status:** **1328 tests across 98 suites, all green** (63 workspace packages). Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming, all on ONE canonical `ChatModel` contract (messages-array + required `AbortSignal` + tool round-trips; `@tenet/core/model.ts`). 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). The end-to-end orchestrator (`@tenet/agent`) is **shipped**: `runAgent` drives the fail-closed turn as a `@tenet/workflow` graph — injection gate → retrieve + knowledge-boundary → cache re-verify → decides-and-drafts Reasoner → governance-gated tools → fail-closed verify → single emit edge, with abstain/handoff carried as values and a top-level catch that fails closed on any error. Pre-1.0; APIs may change.
 
 ---
 
@@ -165,7 +165,7 @@ TENET's stance on the things that matter for a support/answering agent — asser
 - **Hallucination judge**: Vectara HHEM-2.1 (adapter + ONNX wrapper)
 - **WASM runtimes**: Node-22 reference + wasmtime adapter
 
-## What ships today (63 workspace packages, 1325 tests)
+## What ships today (63 workspace packages, 1328 tests)
 
 | Area | Packages |
 |---|---|
@@ -228,7 +228,7 @@ identical composition runs against a real model. Then:
 
 ```bash
 pnpm typecheck              # builds all packages in topological order
-pnpm test                   # 1325 tests across 98 suites
+pnpm test                   # 1328 tests across 98 suites
 pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL)
 ```
 
@@ -263,7 +263,7 @@ pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL)
 Honest list.
 
 1. **Real-model validation of the agent turn** — `runAgent` ships and is green end-to-end (`packages/agent/src/orchestrator.ts`), proving the fail-closed control flow deterministically against fake models. The decides-and-drafts *prompt* (`buildSystem`) and the answer-repair-retry loop are validated only against fakes; a real-model probe is deferred until an API key is available in the build environment. The control-flow guarantee does not depend on it.
-2. **Verifier hardening (Phase 3)** — the verifier's own fail-closed MODE ships as an opt-in `failClosed` flag (extractor error / judge error / judge-garbage → not-supported, never a spurious pass); still ahead: the non-numeric claim tier (named-entity coverage + negation/scope guard) and spelled-out-number / truncation hardening.
+2. **Verifier hardening (Phase 3)** — the verifier's own fail-closed MODE ships as an opt-in `failClosed` flag (extractor error / judge error / judge-garbage / a truncated (`max_tokens`) or over-cap extraction → not-supported, never a spurious pass); spelled-out-number and truncation hardening now ship too; still ahead: the non-numeric claim tier (named-entity coverage + negation/scope guard).
 3. **Real HHEM-2.1 model bytes** — `@tenet/judge-hhem-onnx` wraps any HF / ONNX pipeline; the operator brings the model weights (license / install choice is theirs).
 4. **Real-fetch integration job in CI** — secret-gated workflow that runs `apps/measure-real/examples/anthropic-sonnet.ts` when `ANTHROPIC_API_KEY` is set. Never blocks PRs from forks.
 5. **Self-distillation loop** — BENCHMARKS Dim 2 ("cost < $0.01") depends on weekly LoRA fine-tunes of a cheap-path model on verified flagship traces. Trace capture ships; the fine-tune pipeline does not.
