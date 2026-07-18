@@ -26,7 +26,7 @@ TENET is a TypeScript agent framework focused on:
 - MCP OAuth gateway (RFC 9207, 2026-07-28 spec RC)
 - 10 surfaces in one config
 - BENCHMARKS measured + gated in CI on every PR (11/11 dimensions PASS against the hermetic stub SUT; real-model numbers are operator-run — see docs/BENCHMARKS.md)
-- 1205 tests across 92 suites, all green
+- 1213 tests across 92 suites, all green
 - Apache-2.0
 ```
 

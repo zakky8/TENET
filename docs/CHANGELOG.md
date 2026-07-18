@@ -6,6 +6,18 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — deterministic check for spelled-out fabricated amounts (3.3, 2026-07-18)
+The numeric fabrication pre-check now catches numbers spelled out in words, not just digits: a claim asserting
+a currency- or percent-marked spelled amount absent from the sources ("the fee is **five hundred dollars**"
+when the price is "$299", "**twenty percent** uptime" when it is "99.9%") FAILS deterministically, closing the
+paraphrase-to-words evasion of the digit check. The parser (`parseSpelledNumbers`) feeds the SAME
+`extractNumericTokens` used for both claim and sources, so grounding stays symmetric — "five hundred dollars"
+matches a source's "$500" and vice-versa, never a false-fail. Conservative by construction: a run needs a
+spelled leaf word (a lone "hundred"/"million" is not a number), "and" is absorbed only between number words
+("one hundred and fifty thousand"), and — like the digit path — only currency/percent-**marked** spelled
+numbers fail by default; a bare spelled count ("five reasons") defers to the judge. Mutation-probed the "and"
+absorption and marker detection are load-bearing. Suite 1205 → 1213 (+8); all prior verifier tests unchanged.
+
 ### Added — deterministic URL-fabrication check (3.2 partial, 2026-07-18)
 `urlFabricationCheck()` joins the verifier's deterministic tier (`defaultPreChecks`): a claim that cites an
 `http(s)://` URL appearing NOWHERE in the sources FAILS deterministically — an invented link is a classic,

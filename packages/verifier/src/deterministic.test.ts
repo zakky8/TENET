@@ -41,6 +41,20 @@ describe('extractNumericValues', () => {
   it('returns empty for no numbers', () => {
     expect(extractNumericValues('no digits here')).toEqual([]);
   });
+
+  it('parses fully-spelled cardinals (five hundred, twenty-five, and-joined)', () => {
+    expect(extractNumericValues('five hundred')).toEqual([500]);
+    expect(extractNumericValues('twenty-five')).toEqual([25]);
+    expect(extractNumericValues('one hundred and fifty thousand')).toEqual([150_000]);
+  });
+
+  it('needs a leaf digit-word: bare scales, plurals, and prose "and" are not numbers', () => {
+    // Matches the digit path (a lone magnitude is ignored) and avoids
+    // 0-valued degenerate tokens / merging unrelated values across "and".
+    expect(extractNumericValues('millions of users')).toEqual([]);
+    expect(extractNumericValues('a hundred reasons')).toEqual([]);
+    expect(extractNumericValues('cats and dogs')).toEqual([]);
+  });
 });
 
 describe('numericFabricationCheck', () => {
@@ -95,6 +109,42 @@ describe('numericFabricationCheck', () => {
 
   it('rejects negative tolerance', () => {
     expect(() => numericFabricationCheck({ relativeTolerance: -1 })).toThrow();
+  });
+
+  // Spelled-out amounts — a model that has learned the digit check exists
+  // can paraphrase a fabricated number into words to dodge it.
+  it('fails a MARKED spelled amount absent from sources (paraphrase evasion)', () => {
+    const c = numericFabricationCheck();
+    const r = c.check('The fee is five hundred dollars.', 'The fee is $299.');
+    expect(r.verdict).toBe('fail');
+    expect(r.reason).toContain('500');
+  });
+
+  it('fails a spelled percent absent from sources', () => {
+    const c = numericFabricationCheck();
+    expect(c.check('Uptime is twenty percent.', 'Uptime is 99.9%.').verdict).toBe('fail');
+  });
+
+  it('DEFERS a bare spelled count — no marker, no false-fail', () => {
+    const c = numericFabricationCheck();
+    // "five reasons" is discourse, not a currency/percent fact → judge, not fail.
+    expect(c.check('There are five reasons to switch.', 'no numbers in here').verdict).toBe('judge');
+  });
+
+  it('is symmetric — spelled vs digit either direction does NOT false-fail', () => {
+    const c = numericFabricationCheck();
+    // spelled claim, digit source
+    expect(c.check('It costs five hundred dollars.', 'The price is $500 total.').verdict).toBe('judge');
+    // digit claim, spelled source (reddens if spelled parsing weren't applied to sources too)
+    expect(c.check('The price is $500.', 'It costs five hundred dollars total.').verdict).toBe('judge');
+    expect(c.check('Uptime is twenty percent.', 'Uptime holds at 20% or better.').verdict).toBe('judge');
+  });
+
+  it('does NOT mark sub-unit words (cents) — the parser cannot scale, so it would false-fail', () => {
+    const c = numericFabricationCheck();
+    // "fifty cents" would read as 50 while "$0.50" reads as 0.5; treating
+    // cents as a marker would false-fail a grounded amount → cents defer.
+    expect(c.check('It is fifty cents.', 'each call costs $0.50').verdict).toBe('judge');
   });
 });
 
@@ -163,6 +213,11 @@ describe('runPreChecks composition', () => {
   it('all-judge defers', () => {
     const r = runPreChecks(defaultPreChecks(), 'a vague statement', 'unrelated sources');
     expect(r.verdict).toBe('judge');
+  });
+
+  it('catches a spelled fabricated amount through the recommended tier', () => {
+    const r = runPreChecks(defaultPreChecks(), 'We refund five hundred dollars.', 'no amount stated here');
+    expect(r.verdict).toBe('fail');
   });
 });
 

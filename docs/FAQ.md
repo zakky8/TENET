@@ -38,7 +38,7 @@ Six model adapters ship — Anthropic-direct, OpenAI, Google Gemini, Mistral, Ol
 
 ## How does the verifier work?
 
-The verifier decomposes a draft into atomic claims and checks each. Cheap **deterministic pre-checks** run first (does a quoted number appear verbatim in the sources? a currency- or percent-marked value absent from the sources is fabrication evidence; a cited `http(s)://` URL that appears nowhere in the sources is a fabricated link and fails) — deterministic comparison does not misread `$1.2M` versus `$1.5M`, or wave through an invented URL, the way an LLM judge can. Remaining claims go to a strict-then-permissive multi-judge. An opt-in **fail-closed mode** makes the verifier's own infrastructure failures (extractor error, judge error or garbage, an over-cap claim extraction) resolve to *not-supported* instead of a spurious pass.
+The verifier decomposes a draft into atomic claims and checks each. Cheap **deterministic pre-checks** run first (does a quoted number appear verbatim in the sources? a currency- or percent-marked value absent from the sources — in digits or spelled out, so "five hundred dollars" cannot dodge the check for "$500" — is fabrication evidence; a cited `http(s)://` URL that appears nowhere in the sources is a fabricated link and fails) — deterministic comparison does not misread `$1.2M` versus `$1.5M`, or wave through an invented URL, the way an LLM judge can. Remaining claims go to a strict-then-permissive multi-judge. An opt-in **fail-closed mode** makes the verifier's own infrastructure failures (extractor error, judge error or garbage, an over-cap claim extraction) resolve to *not-supported* instead of a spurious pass.
 
 ## What is the "single emit edge"?
 
