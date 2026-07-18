@@ -50,6 +50,19 @@ describe('extractClaims — basic behavior', () => {
     expect(out).toEqual([]); // no throw — the distinction the fail-closed path depends on
   });
 
+  const manyClaims = Array.from({ length: 10 }, (_, i) => `claim number ${i} is a real factual assertion`).join('\n');
+
+  it('failClosed: MORE claims than maxClaims → throws (dropped claims would never be verified)', async () => {
+    await expect(
+      extractClaims(mockModel(manyClaims), 'd', { ...DEFAULT_VERIFIER_CONFIG, maxClaims: 8, failClosed: true }),
+    ).rejects.toBeInstanceOf(ClaimExtractionError);
+  });
+
+  it('default (fail-open): over-cap silently slices to maxClaims — unchanged behavior', async () => {
+    const out = await extractClaims(mockModel(manyClaims), 'd', { ...DEFAULT_VERIFIER_CONFIG, maxClaims: 8 });
+    expect(out).toHaveLength(8); // extras dropped, no throw
+  });
+
   it('filters claims by length window (>=8, <=240)', async () => {
     // 'short' = 5 chars — dropped
     // long string > 240 — dropped

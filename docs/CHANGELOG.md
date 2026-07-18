@@ -25,6 +25,10 @@ guard emitted an unverified answer.
 - `judge.ts`: a judge error/timeout OR a total-garbage (no-parse) response marks claims
   `supported:false` when `failClosed` (was the fail-open "all supported"). The permissive
   re-judge runs the same broken model, so it stays unsupported → `pass:false`.
+- `claimExtractor.ts` (3.3 maxClaims-drop, 2026-07-18): when `failClosed` and the model
+  over-produces past `maxClaims`, the extractor throws instead of silently `.slice`-ing off
+  the extras → `verifyDraft` → `pass:false`. Previously the dropped claims were never
+  verified, so a fabrication past the cap could ship. Suite 1190 → 1193.
 - DELIBERATE: a genuinely claim-free draft (greeting; extractor returns `NONE`) still
   passes — it is vacuously grounded; emit policy (require a citation) is the orchestrator's
   job. `failClosed` hardens infra failures, not legitimate empties.

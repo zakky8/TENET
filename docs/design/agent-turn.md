@@ -628,7 +628,7 @@ Each adapter unit test asserts the mapping table above.
 
 The original invariant ("nothing else can produce a fact") was false because fail-**open** paths let verifier INFRA breakage ship a claim. `failClosed` closes them at the source. When `failClosed === true`:
 
-1. **`claimExtractor.ts`** — on an extractor error/timeout, throws `ClaimExtractionError` (not `[]`); `verifyDraft` catches it → `pass:false`. A slow/broken extractor can no longer masquerade as zero claims → auto-pass.
+1. **`claimExtractor.ts`** — on an extractor error/timeout, throws `ClaimExtractionError` (not `[]`); `verifyDraft` catches it → `pass:false`. A slow/broken extractor can no longer masquerade as zero claims → auto-pass. ALSO: when the model over-produces past `maxClaims`, the extractor throws (rather than `.slice`-ing off the extras) — a dropped claim is never verified, so a fabrication hiding in it would otherwise ship.
 2. **`judge.ts`** — a judge error/timeout OR a total-garbage (no-parse) response marks the affected claims `supported:false` (was the fail-OPEN "all supported"). A judge we could not run cannot clear a claim; the permissive re-judge runs the same broken model, so it stays `supported:false` → `pass:false`.
 
 > **DELIBERATE DEVIATION from the original proposal (point 2, "zero claims → pass:false"):** a GENUINELY

@@ -13,12 +13,13 @@ EXCLUDE: greetings, follow-up questions, clarifying questions, generic filler, o
 
 If the draft has NO factual claims (it's just a greeting / clarifying question / filler), output exactly the word: NONE`;
 
-/** Thrown by `extractClaims` on an extractor error ONLY when `config.failClosed` is set.
- *  Lets `verifyDraft` distinguish "extraction failed" (→ fail closed) from "the draft
- *  genuinely has no claims" (→ empty list, safe). */
+/** Thrown by `extractClaims` ONLY when `config.failClosed` is set — either the extractor
+ *  errored, or the draft has MORE claims than `maxClaims` (so some would be dropped
+ *  unverified). Lets `verifyDraft` distinguish "cannot fully verify" (→ fail closed) from
+ *  "the draft genuinely has no claims" (→ empty list, safe). */
 export class ClaimExtractionError extends Error {
-  constructor(cause?: unknown) {
-    super('claim extraction failed');
+  constructor(reason: string, cause?: unknown) {
+    super(reason);
     this.name = 'ClaimExtractionError';
     if (cause !== undefined) this.cause = cause;
   }
@@ -26,7 +27,8 @@ export class ClaimExtractionError extends Error {
 
 /** Extract up to config.maxClaims atomic claims from a draft. On an extractor error the
  *  default is fail-OPEN (returns []); when `config.failClosed` is set it throws
- *  `ClaimExtractionError` so the caller cannot mistake a failed extraction for zero claims. */
+ *  `ClaimExtractionError` — both on an extractor error AND when the model over-produces
+ *  past `maxClaims` (the dropped-and-unverified claims would otherwise ship). */
 export async function extractClaims(
   model: ChatModel,
   draft: string,
@@ -50,7 +52,7 @@ export async function extractClaims(
       ),
     );
   } catch (err) {
-    if (config.failClosed) throw new ClaimExtractionError(err); // FAIL CLOSED: not the same as zero claims
+    if (config.failClosed) throw new ClaimExtractionError('claim extraction failed', err); // FAIL CLOSED
     return []; // fail-open default (preserves existing callers)
   }
 
@@ -62,9 +64,18 @@ export async function extractClaims(
   // leading digits — claims like "2025 EU regulation" or "5000 units per
   // shipment" must survive verbatim.
   const LIST_MARKER_RE = /^\s*(?:\d+[.)]\s+|\(\d+\)\s+|[-*•]\s+)/;
-  return text
+  const claims = text
     .split('\n')
     .map((l) => l.replace(LIST_MARKER_RE, '').trim())
-    .filter((l) => l.length >= 8 && l.length <= 240)
-    .slice(0, config.maxClaims);
+    .filter((l) => l.length >= 8 && l.length <= 240);
+
+  // FAIL CLOSED: if the model over-produced past maxClaims, `.slice` would silently drop
+  // the extras — and a dropped claim is NEVER verified, so a fabrication hiding in it would
+  // ship. A draft too claim-dense to fully verify must not pass; signal it to verifyDraft.
+  if (config.failClosed && claims.length > config.maxClaims) {
+    throw new ClaimExtractionError(
+      `draft has ${claims.length} claims, exceeds maxClaims (${config.maxClaims}) — cannot fully verify`,
+    );
+  }
+  return claims.slice(0, config.maxClaims);
 }

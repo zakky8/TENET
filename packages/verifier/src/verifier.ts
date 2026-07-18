@@ -39,9 +39,11 @@ export async function verifyDraft(
   let allClaims: string[];
   try {
     allClaims = await extractClaims(model, input.draft, config);
-  } catch {
-    // Only thrown when config.failClosed: a failed extraction is NOT zero claims → fail closed.
-    return { pass: false, critique: 'claim extraction failed', verdicts: [], approvedCitations: [] };
+  } catch (err) {
+    // Only thrown when config.failClosed: an extractor error OR an over-cap (too many claims
+    // to fully verify) is NOT the same as zero claims → fail closed. Carry the reason.
+    const critique = err instanceof Error ? err.message : 'claim extraction failed';
+    return { pass: false, critique, verdicts: [], approvedCitations: [] };
   }
   if (allClaims.length === 0) {
     // A genuinely claim-free draft (greeting/filler) is vacuously grounded → pass. Emit

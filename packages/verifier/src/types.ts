@@ -80,6 +80,8 @@ export interface VerifierConfig {
    * verifier's own infra failures resolve toward NOT-supported instead of ship:
    *   - a claim-extractor error/timeout → `verifyDraft` returns `pass:false` (instead of
    *     silently yielding zero claims → auto-pass);
+   *   - a draft with MORE claims than `maxClaims` → `pass:false` (instead of silently
+   *     dropping — and never verifying — the claims past the cap);
    *   - a judge error/timeout or total-garbage response marks the affected claims
    *     `supported:false` (instead of the fail-OPEN "all supported so we don't block ship").
    * A GENUINELY claim-free draft (greeting/filler) still passes — there is nothing to

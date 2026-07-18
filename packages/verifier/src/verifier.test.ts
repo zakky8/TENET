@@ -82,6 +82,14 @@ describe('verifyDraft — failClosed (3.1)', () => {
     const out = await verifyDraft(model, { sources: 's', draft: 'Hello!' }, { failClosed: true });
     expect(out.pass).toBe(true); // deliberate: failClosed hardens infra failures, not legitimate empties
   });
+
+  it('failClosed: a draft with MORE claims than maxClaims → pass:false (too dense to fully verify)', async () => {
+    // 10 claims but maxClaims=8 → 2 would be dropped-and-unverified → must not pass.
+    const many = Array.from({ length: 10 }, (_, i) => `claim number ${i} is a real factual assertion`).join('\n');
+    const out = await verifyDraft(scriptedModel([many]), { sources: 's', draft: 'x' }, { maxClaims: 8, failClosed: true });
+    expect(out.pass).toBe(false);
+    expect(out.critique).toContain('exceeds maxClaims'); // the exact overflow signal (non-vacuous)
+  });
 });
 
 describe('verifyDraft — URL pre-pass', () => {
