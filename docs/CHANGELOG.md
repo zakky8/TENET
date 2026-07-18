@@ -6,6 +6,17 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — deterministic URL-fabrication check (3.2 partial, 2026-07-18)
+`urlFabricationCheck()` joins the verifier's deterministic tier (`defaultPreChecks`): a claim that cites an
+`http(s)://` URL appearing NOWHERE in the sources FAILS deterministically — an invented link is a classic,
+dangerous hallucination, and it's caught without spending a judge. Enforces TENET's source-grounded-URL thesis.
+Conservative by construction to avoid false-fails: only scheme-bearing URLs are checked (so `index.ts`,
+`Node.js`, `package.json` are never mistaken for URLs), trailing sentence punctuation is stripped, and grounding
+is a scheme/`www`-insensitive substring match (a parent/child path counts as grounded; lookalike-domain misses
+defer to the judge rather than false-fail). A URL being present never PASSES a claim. Mutation-probed that the
+scheme requirement is what prevents the non-URL false-fail. Suite 1198 → 1205 (+7); 127 prior verifier tests
+unchanged (backward compatible). STILL open in 3.2: named-entity coverage + the negation/scope guard.
+
 ### Added — coverage gate that protects the actual coverage level (6.2, 2026-07-18)
 `pnpm test:coverage` is now a CI step, and the `jest.config.cjs` `coverageThreshold` was raised from the loose
 60/70/70/70 floor to **75 branches / 90 functions / 90 lines / 88 statements** — just below the actual

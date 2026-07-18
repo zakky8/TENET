@@ -3,6 +3,7 @@ import {
   extractNumericValues,
   numericFabricationCheck,
   quoteGroundingCheck,
+  urlFabricationCheck,
   defaultPreChecks,
   runPreChecks,
 } from './deterministic.js';
@@ -226,5 +227,46 @@ describe('verifyDraft with claimPreChecks (integration)', () => {
     expect(judgeCalls()).toBeGreaterThan(0); // judges DID run
     expect(out.pass).toBe(true); // scripted judge says SUPPORTED — the exact
     // wrong-number case LLM judges wave through and the new tier catches
+  });
+});
+
+describe('urlFabricationCheck — a cited URL absent from sources is a fabricated link', () => {
+  const c = urlFabricationCheck();
+
+  it('FAILS a claim citing an https URL that appears nowhere in the sources', () => {
+    const r = c.check('See the guide at https://acme.com/help for details.', 'The support docs cover this topic.');
+    expect(r.verdict).toBe('fail');
+    expect(r.reason).toContain('acme.com/help');
+  });
+
+  it('DEFERS (judge) when the cited URL IS in the sources — presence never PASSES', () => {
+    const r = c.check('Docs are at https://acme.com/help.', 'Documentation: https://acme.com/help and more.');
+    expect(r.verdict).toBe('judge');
+  });
+
+  it('grounds a claim URL that is a parent path of a source URL', () => {
+    const r = c.check('See https://acme.com/help', 'full path https://acme.com/help/getting-started');
+    expect(r.verdict).toBe('judge');
+  });
+
+  it('grounding is scheme/www-insensitive (claim https+www vs source bare host)', () => {
+    const r = c.check('visit https://www.acme.com/faq today', 'the faq lives at acme.com/faq');
+    expect(r.verdict).toBe('judge');
+  });
+
+  it('NO false-fail on dotted NON-URL tokens (index.ts / Node.js / package.json have no scheme)', () => {
+    // The scheme requirement is what makes this safe — a filename is never a "fabricated URL".
+    const r = c.check('Edit index.ts, see Node.js docs, check package.json.', 'unrelated source text');
+    expect(r.verdict).toBe('judge');
+  });
+
+  it('a claim with no URL at all defers', () => {
+    expect(c.check('The daily limit is 5%.', 'sources').verdict).toBe('judge');
+  });
+
+  it('ships in defaultPreChecks — a fabricated URL is caught by the recommended tier', () => {
+    const r = runPreChecks(defaultPreChecks(), 'Read https://fake.example/page now.', 'no such url in here');
+    expect(r.verdict).toBe('fail');
+    expect(r.reason).toContain('fake.example/page');
   });
 });

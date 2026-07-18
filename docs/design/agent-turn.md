@@ -638,7 +638,7 @@ The original invariant ("nothing else can produce a fact") was false because fai
 > check. Conflating the two would make the verifier reject legitimate greetings. The extractor-ERROR case (which
 > point 1 handles by throwing) is what must fail closed — not a legitimate empty.
 
-**Consequence, stated plainly:** with `failClosed:true` and no real judge/extractor model, the runtime abstains on any non-deterministic claim, emitting only what the deterministic tier (quote-grounding / numeric) supports. The system stays silent rather than fabricating.
+**Consequence, stated plainly:** with `failClosed:true` and no real judge/extractor model, the runtime abstains on any non-deterministic claim, emitting only what the deterministic tier (quote-grounding / numeric-fabrication / URL-fabrication) supports. The system stays silent rather than fabricating.
 
 **Still Phase 3 (NOT in 3.1):** the non-numeric claim tier (3.2 — named-entity coverage + negation/scope guard), spelled-out-number fabrication + `max_tokens` truncation→abstain + `maxClaims`-drop→abstain (3.3).
 

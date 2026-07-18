@@ -227,16 +227,56 @@ export function quoteGroundingCheck(opts: QuoteGroundingOptions = {}): ClaimPreC
   };
 }
 
+// ── URL fabrication ───────────────────────────────────────────────────
+
+// Deliberately requires an explicit http(s):// scheme so bare dotted tokens
+// (`index.ts`, `Node.js`, `e.g.`, `package.json`) are NEVER mistaken for a URL —
+// a false-fail on a non-URL would be worse than missing a schemeless link.
+const SCHEMED_URL_RE = /https?:\/\/([a-z0-9-]+(?:\.[a-z0-9-]+)+)((?:\/[^\s)\]"'>]*)?)/gi;
+
+/**
+ * Fail a claim that cites an `http(s)://` URL which appears NOWHERE in the sources —
+ * a fabricated link (the model invents a plausible-looking URL). This is TENET's
+ * source-grounded-URL thesis enforced deterministically: an answer may only cite URLs
+ * that came from its sources. FINAL (no permissive rescue), like numeric fabrication.
+ *
+ * Conservative by construction: only scheme-bearing URLs are checked, and grounding is a
+ * scheme/`www`-insensitive substring match against the sources — so a claim URL that is a
+ * parent/child path of a source URL still counts as grounded, and lookalike-domain misses
+ * fall through to the judge rather than false-failing. A URL being PRESENT never PASSES a
+ * claim (it could be misattributed) — presence only defers.
+ */
+export function urlFabricationCheck(): ClaimPreCheck {
+  return {
+    check(claim, sources) {
+      const claimUrls = Array.from(claim.matchAll(SCHEMED_URL_RE)).map((m) => {
+        const host = (m[1] ?? '').toLowerCase().replace(/^www\./, '');
+        // Strip trailing slash AND terminal sentence punctuation the URL picked up at a
+        // sentence end (`…/help.`) — otherwise it wouldn't match `…/help` in the sources.
+        const path = (m[2] ?? '').replace(/[/.,;:!?]+$/, '');
+        return host + path;
+      });
+      if (claimUrls.length === 0) return { verdict: 'judge' };
+      const normSources = sources.toLowerCase().replace(/https?:\/\//g, '').replace(/www\./g, '');
+      const fabricated = claimUrls.find((u) => u !== '' && !normSources.includes(u));
+      if (fabricated !== undefined) {
+        return { verdict: 'fail', reason: `URL not grounded in sources: ${fabricated}` };
+      }
+      return { verdict: 'judge' };
+    },
+  };
+}
+
 // ── Composition ───────────────────────────────────────────────────────
 
 /**
- * The recommended deterministic tier: quote grounding (pass) +
- * numeric fabrication (fail). Order matters — a verbatim quote
- * containing a number the sources state is settled by the quote check
- * first; runPreChecks() short-circuits on the first non-'judge'.
+ * The recommended deterministic tier: quote grounding (pass) + numeric fabrication
+ * (fail) + URL fabrication (fail). Order matters — a verbatim quote containing a number
+ * or URL the sources state is settled by the quote check first; runPreChecks()
+ * short-circuits on the first non-'judge'.
  */
 export function defaultPreChecks(): ClaimPreCheck[] {
-  return [quoteGroundingCheck(), numericFabricationCheck()];
+  return [quoteGroundingCheck(), numericFabricationCheck(), urlFabricationCheck()];
 }
 
 /** First non-'judge' verdict wins; all-'judge' defers to the LLM path. */
