@@ -156,6 +156,9 @@ importers:
       '@tenet/harness':
         specifier: workspace:*
         version: link:../harness
+      '@tenet/workflow':
+        specifier: workspace:*
+        version: link:../workflow
 
   packages/core: {}
 
