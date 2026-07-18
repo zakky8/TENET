@@ -6,6 +6,20 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `pnpm inventory:check`: docs' surface/model adapter counts are gated against the filesystem (2026-07-18)
+A structural count in the repo's own voice ("9 surface adapters", "6 model adapters") is held to §1 like the
+test count — the only witness is the tree. This drift is REAL: `AGENTS.md` had said "Surfaces (12)" while
+`ls surfaces/` was 9 (fixed 349940a). `scripts/check-inventory.mjs` (`pnpm inventory:check`, now a CI step)
+computes the live counts from `surfaces/` (minus `core`, which is shared infra, not an adapter) and `models/`,
+then FAILS on any tracked doc whose adapter-count claim disagrees — across the digit phrasings the docs use
+(`N surface adapters`, `N surfaces`, `Surfaces (N adapters)`, `N model adapters`, `Models (N)`).
+`docs/CHANGELOG.md` is excluded (it records old counts verbatim, e.g. this entry). Mutation probe **non-vacuous
+across all five pattern branches**: bumping a doc's count in each phrasing (e.g. `9 surface adapters`→8,
+`Surfaces (9 adapters)`→12, `Models (6)`→7) reddens the gate; files restored byte-identical. Currently 19
+claims across 8 docs all match live `9 surface adapters / 6 model adapters`. Tooling/docs only — no TypeScript
+source or test changed, so `pnpm -r build`/`pnpm test` are unaffected (green at parent `f26e491`); suite
+unchanged at 1300/97. Closes the flagged "surface/model-count gate" follow-up.
+
 ### Added — long-history compaction is now a fail-closed pre-step in the agent turn (2.4, 2026-07-18)
 `@tenet/harness` shipped a `ContextCompactor` (summarize the middle of an overflowing conversation to fit a
 token budget) but nothing consumed it — `git grep ContextCompactor` outside `packages/harness/` returned
