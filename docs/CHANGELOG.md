@@ -6,6 +6,27 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — deterministic verifier catches a fabricated CONTACT EMAIL (`emailFabricationCheck`, in `defaultPreChecks`) (2026-07-18)
+A support agent that invents `support@wrong.com` sends the user to the wrong — possibly hostile — address;
+that's a real, harmful hallucination the deterministic tier did not catch. `emailFabricationCheck` fails a
+claim citing an email that appears NOWHERE in the sources, enforced before any LLM judge and FINAL (no
+permissive rescue), exactly like `urlFabricationCheck`. It is now in `defaultPreChecks`, so the recommended
+tier catches it by default. Design mirrors the URL check and stays inside the tier's soundness rules:
+- **Safe by construction (verbatim token).** An email has none of the `$1.2M`↔`$1.2 million` /
+  `2025-01-15`↔`January 15` format variance that forces numbers/dates to defer, so an EXACT case-insensitive
+  token-set match neither false-fails a grounded address nor waves through a lookalike — `support@acme.com` is
+  NOT grounded by `notsupport@acme.com` (distinct tokens, not a substring). A TLD is required so bare
+  `user@host` handles aren't treated as contact addresses.
+- **Asymmetric like the rest of the tier:** only ABSENCE fails; a PRESENT email never passes (it could be
+  misattributed) — presence only defers to the judges. Fails CLOSED — the only residual false-fail is a source
+  that obfuscates an address (`support AT acme DOT com`), which abstains rather than ships, and is rare for an
+  internal KB.
+7 tests (absent→fail, present→judge, case-insensitive grounding, lookalike-distinct→fail, trailing-punctuation,
+no-email→judge, caught-via-defaultPreChecks). Mutation probe non-vacuous: making the check never flag reddens
+exactly the 3 fabrication-detection tests, not the 4 defer tests. No regression (149 verifier tests green,
+incl. the `defaultPreChecks` integration path). Docs synced (SKILL.md, ARCHITECTURE, FAQ — both JSON-LD +
+visible — and index.md now list emails alongside numbers/URLs). `pnpm -r build` green; suite 1302 → **1309** (+7).
+
 ### Added — `pnpm links:check`: every internal doc link must resolve to a file that exists (2026-07-18)
 A markdown link to a doc that isn't there is the repo referencing something that doesn't exist — a stale
 reference in its own voice, the same §9 defect class as a stale number. `scripts/check-doc-links.mjs`

@@ -17,7 +17,7 @@ is actually in the tree on branch `upgrade/top-1pct`, so the proposal is not rea
 a description of shipped code. Numbers are measured, not aspirational.
 
 - **Repo:** 63 workspace packages (every `package.json` under the `pnpm-workspace.yaml`
-  globs). Test suite: **97 suites / 1302 tests, all green** (was 83 / 1051 at the start
+  globs). Test suite: **97 suites / 1309 tests, all green** (was 83 / 1051 at the start
   of this upgrade). All figures are from the **hermetic stub plane** — no real-model
   access exists in this environment, so no real-model benchmark numbers are claimed here.
 - **Phase 1 — canonical model contract (complete):** one `ChatModel` in `@tenet/core`
@@ -42,11 +42,11 @@ a description of shipped code. Numbers are measured, not aspirational.
   refusal / aborted stop (`packages/agent/src/reasoner.ts` — a cut-off draft never ships);
   an over-cap claim extraction throws `ClaimExtractionError` under `failClosed` instead of
   silently dropping the unverified overflow (`packages/verifier/src/claimExtractor.ts`);
-  and the deterministic pre-check tier fails a fabricated number, spelled-out amount, or
-  `http(s)://` URL that is absent from the sources BEFORE any judge runs
+  and the deterministic pre-check tier fails a fabricated number, spelled-out amount,
+  `http(s)://` URL, or contact email that is absent from the sources BEFORE any judge runs
   (`packages/verifier/src/deterministic.ts`: `numericFabricationCheck` incl.
-  `parseSpelledNumbers`, `urlFabricationCheck`, `quoteGroundingCheck`, composed in
-  `defaultPreChecks`). A `groundedOrAbstain` reference orchestrator (3.4) chains the
+  `parseSpelledNumbers`, `urlFabricationCheck`, `emailFabricationCheck`, `quoteGroundingCheck`,
+  composed in `defaultPreChecks`). A `groundedOrAbstain` reference orchestrator (3.4) chains the
   knowledge-boundary gate → draft → verify + bounded repair → answer/abstain in
   `@tenet/refine`. Only 3.2's named-entity + negation-scope guards remain — deferred until
   a real judge model ships (defense-in-depth for the judge, not a current end-to-end hole).
@@ -310,7 +310,7 @@ The smallest end-to-end vertical that proves the spine works:
 - `models/bedrock` only (gpt-oss-120b, matching TENET's current setup)
 - `stores/vector/pgvector` + `stores/state/redis`
 - `apps/community-bot` — port TENET's current behavior to the new framework
-- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 97 suites / 1302 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
+- `eval/harness` running TENET's existing golden conversations against the new runtime (the repo-wide unit/suite figure — 97 suites / 1309 tests green as of 2026-07-18 — is the hermetic stub plane, not a real-model eval)
 
 Success criteria for MVP:
 1. TENET's golden conversations replay through the new runtime with **same or better** accuracy

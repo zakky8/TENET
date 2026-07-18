@@ -386,16 +386,53 @@ export function urlFabricationCheck(): ClaimPreCheck {
   };
 }
 
+// ── Email fabrication ─────────────────────────────────────────────────
+
+// A contact email is a verbatim token — it has none of the "$1.2M vs $1.2
+// million" / "2025-01-15 vs January 15" format variance that forces numbers
+// and dates to defer, so an exact case-insensitive token match neither
+// false-fails a grounded address nor waves through a lookalike. Match the
+// FULL token (a set, not a substring), so "support@acme.com" is NOT grounded
+// by "notsupport@acme.com". A TLD (a dot in the domain) is required so bare
+// `user@host` handles are not treated as contact addresses.
+const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+/gi;
+
+/**
+ * Fail a claim that cites an email address appearing NOWHERE in the sources —
+ * a fabricated contact (an agent inventing "support@wrong.com" sends the user
+ * to the wrong, possibly hostile, address). Enforced deterministically like
+ * url/numeric fabrication, and FINAL (no permissive rescue). Grounding is an
+ * exact case-insensitive token match, so a lookalike local part
+ * ("support@" vs "notsupport@") does not pass. A present email never PASSES
+ * the claim (it could be misattributed) — presence only defers to the judges.
+ */
+export function emailFabricationCheck(): ClaimPreCheck {
+  return {
+    check(claim, sources) {
+      const claimEmails = Array.from(claim.matchAll(EMAIL_RE)).map((m) => m[0].toLowerCase());
+      if (claimEmails.length === 0) return { verdict: 'judge' };
+      const sourceEmails = new Set(
+        Array.from(sources.matchAll(EMAIL_RE)).map((m) => m[0].toLowerCase()),
+      );
+      const fabricated = claimEmails.find((e) => !sourceEmails.has(e));
+      if (fabricated !== undefined) {
+        return { verdict: 'fail', reason: `email address not grounded in sources: ${fabricated}` };
+      }
+      return { verdict: 'judge' };
+    },
+  };
+}
+
 // ── Composition ───────────────────────────────────────────────────────
 
 /**
  * The recommended deterministic tier: quote grounding (pass) + numeric fabrication
- * (fail) + URL fabrication (fail). Order matters — a verbatim quote containing a number
- * or URL the sources state is settled by the quote check first; runPreChecks()
- * short-circuits on the first non-'judge'.
+ * (fail) + URL fabrication (fail) + email fabrication (fail). Order matters — a verbatim
+ * quote containing a number, URL, or email the sources state is settled by the quote
+ * check first; runPreChecks() short-circuits on the first non-'judge'.
  */
 export function defaultPreChecks(): ClaimPreCheck[] {
-  return [quoteGroundingCheck(), numericFabricationCheck(), urlFabricationCheck()];
+  return [quoteGroundingCheck(), numericFabricationCheck(), urlFabricationCheck(), emailFabricationCheck()];
 }
 
 /** First non-'judge' verdict wins; all-'judge' defers to the LLM path. */

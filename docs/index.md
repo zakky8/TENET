@@ -32,12 +32,12 @@ TENET is a framework, not a model: it *calls* whichever frontier model you bring
 
 ## What ships today
 
-Every row is a package in the monorepo — no capability claimed here that isn't in the code, and the repo's own numbers (**1302 tests across 97 suites**) are checked against the live suite in CI (`pnpm counts:check`).
+Every row is a package in the monorepo — no capability claimed here that isn't in the code, and the repo's own numbers (**1309 tests across 97 suites**) are checked against the live suite in CI (`pnpm counts:check`).
 
 | Capability | Package | What it does |
 |---|---|---|
 | **Fail-closed agent turn** | `@tenet/agent` | `runAgent` drives the turn as a graph to a **single emit edge**; abstain/handoff are carried as values (never thrown); a top-level catch fails closed to abstain. |
-| **Deterministic verifier pre-checks** | `@tenet/verifier` | Before any LLM judge: quote-grounding, and fabrication checks for numbers (incl. spelled-out) and `http(s)://` URLs absent from the sources. |
+| **Deterministic verifier pre-checks** | `@tenet/verifier` | Before any LLM judge: quote-grounding, and fabrication checks for numbers (incl. spelled-out), `http(s)://` URLs, and contact emails absent from the sources. |
 | **Multi-judge verifier + fail-closed mode** | `@tenet/verifier` | Atomic-claim strict-then-permissive judging; an opt-in `failClosed` mode resolves extractor/judge infra failures to *not-supported*, never a spurious pass. |
 | **HHEM judge adapter** | `@tenet/judge-hhem`, `@tenet/judge-hhem-onnx` | An adapter surface for a Vectara-HHEM-style hallucination judge — you bring the model weights; a deterministic token-overlap scorer ships as the reference. |
 | **Pre-tool-call governance** | `@tenet/governance` | Per-tool deny / allow / require-approval policy, an idempotent approval gate, and a structured audit trail — the tool executor only sees policy-allowed calls. |

@@ -4,6 +4,7 @@ import {
   numericFabricationCheck,
   quoteGroundingCheck,
   urlFabricationCheck,
+  emailFabricationCheck,
   defaultPreChecks,
   runPreChecks,
 } from './deterministic.js';
@@ -323,5 +324,48 @@ describe('urlFabricationCheck — a cited URL absent from sources is a fabricate
     const r = runPreChecks(defaultPreChecks(), 'Read https://fake.example/page now.', 'no such url in here');
     expect(r.verdict).toBe('fail');
     expect(r.reason).toContain('fake.example/page');
+  });
+});
+
+describe('emailFabricationCheck — a cited email absent from sources is a fabricated contact', () => {
+  const c = emailFabricationCheck();
+
+  it('FAILS a claim citing an email that appears nowhere in the sources', () => {
+    const r = c.check('Email support@acme.com for help.', 'Reach the team via the in-app widget.');
+    expect(r.verdict).toBe('fail');
+    expect(r.reason).toContain('support@acme.com');
+  });
+
+  it('DEFERS (judge) when the cited email IS in the sources — presence never PASSES', () => {
+    const r = c.check('Write to support@acme.com.', 'Contact: support@acme.com or call us.');
+    expect(r.verdict).toBe('judge');
+  });
+
+  it('grounding is case-insensitive (claim UPPER vs source lower does NOT false-fail)', () => {
+    const r = c.check('Email SUPPORT@Acme.COM.', 'contact support@acme.com anytime');
+    expect(r.verdict).toBe('judge');
+  });
+
+  it('a lookalike local part is a DISTINCT token — support@ is not grounded by notsupport@', () => {
+    // Exact token membership, not substring: the fabricated address must not be
+    // waved through just because it is a substring of a real one.
+    const r = c.check('Use support@acme.com.', 'the real inbox is notsupport@acme.com');
+    expect(r.verdict).toBe('fail');
+    expect(r.reason).toContain('support@acme.com');
+  });
+
+  it('a trailing sentence period does not break grounding', () => {
+    const r = c.check('Reach us at support@acme.com.', 'support@acme.com is monitored 24/7');
+    expect(r.verdict).toBe('judge');
+  });
+
+  it('a claim with no email at all defers', () => {
+    expect(c.check('The daily limit is 5%.', 'sources').verdict).toBe('judge');
+  });
+
+  it('ships in defaultPreChecks — a fabricated email is caught by the recommended tier', () => {
+    const r = runPreChecks(defaultPreChecks(), 'Contact billing@fake.example now.', 'no such address in here');
+    expect(r.verdict).toBe('fail');
+    expect(r.reason).toContain('billing@fake.example');
   });
 });
