@@ -43,14 +43,22 @@ describe('verifyDraft — duplicate-claim permissive merge (FIX #10)', () => {
     expect(stillFailedVerdicts).toHaveLength(1);
   });
 
-  it('all duplicates pass on permissive: index alignment lets every duplicate get rescued', async () => {
+  it('THREE identical strict-failed claims: index alignment gives each its OWN permissive verdict', async () => {
+    // `claimsPerBatch: 3` puts all three in ONE strict + ONE permissive batch, so the
+    // 3-reply script is COMPLETE — no empty trailing batch reply that the (default)
+    // fail-open judge could mask into "all supported" (which made the previous version of
+    // this test pass regardless of the merge — a vacuous test). Permissive rescues #1 and
+    // #3 but NOT #2; index alignment must keep the middle one failed. A string-keyed merge
+    // (the FIX#10 bug) would collapse the three identical strings to ONE verdict → all
+    // rescued → pass:true, which this asserts against.
     const dup = 'budget allocation includes ops and team buckets in the doc';
     const replies = [
       `${dup}\n${dup}\n${dup}`,
-      '[1] UNSUPPORTED: x\n[2] UNSUPPORTED: x\n[3] UNSUPPORTED: x',
-      '[1] SUPPORTED\n[2] SUPPORTED\n[3] SUPPORTED',
+      '[1] UNSUPPORTED: x\n[2] UNSUPPORTED: x\n[3] UNSUPPORTED: x', // strict fails all three
+      '[1] SUPPORTED\n[2] UNSUPPORTED: still-bad\n[3] SUPPORTED', // permissive rescues #1 and #3, not #2
     ];
-    const out = await verifyDraft(scripted(replies), { sources: 's', draft: 'd' });
-    expect(out.pass).toBe(true);
+    const out = await verifyDraft(scripted(replies), { sources: 's', draft: 'd' }, { claimsPerBatch: 3 });
+    expect(out.pass).toBe(false);
+    expect(out.verdicts.filter((v) => !v.supported)).toHaveLength(1); // exactly the middle claim
   });
 });
