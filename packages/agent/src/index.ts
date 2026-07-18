@@ -34,8 +34,11 @@ export type {
   Verifier,
   VerifierInput,
   VerifierVerdict,
+  ToolExecutor,
 } from './deps.js';
+export type { ToolResultBlock } from './types.js';
 export { injectionGate, retrieveNode, cacheNode } from './nodes.js';
 export { verifyAndEmit, knowledgeBlock, type EmitDecision } from './emit.js';
+export { runTools, type ToolRunContext, type ToolRunResult } from './tools.js';
 
 export const VERSION = '0.0.0';

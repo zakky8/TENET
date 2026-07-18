@@ -22,6 +22,15 @@ export interface ToolCall {
   readonly input: Readonly<Record<string, unknown>>;
 }
 
+/** The result of ONE executed tool call, in the provider-agnostic shape the next
+ *  reasoning pass consumes. `isError: true` marks a tool failure the model must react
+ *  to — it is never silently dropped or turned into a fake success. */
+export interface ToolResultBlock {
+  readonly toolUseId: string;
+  readonly content: string;
+  readonly isError: boolean;
+}
+
 /** A retrieved chunk carries retrieval RELEVANCE (cosine / BM25 / rerank,
  *  normalized 0..1) — deliberately distinct from `Source.confidence`, which is a
  *  correctness prior. The knowledge-boundary gate keys on relevance. */
@@ -53,11 +62,7 @@ export interface OrchestratorState extends AgentState {
   readonly cachedDraft?: string;
   /** Results of tool calls executed this turn, appended to history for the next
    *  reasoning pass. */
-  readonly toolResults?: ReadonlyArray<{
-    readonly toolUseId: string;
-    readonly content: string;
-    readonly isError: boolean;
-  }>;
+  readonly toolResults?: ReadonlyArray<ToolResultBlock>;
   /** Set when the graph is short-circuiting to a terminal outcome. */
   readonly halt?: Result;
 }

@@ -153,6 +153,9 @@ importers:
       '@tenet/core':
         specifier: workspace:*
         version: link:../core
+      '@tenet/governance':
+        specifier: workspace:*
+        version: link:../governance
       '@tenet/guardrails':
         specifier: workspace:*
         version: link:../guardrails

@@ -16,6 +16,7 @@
 import type { Citation, Source } from '@tenet/core';
 import type { Filter } from '@tenet/guardrails';
 import type { BoundaryGateOptions } from '@tenet/refine';
+import type { ToolCall } from './types.js';
 
 /** A scored retrieval result. Structurally identical to `@tenet/retrieval`'s
  *  `ScoredSource`, redeclared here so the agent depends on the PORT, not a concrete
@@ -67,6 +68,16 @@ export interface VerifierVerdict {
  *  every emit. The concrete atomic-claim multi-judge verifier lives behind it. */
 export interface Verifier {
   check(input: VerifierInput): Promise<VerifierVerdict>;
+}
+
+/** Narrow tool-execution port. A single ToolCall runs here and yields its result;
+ *  a concrete MCP/registry executor is wrapped behind it at composition. Governance
+ *  runs BEFORE this (see runTools) — the executor only ever sees allowed calls. */
+export interface ToolExecutor {
+  execute(
+    call: ToolCall,
+    signal?: AbortSignal,
+  ): Promise<{ readonly content: string; readonly isError: boolean }>;
 }
 
 /** Everything the orchestrator injects into the turn's nodes. */

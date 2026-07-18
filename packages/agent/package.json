@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@tenet/core": "workspace:*",
+    "@tenet/governance": "workspace:*",
     "@tenet/guardrails": "workspace:*",
     "@tenet/harness": "workspace:*",
     "@tenet/refine": "workspace:*",
