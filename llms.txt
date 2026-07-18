@@ -4,7 +4,7 @@
 
 TENET is a framework, not a model: it does not train or fine-tune an LLM, it *calls* one and makes whichever frontier model you call provably more grounded. The core is a fail-CLOSED agent turn: `runAgent` (`packages/agent/src/orchestrator.ts`) drives `OrchestratorState` through a `@tenet/workflow` graph — inbound injection gate → retrieve + knowledge-boundary gate → cache re-verify → a decides-and-drafts Reasoner (grounded-or-abstain) → governance-gated tools → a fail-closed verifier → a single emit edge — with abstain/handoff carried as values (never thrown) and a top-level catch that fails closed on any error. The worst outcome of a turn is a human handoff, never an ungrounded fact.
 
-Measured, not marketed: every capability below is code in the monorepo, every benchmark row is gated in hermetic CI on each PR, and doc numbers are checked against the live test suite (`pnpm counts:check`). The suite is 1195 tests across 92 suites, all green, over 62 workspace packages.
+Measured, not marketed: every capability below is code in the monorepo, every benchmark row is gated in hermetic CI on each PR, and doc numbers are checked against the live test suite (`pnpm counts:check`). The suite is 1198 tests across 92 suites, all green, over 62 workspace packages.
 
 ## Documentation
 

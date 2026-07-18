@@ -26,6 +26,7 @@
  * Pure functions; no I/O. Body loading is delegated to an injected
  * BodyLoader — operator picks fs.readFile / fetch / GitHub raw / etc.
  */
+import { allowListRule, type PolicyRule } from '@tenet/governance';
 
 // ── Frontmatter schema ────────────────────────────────────────────────
 
@@ -297,6 +298,20 @@ export class SkillRegistry {
  */
 export function skillAllowedTools(skill: SkillFrontmatter): ReadonlyArray<string> {
   return skill.allowedTools ?? [];
+}
+
+/**
+ * ENFORCE a skill's `allowed-tools`: turn it into a `@tenet/governance` `PolicyRule`
+ * that allows ONLY the tools the skill declared. This makes `allowed-tools` a real
+ * capability boundary, not a decorative field — drop it into a `PolicyEvaluator` and a
+ * skill physically cannot call a tool it didn't declare (`runTools` gates every call).
+ *
+ * FAIL-CLOSED: a skill that declares NO tools (`allowedTools` absent/empty) may call
+ * NONE — an undeclared tool is denied by default. An operator who wants an unrestricted
+ * skill simply does not apply this rule.
+ */
+export function skillToolPolicyRule(skill: SkillFrontmatter): PolicyRule {
+  return allowListRule(skillAllowedTools(skill));
 }
 
 /**

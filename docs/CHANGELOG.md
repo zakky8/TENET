@@ -6,6 +6,15 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `skillToolPolicyRule`: `allowed-tools` is now ENFORCED, not decorative (8.2, 2026-07-18)
+`@tenet/skills` gains `skillToolPolicyRule(frontmatter)` → a `@tenet/governance` `PolicyRule` that allows
+ONLY the tools a skill declared. Dropped into a `PolicyEvaluator`, a skill physically cannot call a tool it
+did not declare (the agent's `runTools` gates every call before execution). FAIL-CLOSED: a skill that
+declares no `allowed-tools` may call none. This turns the header's long-standing "governance-aware" promise
+(and the package description's "@tenet/governance allowed-tools enforcement") into a shipped, tested helper —
+`@tenet/skills` now actually depends on `@tenet/governance`. Tests prove allow-declared / deny-undeclared
+(with reason) / deny-all-on-empty. Suite 1195 → 1198.
+
 ### Added — flagship `SKILL.md`: build a verification-first, grounded-or-abstain agent (8.1, 2026-07-18)
 A repo-root `SKILL.md` (parseable by `@tenet/skills`' own `SkillRegistry`, frontmatter
 `name: verification-first-agent`) distilling how to build an agent whose worst outcome is a human

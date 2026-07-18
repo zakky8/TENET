@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { PolicyEvaluator, type ToolCallContext } from '@tenet/governance';
 import {
   parseFrontmatter,
   SkillRegistry,
   SkillError,
   InMemoryBodyLoader,
   skillAllowedTools,
+  skillToolPolicyRule,
 } from './index.js';
 
 const SAMPLE = `---
@@ -194,5 +196,37 @@ describe('repo-root SKILL.md (the flagship verification-first-agent skill)', () 
     const reg = new SkillRegistry(new InMemoryBodyLoader({}));
     expect(() => reg.registerFromText('SKILL.md', text)).not.toThrow();
     expect(reg.list().map((f) => f.name)).toContain('verification-first-agent');
+  });
+});
+
+// allowed-tools must be ENFORCED, not decorative (8.2): a skill's declared tools become
+// a governance rule so it physically cannot call an undeclared tool. FAIL-CLOSED.
+describe('skillToolPolicyRule — allowed-tools enforcement', () => {
+  const ctx = (toolName: string): ToolCallContext => ({
+    toolName,
+    args: {},
+    tenantId: 't1',
+    principalId: 'bot',
+  });
+  const policyFor = (frontmatterYaml: string) => {
+    const { frontmatter } = parseFrontmatter(frontmatterYaml);
+    return new PolicyEvaluator([skillToolPolicyRule(frontmatter)]);
+  };
+
+  it('ALLOWS a tool the skill declared', () => {
+    const p = policyFor('---\nname: a\ndescription: b\nallowed-tools: ["kb.lookup", "kb.search"]\n---\n');
+    expect(p.evaluate(ctx('kb.lookup'))).toEqual({ kind: 'allow' });
+  });
+
+  it('DENIES a tool the skill did not declare', () => {
+    const p = policyFor('---\nname: a\ndescription: b\nallowed-tools: ["kb.lookup"]\n---\n');
+    const d = p.evaluate(ctx('db.write'));
+    expect(d.kind).toBe('deny');
+    if (d.kind === 'deny') expect(d.reason).toContain('db.write');
+  });
+
+  it('FAIL-CLOSED: a skill that declares NO tools may call NONE', () => {
+    const p = policyFor('---\nname: a\ndescription: b\n---\n'); // no allowed-tools
+    expect(p.evaluate(ctx('kb.lookup')).kind).toBe('deny'); // undeclared → denied
   });
 });

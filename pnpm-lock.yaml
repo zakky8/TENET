@@ -227,7 +227,11 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/skills: {}
+  packages/skills:
+    dependencies:
+      '@tenet/governance':
+        specifier: workspace:*
+        version: link:../governance
 
   packages/streaming:
     dependencies:
