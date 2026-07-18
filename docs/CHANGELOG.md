@@ -6,6 +6,19 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — lock `withTimeout`'s error classification (parent-abort ≠ timeout; normal errors pass through) (2026-07-18)
+`withTimeout` (which the orchestrator wraps every pre-reasoning node in) has non-obvious `catch` logic: only if
+the wall-clock controller fired does it throw `WorkflowError('timeout')` — a caller (parent-signal) abort
+re-throws the abort, and any other step error passes through UNCHANGED (so consumers that inspect the error
+type — retryable? auth? abort? — still can). The block tested only the timeout-fires + fast-pass cases; a
+regression that wrapped *every* catch as `'timeout'` would pass both. Added two regression tests: a normal
+step error is re-thrown unchanged (not masked as timeout), and a PARENT abort surfaces as the caller's abort
+(not `'timeout'`). Mutation probe non-vacuous: collapsing the `catch` to always-timeout reddens both new tests
+while the existing timeout/fast tests stay green. Test-only — `withTimeout` is unchanged (already correct);
+`pnpm -r build`/`pnpm test` green, suite 1322 → **1324** (+2). Audited the rest of `@tenet/workflow`
+(sequential/parallel/branch/retry abort + error propagation) in the same pass — all sound (parallel already
+distinguishes parent-abort from child-failure, retry cleans up its abort listener per attempt).
+
 ### Added — lock the approval-key canonicalisation (the nested-reorder bypass fix) with real tests (2026-07-18)
 `stableApprovalKey` canonicalises tool-call args RECURSIVELY (a 2026-06-04 security fix) so an attacker who
 controls JSON key order cannot reorder args to force a FRESH approval prompt that bypasses a prior rejection —

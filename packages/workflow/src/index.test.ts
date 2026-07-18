@@ -133,4 +133,27 @@ describe('withTimeout', () => {
     const wf = withTimeout(fast, 1000);
     expect(await runWorkflow(wf, 7, { runId: 'r' })).toBe(7);
   });
+
+  it('re-throws a normal step error UNCHANGED — not masked as a timeout', async () => {
+    // The wall-clock did not fire, so the original error must pass through so consumers
+    // that inspect the error type (retryable? auth? abort?) still can. A regression that
+    // wrapped every catch as WorkflowError('timeout') would break that.
+    const boom: Step<number, number> = async () => { throw new Error('business failure'); };
+    const wf = withTimeout(boom, 1000);
+    await expect(runWorkflow(wf, 1, { runId: 'r' })).rejects.toThrow('business failure');
+  });
+
+  it('a PARENT abort re-throws the abort, NOT a timeout (caller-cancel ≠ wall-clock)', async () => {
+    const ac = new AbortController();
+    const slow: Step<number, number> = async (_, ctx) =>
+      new Promise<number>((resolve, reject) => {
+        const t = setTimeout(() => resolve(0), 500);
+        ctx.signal.addEventListener('abort', () => { clearTimeout(t); reject(new Error('caller cancelled')); });
+      });
+    const wf = withTimeout(slow, 1000); // generous budget — the CALLER's abort fires first
+    const p = runWorkflow(wf, 1, { runId: 'r', signal: ac.signal });
+    ac.abort();
+    // Only the timeout controller firing → 'timeout'; a caller abort must surface as itself.
+    await expect(p).rejects.toThrow('caller cancelled');
+  });
 });
