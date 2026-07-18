@@ -6,12 +6,12 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node 22+](https://img.shields.io/badge/node-22+-43853d.svg)](.nvmrc)
 [![TypeScript Strict](https://img.shields.io/badge/typescript-strict-3178c6.svg)](tsconfig.base.json)
-[![Tests](https://img.shields.io/badge/tests-1320%20passing-success)](packages)
+[![Tests](https://img.shields.io/badge/tests-1322%20passing-success)](packages)
 [![BENCHMARKS gated](https://img.shields.io/badge/BENCHMARKS-gated_in_CI-success)](docs/BENCHMARKS.md)
 [![ES2024](https://img.shields.io/badge/target-ES2024-yellow.svg)](tsconfig.base.json)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-purple.svg)](CODE_OF_CONDUCT.md)
 
-> **Status:** **1320 tests across 98 suites, all green** (63 workspace packages). Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming, all on ONE canonical `ChatModel` contract (messages-array + required `AbortSignal` + tool round-trips; `@tenet/core/model.ts`). 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). The end-to-end orchestrator (`@tenet/agent`) is **shipped**: `runAgent` drives the fail-closed turn as a `@tenet/workflow` graph — injection gate → retrieve + knowledge-boundary → cache re-verify → decides-and-drafts Reasoner → governance-gated tools → fail-closed verify → single emit edge, with abstain/handoff carried as values and a top-level catch that fails closed on any error. Pre-1.0; APIs may change.
+> **Status:** **1322 tests across 98 suites, all green** (63 workspace packages). Every BENCHMARKS dimension measured in hermetic CI via `pnpm benchmarks`; real-model numbers come from the local `apps/measure-real` runner (the CI gate runs a deterministic stub — see BENCHMARKS.md for the split). 9 surfaces (Discord, Slack, Telegram, Teams, web widget, REST, gRPC, Matrix, voice/Twilio) + 4 ticketing connectors (Zendesk, Intercom, Freshdesk, ServiceNow). 6 model adapters — Anthropic-direct, OpenAI, Gemini, Mistral, Ollama, Bedrock — all streaming, all on ONE canonical `ChatModel` contract (messages-array + required `AbortSignal` + tool round-trips; `@tenet/core/model.ts`). 2 vector stores + Redis/Postgres state stores. Protocol interop: MCP client + OAuth gateway, **A2A v1 (server + client)**, **AG-UI**, ACP. **Step-level durable execution with interrupt() HITL** (`@tenet/durable`), agent harness (compaction + todos + subagents), WASM sandbox + wasmtime, on-prem Helm. Plus **pre-tool-call governance + approval gates + structured audit trail** (`@tenet/governance`). The end-to-end orchestrator (`@tenet/agent`) is **shipped**: `runAgent` drives the fail-closed turn as a `@tenet/workflow` graph — injection gate → retrieve + knowledge-boundary → cache re-verify → decides-and-drafts Reasoner → governance-gated tools → fail-closed verify → single emit edge, with abstain/handoff carried as values and a top-level catch that fails closed on any error. Pre-1.0; APIs may change.
 
 ---
 
@@ -165,7 +165,7 @@ TENET's stance on the things that matter for a support/answering agent — asser
 - **Hallucination judge**: Vectara HHEM-2.1 (adapter + ONNX wrapper)
 - **WASM runtimes**: Node-22 reference + wasmtime adapter
 
-## What ships today (63 workspace packages, 1320 tests)
+## What ships today (63 workspace packages, 1322 tests)
 
 | Area | Packages |
 |---|---|
@@ -228,7 +228,7 @@ identical composition runs against a real model. Then:
 
 ```bash
 pnpm typecheck              # builds all packages in topological order
-pnpm test                   # 1320 tests across 98 suites
+pnpm test                   # 1322 tests across 98 suites
 pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL)
 ```
 

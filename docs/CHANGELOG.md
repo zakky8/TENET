@@ -6,6 +6,22 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — lock the approval-key canonicalisation (the nested-reorder bypass fix) with real tests (2026-07-18)
+`stableApprovalKey` canonicalises tool-call args RECURSIVELY (a 2026-06-04 security fix) so an attacker who
+controls JSON key order cannot reorder args to force a FRESH approval prompt that bypasses a prior rejection —
+same operation ⇒ same key ⇒ the cached reject is returned. But the only test reordered TOP-LEVEL keys: a
+partial regression (sort the top level, forget to recurse) would pass it while re-opening the nested-reorder
+bypass. Added two regression tests:
+- **NESTED reorder → same key** (keys inside nested objects AND inside array elements reordered) — locks the
+  recursive canonicalisation. Mutation probe: making nested values non-recursive (`JSON.stringify` instead of
+  recursing) reddens THIS test while the flat one stays green — exactly the partial regression it guards.
+- **Array element order is significant** (`[1,2,3]` ≠ `[3,2,1]`) — a reordered array is a different operation
+  and must NOT share an approval; locks that canonicalisation sorts object keys but PRESERVES array order.
+  Mutation probe: sorting arrays reddens it.
+Test-only — `canonicalJson` is unchanged (already correct). `pnpm -r build`/`pnpm test` green, suite 1320 →
+**1322** (+2). Audited the rest of `@tenet/governance` in the same pass (PolicyEvaluator, ApprovalGate
+idempotency, redact-all-args default) — all sound.
+
 ### Added — lock the abnormal-stop → `refusal` mapping in every model adapter's tests (2026-07-18)
 A content-filtered / refused generation MUST map to canonical `refusal` (not `end_turn`), because the reasoner
 abstains on `refusal`/`max_tokens` *before* parsing — mapping it to `end_turn` would let a filtered draft be

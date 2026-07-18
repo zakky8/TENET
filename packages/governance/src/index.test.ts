@@ -86,6 +86,24 @@ describe('stableApprovalKey', () => {
     const b = stableApprovalKey(ctx({ args: { b: 2, a: 1 } }));
     expect(a).toBe(b);
   });
+
+  it('NESTED argument order does not affect key (recursive canonicalisation — the bypass fix)', () => {
+    // The 2026-06-04 hardening canonicalises RECURSIVELY. A partial (top-level-only)
+    // canonicaliser would pass the flat test above yet let an attacker reorder NESTED
+    // keys — inside objects AND inside array elements — to force a fresh approval prompt
+    // that bypasses a prior rejection. Same operation ⇒ same key.
+    const a = stableApprovalKey(ctx({ args: { outer: { a: 1, b: 2 }, items: [{ x: 1, y: 2 }] } }));
+    const b = stableApprovalKey(ctx({ args: { items: [{ y: 2, x: 1 }], outer: { b: 2, a: 1 } } }));
+    expect(a).toBe(b);
+  });
+
+  it('array element ORDER is significant — a reordered array is a DIFFERENT operation', () => {
+    // Arrays are ordered; [1,2,3] and [3,2,1] are different calls and must NOT share an
+    // approval (canonicalisation must sort object keys but PRESERVE array order).
+    const a = stableApprovalKey(ctx({ args: { ids: [1, 2, 3] } }));
+    const b = stableApprovalKey(ctx({ args: { ids: [3, 2, 1] } }));
+    expect(a).not.toBe(b);
+  });
 });
 
 describe('Governance.governApprove — allow / deny / approval paths', () => {
