@@ -6,6 +6,21 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — `@tenet/verifier` now re-exports ALL composable deterministic pre-checks (public-API completeness) (2026-07-18)
+The package entry exported `numericFabricationCheck` + `quoteGroundingCheck` (plus `ClaimPreCheck` +
+`runPreChecks`), so composing a CUSTOM deterministic tier is clearly a supported use case — but
+`urlFabricationCheck` and `emailFabricationCheck` (added later, in 3.2 and this loop) were never added to the
+`index.ts` re-export, so a caller literally could not import them from `@tenet/verifier`. An oversight, not a
+design choice: each check was added to `deterministic.ts` and to `defaultPreChecks` but the public export list
+wasn't updated. Added `urlFabricationCheck`, `emailFabricationCheck`, and the two options types
+(`NumericFabricationOptions`, `QuoteGroundingOptions`) to the entry — the composable surface is now complete
+and consistent. Added `publicApi.test.ts` that imports every check factory + options type from `./index.js`
+(the public entry, not the internal module) and builds + runs a hand-rolled tier — this LOCKS the surface:
+mutation probe non-vacuous (dropping an export from `index.ts` reddens the test — and nothing else would catch
+it, since url/email have no in-repo consumer outside `defaultPreChecks`). Pure additive re-export (§7:
+tsc-green is the proof) + a lock test; no behavior change. `pnpm -r build` green; suite 1309/97 → **1312/98**
+(+3 tests, +1 suite — the new test file).
+
 ### Added — deterministic verifier catches a fabricated CONTACT EMAIL (`emailFabricationCheck`, in `defaultPreChecks`) (2026-07-18)
 A support agent that invents `support@wrong.com` sends the user to the wrong — possibly hostile — address;
 that's a real, harmful hallucination the deterministic tier did not catch. `emailFabricationCheck` fails a

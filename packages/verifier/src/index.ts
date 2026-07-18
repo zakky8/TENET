@@ -15,9 +15,13 @@ export {
   extractNumericValues,
   numericFabricationCheck,
   quoteGroundingCheck,
+  urlFabricationCheck,
+  emailFabricationCheck,
   runPreChecks,
   type ClaimPreCheck,
   type PreCheckResult,
   type PreCheckVerdict,
+  type NumericFabricationOptions,
+  type QuoteGroundingOptions,
 } from './deterministic.js';
 export const VERSION = '0.0.0';
