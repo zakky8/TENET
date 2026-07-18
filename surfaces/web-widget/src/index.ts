@@ -31,6 +31,8 @@ export interface JwtClaims {
   tnt: string;
   /** Expiry epoch seconds. */
   exp: number;
+  /** Not-before epoch seconds — token is invalid until this time. */
+  nbf?: number;
   /** Issued-at epoch seconds. */
   iat?: number;
   /** Free-form custom claims. */
@@ -52,6 +54,24 @@ export function hs256Verifier(secret: string, opts: { now?: () => number } = {})
       const parts = token.split('.');
       if (parts.length !== 3) throw new JwtError('malformed JWT (parts != 3)');
       const [headerB64, payloadB64, sigB64] = parts as [string, string, string];
+      // SECURITY: assert alg=HS256 BEFORE verifying the signature. A token
+      // whose header claims alg:none or RS256 must be rejected even if an
+      // HMAC over header.payload happens to match — this closes the alg:none
+      // and RS256→HS256 confusion classes. Never trust the header's alg.
+      // Parity with the REST surface's hs256RestVerifier.
+      let header: unknown;
+      try {
+        header = JSON.parse(Buffer.from(b64UrlDecode(headerB64), 'base64').toString('utf8'));
+      } catch {
+        throw new JwtError('malformed JWT header');
+      }
+      if (
+        header === null ||
+        typeof header !== 'object' ||
+        (header as { alg?: unknown }).alg !== 'HS256'
+      ) {
+        throw new JwtError('JWT alg must be HS256');
+      }
       const expectedSig = createHmac('sha256', secret)
         .update(`${headerB64}.${payloadB64}`)
         .digest();
@@ -71,6 +91,11 @@ export function hs256Verifier(secret: string, opts: { now?: () => number } = {})
         throw new JwtError('payload decode failed');
       }
       if (!isJwtClaims(payload)) throw new JwtError('claims missing sub/tnt/exp');
+      // Optional nbf (not-before): a token that is not yet valid must be
+      // rejected, not just an expired one. Parity with the REST surface.
+      if (typeof payload.nbf === 'number' && payload.nbf > now()) {
+        throw new JwtError('token not yet valid');
+      }
       if (payload.exp < now()) throw new JwtError('token expired');
       return payload;
     },

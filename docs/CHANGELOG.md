@@ -6,6 +6,23 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Security — harden the web-widget HS256 JWT verifier to REST parity (5.3 partial, 2026-07-18)
+The web-widget surface's `hs256Verifier` was the weaker of the repo's two HS256 verifiers: it verified the
+HMAC signature but never checked the header's `alg`, and never checked `nbf`. Two gaps closed, mirroring the
+already-hardened REST `hs256RestVerifier`:
+- **alg-confusion / alg:none:** the header's `alg` is now asserted to equal `HS256` BEFORE the signature is
+  checked. A token whose header claims `alg:none` or `alg:RS256` is rejected even when an HMAC over
+  `header.payload` happens to match — exactly the case a signature-only check waves through. (Never trust the
+  header's alg.)
+- **nbf (not-before):** a token whose `nbf` is in the future is now rejected as "not yet valid", not just an
+  expired one; `nbf` added to `JwtClaims`.
+
+4 regression tests, all DISCRIMINATING: the alg-confusion tokens carry a VALID HMAC (signed with the real
+secret), so a signature-only verifier would accept them — mutation-removing the alg check reddens both;
+removing the nbf check reddens the not-yet-valid test. Suite 1230 → 1234 (+4). STILL OPEN in 5.3: the DRY
+de-fork of the two now-parallel verifiers into a shared `@tenet/surface-core` (a public-API refactor across
+both surfaces — its own increment), and moving the grounding gate into the surface send path.
+
 ### Added — README fenced-TypeScript gate + fixed the measure-real usage example (4.gate, 2026-07-18)
 `pnpm readme:check` (`scripts/check-readme-ts.mjs`, now a CI step + in CLAUDE.md's gate) extracts every
 ` ```ts ` block from a tracked README, writes it into the owning package's `examples/` dir (so workspace

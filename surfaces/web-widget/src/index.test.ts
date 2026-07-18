@@ -25,6 +25,24 @@ function makeJwt(claims: Record<string, unknown>, secret: string = SECRET): stri
   return `${header}.${payload}.${sig}`;
 }
 
+// Like makeJwt but with an attacker-chosen header — the signature is still a
+// VALID HMAC over header.payload, so only an explicit alg check can reject it.
+function makeJwtWithHeader(
+  header: Record<string, unknown>,
+  claims: Record<string, unknown>,
+  secret: string = SECRET,
+): string {
+  const h = b64UrlEncode(JSON.stringify(header));
+  const p = b64UrlEncode(JSON.stringify(claims));
+  const sig = createHmac('sha256', secret)
+    .update(`${h}.${p}`)
+    .digest('base64')
+    .replace(/=+$/, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+  return `${h}.${p}.${sig}`;
+}
+
 async function consumeBody(it: AsyncIterable<string>): Promise<string> {
   let out = '';
   for await (const c of it) out += c;
@@ -76,6 +94,34 @@ describe('hs256Verifier', () => {
     const v = hs256Verifier(SECRET);
     const tok = makeJwt({ sub: 'u' }); // missing tnt + exp
     await expect(v.verify(tok)).rejects.toThrow(/sub\/tnt\/exp/);
+  });
+
+  // SECURITY (alg-confusion): the header's alg is attacker-controlled. Even a
+  // token whose HMAC signature is VALID must be rejected if its alg is not
+  // HS256 — exactly the case a signature-only check would wave through.
+  it('rejects alg:none even when the HMAC signature is valid', async () => {
+    const v = hs256Verifier(SECRET, { now: () => NOW_S });
+    const tok = makeJwtWithHeader({ alg: 'none', typ: 'JWT' }, { sub: 'u', tnt: 't', exp: NOW_S + 60 });
+    await expect(v.verify(tok)).rejects.toThrow(/alg must be HS256/);
+  });
+
+  it('rejects alg:RS256 even when the HMAC signature is valid', async () => {
+    const v = hs256Verifier(SECRET, { now: () => NOW_S });
+    const tok = makeJwtWithHeader({ alg: 'RS256', typ: 'JWT' }, { sub: 'u', tnt: 't', exp: NOW_S + 60 });
+    await expect(v.verify(tok)).rejects.toThrow(/alg must be HS256/);
+  });
+
+  it('rejects a token whose nbf is in the future (not yet valid)', async () => {
+    const v = hs256Verifier(SECRET, { now: () => NOW_S });
+    const tok = makeJwt({ sub: 'u', tnt: 't', exp: NOW_S + 60, nbf: NOW_S + 30 });
+    await expect(v.verify(tok)).rejects.toThrow(/not yet valid/);
+  });
+
+  it('accepts a token whose nbf is already past', async () => {
+    const v = hs256Verifier(SECRET, { now: () => NOW_S });
+    const tok = makeJwt({ sub: 'u', tnt: 't', exp: NOW_S + 60, nbf: NOW_S - 30 });
+    const claims = await v.verify(tok);
+    expect(claims.sub).toBe('u');
   });
 });
 
