@@ -5,23 +5,31 @@ Real-ChatModel BENCHMARKS runner. Composes `@tenet/models-anthropic` (or any `Ch
 Swap `PUBLIC_SLICE` for real TruthfulQA / HaluEval / HELM via the `dataset` config field. License compliance for those datasets is the operator's responsibility.
 
 ```ts
-import { measureReal, makeCostMeter, REAL_TARGETS } from '@tenet/app-measure-real';
+import { measureReal, makeCostMeter } from '@tenet/app-measure-real';
 import { AnthropicChatModel } from '@tenet/models-anthropic';
 import { TOKEN_OVERLAP_SCORER } from '@tenet/judge-hhem';
 
-const model = new AnthropicChatModel({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-  model: 'claude-sonnet-4-5-20250929',
-  // ... injected http
-});
+const apiKey = process.env['ANTHROPIC_API_KEY'];
+if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+const modelId = 'claude-sonnet-4-6';
+
+// AnthropicChatModel takes an injected http transport FIRST, then options.
+const http = {
+  async fetch(url: string, init: { method: 'POST'; headers: Readonly<Record<string, string>>; body: string; signal?: AbortSignal }) {
+    const r = await fetch(url, init);
+    return { status: r.status, text: () => r.text() };
+  },
+};
+const model = new AnthropicChatModel(http, { apiKey, model: modelId });
+
 const cost = makeCostMeter({
-  'claude-sonnet-4-5-20250929': { inputUsdPerMillion: 3, outputUsdPerMillion: 15 },
+  [modelId]: { inputUsdPerMillion: 3, outputUsdPerMillion: 15 },
 });
 
 const report = await measureReal({
   model,
-  modelId: 'claude-sonnet-4-5-20250929',
-  hhem: TOKEN_OVERLAP_SCORER, // replace with real HHEM-2.1
+  modelId,
+  hhem: TOKEN_OVERLAP_SCORER, // swap for a real HHEM-2.1 via @tenet/judge-hhem-onnx
   cost,
 });
 console.log(JSON.stringify(report, null, 2));

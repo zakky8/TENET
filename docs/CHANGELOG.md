@@ -6,6 +6,20 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — README fenced-TypeScript gate + fixed the measure-real usage example (4.gate, 2026-07-18)
+`pnpm readme:check` (`scripts/check-readme-ts.mjs`, now a CI step + in CLAUDE.md's gate) extracts every
+` ```ts ` block from a tracked README, writes it into the owning package's `examples/` dir (so workspace
+`@tenet/*` imports and ESM top-level `await` resolve as an operator's copy would), and typechecks it with
+`tsc --noEmit`. A usage example that no longer compiles is stale code in the repo's own voice; the gate fails
+CI the moment one drifts from the API it documents. Caught + fixed REAL drift in `apps/measure-real/README.md`:
+its `ts` example imported a non-existent `REAL_TARGETS` export and constructed `AnthropicChatModel` with ONE
+argument (the real constructor is two — an injected `http` transport, then options), and used the stale model
+id `claude-sonnet-4-5-20250929`. Rewrote it to a complete, compilable snippet (two-arg constructor with a real
+`http` shape, `claude-sonnet-4-6`); synced the same stale id + the phantom `REAL_TARGETS` out of `cli.ts`'s
+usage comment, the canonical `examples/anthropic-sonnet.ts`, and `.github/workflows/measure-real.yml`.
+Non-vacuous: re-introducing the one-arg constructor makes the gate exit 1. (Also newly typechecks the
+canonical example, which the app build's `include: ["src/**/*"]` had never covered.) Suite unchanged (1230/92).
+
 ### Fixed — community-bot no longer hardcodes costUsd: 0 (4.3 partial, 2026-07-18)
 The community-bot reference recorded `costUsd: 0` on every outcome (a fabricated "free" measurement,
 commented "cost meter integration is Phase 2"). Fixed with the same structural CostMeter wiring as

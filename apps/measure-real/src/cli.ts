@@ -12,12 +12,12 @@
  *
  *   const model = new AnthropicChatModel(
  *     { fetch: (url, init) => fetch(url, init) },
- *     { apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-sonnet-4-5-20250929' },
+ *     { apiKey: process.env.ANTHROPIC_API_KEY!, model: 'claude-sonnet-4-6' },
  *   );
  *   const cost = makeCostMeter({
- *     'claude-sonnet-4-5-20250929': { inputUsdPerMillion: 3, outputUsdPerMillion: 15 },
+ *     'claude-sonnet-4-6': { inputUsdPerMillion: 3, outputUsdPerMillion: 15 },
  *   });
- *   const report = await measureReal({ model, modelId: '...', hhem, cost }, REAL_TARGETS);
+ *   const report = await measureReal({ model, modelId: '...', hhem, cost });
  *   console.log(JSON.stringify(report, null, 2));
  *
  * We do NOT auto-read env vars or auto-instantiate fetch here. Keeping

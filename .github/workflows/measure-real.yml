@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       model_id:
-        description: 'Anthropic model id (e.g. claude-sonnet-4-5-20250929)'
+        description: 'Anthropic model id (e.g. claude-sonnet-4-6)'
         required: false
-        default: 'claude-sonnet-4-5-20250929'
+        default: 'claude-sonnet-4-6'
   schedule:
     # Nightly at 03:17 UTC — off the hour to avoid the rush.
     - cron: '17 3 * * *'
@@ -67,7 +67,7 @@ jobs:
         if: steps.check.outputs.has_secret == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          MODEL_ID: ${{ github.event.inputs.model_id || 'claude-sonnet-4-5-20250929' }}
+          MODEL_ID: ${{ github.event.inputs.model_id || 'claude-sonnet-4-6' }}
         run: |
           node --experimental-strip-types \
             apps/measure-real/examples/anthropic-sonnet.ts \

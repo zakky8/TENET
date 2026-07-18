@@ -53,6 +53,7 @@ pnpm --filter @tenet/<pkg> build # typecheck a single package (fast inner loop)
 pnpm exec jest packages/<pkg>    # run one package's tests (fast inner loop)
 pnpm -r lint                     # lint (several packages are still lint-stubbed — see §10)
 pnpm counts:check                # docs' test-count claims must equal the LIVE suite (fails on drift)
+pnpm readme:check                # README ```ts examples must COMPILE against the real API (run after build)
 pnpm test:coverage               # CI's coverage gate — thresholds in jest.config.cjs (loop gate uses plain `pnpm test`)
 ```
 

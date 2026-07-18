@@ -18,3 +18,5 @@ storage/
 *.pid
 *.seed
 .cache/
+# transient snippet written by scripts/check-readme-ts.mjs (README fenced-TS gate)
+**/examples/__readme_check__.ts

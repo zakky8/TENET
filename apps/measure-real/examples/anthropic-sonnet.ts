@@ -26,7 +26,7 @@ if (!apiKey) {
   process.exit(2);
 }
 
-const modelId = 'claude-sonnet-4-5-20250929';
+const modelId = 'claude-sonnet-4-6';
 
 const http = {
   async fetch(url: string, init: { method: 'POST'; headers: Readonly<Record<string, string>>; body: string; signal?: AbortSignal }) {
