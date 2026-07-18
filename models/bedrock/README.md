@@ -1,15 +1,15 @@
 # @tenet/models-bedrock
 
-AWS Bedrock ChatModel adapter for the Anthropic Claude family. Implements `ChatModel` from `@tenet/verifier`.
+AWS Bedrock ChatModel adapter for the Anthropic Claude family. Implements `ChatModel` from `@tenet/core`.
 
 **No AWS SDK dependency.** The adapter takes an injected `BedrockInvoker` so callers wire their own `@aws-sdk/client-bedrock-runtime` client (or a gateway in front of Bedrock).
 
 ```ts
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
-import { AnthropicOnBedrockChatModel } from '@tenet/models-bedrock';
+import { AnthropicOnBedrockChatModel, type BedrockInvoker } from '@tenet/models-bedrock';
 
 const client = new BedrockRuntimeClient({ region: 'us-east-1' });
-const invoker = {
+const invoker: BedrockInvoker = {
   async invokeModel({ modelId, body, signal }) {
     const cmd = new InvokeModelCommand({ modelId, body });
     const res = await client.send(cmd, { abortSignal: signal });
