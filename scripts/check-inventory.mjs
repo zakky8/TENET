@@ -29,7 +29,12 @@ const subdirs = (p) =>
 // so it is excluded from the adapter count the docs state.
 const surfaceAdapters = subdirs('surfaces').filter((n) => n !== 'core');
 const modelAdapters = subdirs('models');
-const actual = { surface: surfaceAdapters.length, model: modelAdapters.length };
+const actual = {
+  surface: surfaceAdapters.length,
+  model: modelAdapters.length,
+  vectorstore: subdirs('stores/vector').length,
+};
+const LABELS = { surface: 'surface adapter', model: 'model adapter', vectorstore: 'vector store' };
 
 // Docs that state adapter counts. CHANGELOG excluded (see header).
 const DOCS = [
@@ -52,6 +57,7 @@ const PATTERNS = [
   { kind: 'surface', re: /surfaces\s*\((\d+)(?:\s+adapters)?\)/gi },
   { kind: 'model', re: /(\d+)\s+model adapters/gi },
   { kind: 'model', re: /models\s*\((\d+)\)/gi },
+  { kind: 'vectorstore', re: /(\d+)\s+vector stores?/gi },
 ];
 
 let errors = 0;
@@ -68,21 +74,23 @@ for (const doc of DOCS) {
       checked++;
       const claimed = Number(m[1]);
       if (claimed !== actual[kind]) {
-        console.error(`✗ ${doc}: "${m[0].trim()}" — ${kind} adapter count ${claimed} ≠ live ${actual[kind]}`);
+        console.error(`✗ ${doc}: "${m[0].trim()}" — ${LABELS[kind]} count ${claimed} ≠ live ${actual[kind]}`);
         errors++;
       }
     }
   }
 }
 
-console.log(`live inventory: ${actual.surface} surface adapters / ${actual.model} model adapters`);
+console.log(
+  `live inventory: ${actual.surface} surface adapters / ${actual.model} model adapters / ${actual.vectorstore} vector stores`,
+);
 if (checked === 0) {
-  console.error('✗ no adapter-count claims found in the tracked docs — the gate matched nothing');
+  console.error('✗ no inventory-count claims found in the tracked docs — the gate matched nothing');
   process.exit(1);
 }
 if (errors > 0) {
-  console.error(`\n${errors} stale inventory count(s) — a wrong adapter count is a hallucination in the repo's own voice.`);
-  console.error(`Update the docs to ${actual.surface} surface adapters / ${actual.model} model adapters, or re-run after fixing.`);
+  console.error(`\n${errors} stale inventory count(s) — a wrong structural count is a hallucination in the repo's own voice.`);
+  console.error('Update the docs to match the live inventory above, or re-run after fixing.');
   process.exit(1);
 }
-console.log(`✓ all ${checked} adapter-count claim(s) match the live inventory`);
+console.log(`✓ all ${checked} inventory-count claim(s) match the live inventory`);

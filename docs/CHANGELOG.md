@@ -6,6 +6,19 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Changed — `inventory:check` now also gates the "N vector stores" count against `stores/vector/` (2026-07-18)
+The inventory gate locked the surface- and model-adapter counts, but "2 vector stores" (README status line) was
+an ungated structural count — exactly the drift class the gate exists to catch (a 3rd store would silently
+leave the doc stale). Extended `scripts/check-inventory.mjs`: it now computes `stores/vector/` (= pgvector +
+qdrant = 2) and fails any doc claiming a different `N vector stores`. The pattern is digit-anchored
+(`(\d+)\s+vector stores?`), so the many prose mentions ("Default vector store: pgvector", "Qdrant vector
+store") do NOT false-positive — verified the gate stays green with them present. Mutation probe non-vacuous:
+`2 vector stores`→`3` in README reddens the gate (`vector store count 3 ≠ live 2`). Now 20 inventory claims
+checked (was 19). Verified in the same pass that the other README status-line capability claims are accurate
+(a2a/ag-ui/acp packages exist, `@tenet/durable` has `interrupt()` HITL, 2 state stores). Tooling-only; no
+TypeScript source or test changed, so `pnpm -r build`/`pnpm test` are unaffected (green at parent `5632ff4`,
+1325/98); counts/jsonld/links green.
+
 ### Fixed — reconcile SECURITY enforcement claims (template-injection + deserialization) to the code (2026-07-18)
 Follow-up to the supply-chain reconciliation: three more enforcement claims in the security tables didn't match
 the code (§9 — no capability that isn't in the code; a security doc that overclaims a control is worse than a
