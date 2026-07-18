@@ -6,6 +6,36 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Fixed — `AGENTS.md` reconciled against the code (removed ungrounded + stale claims, 2026-07-18)
+The public operating manual is held to §1/§9 like any other doc — a claim contributors rely on that isn't
+backed by the code is a hallucination in the repo's own voice. Re-verified every factual claim in `AGENTS.md`
+against the repo this session (`ls`/`grep`/reading `ci.yml` + `.pre-commit-config.yaml` + `package.json`) and
+corrected the ones that were wrong:
+- **Cut the `OWNER_ID` / VPS / "owner-only sensitive ops" / "no public emails" rule** — `git grep OWNER_ID`
+  and `VPS` matched **only `AGENTS.md`**; zero code implements any of it. It was bot-shaped boilerplate that
+  does not describe this framework. Replaced discipline #7 with the rule that *is* the framework's contract —
+  **fail closed** (infra error/timeout/truncation → abstain-or-handoff; no default `answer`; unverified text
+  on an error path is a regression even with green tests).
+- **"Single-branch policy … No feature branches"** contradicted `ci.yml`'s own `pull_request: branches:[main]`
+  trigger (and the actual working branch). Restated as what CI actually does: `main` is the integration
+  branch; CI runs on pushes to `main` and PRs targeting it.
+- **"Surfaces (12)"** disagreed with its own 9-item list and every other doc ("9 surface adapters"). `ls
+  surfaces/` = 9 adapters + `core` (shared infra). Fixed to "9 adapters + ticketing connectors".
+- **Security section corrected to the real CI/pre-commit config**: dropped **Semgrep** (referenced nowhere in
+  `ci.yml` or `.pre-commit-config.yaml`); the `pnpm audit` CI job is informational (`--audit-level critical`,
+  `continue-on-error`), not a `--audit-level=high` gate (that value is the pre-push hook); Trivy is CI
+  report-only (SARIF → Security tab); `actionlint`+`zizmor` run via pre-commit.
+- **Commands block** now lists the real gates it was missing — `test:coverage`, `counts:check`,
+  `readme:check`, `jsonld:check` — and the `pnpm lint` note is exact: **63/63 packages carry the
+  `echo 'no lint yet'` stub, zero have a real lint script**, so "no-op stub in every package".
+- **Dropped the unsourced "caught 20+ real bugs"** boast (§9: a number must trace to a source).
+
+Left untouched what verified TRUE: Node 22 (`.nvmrc`=22, `engines>=22`, consistent across README/CONTRIBUTING/
+ARCHITECTURE), Models (6), HHEM-2.1 (Vectara `hhem-2.1-open`), the `stores/{vector,state}` convention, and the
+15-package "already shipped" table (all dirs confirmed present). Docs-only; no TypeScript source or test
+changed, so `pnpm -r build`/`pnpm test` are unaffected (green at parent `49a726c`). `counts:check` /
+`readme:check` / `jsonld:check` all green, no drift. Suite unchanged at 1294/97.
+
 ### Added — FAQ page emits `FAQPage` JSON-LD, now gated by `pnpm jsonld:check` (2026-07-18)
 Structured data is machine-readable content the repo emits in its own voice, so it is held to §1 like any
 other claim: a malformed or empty block is a broken promise to crawlers shipped silently. Two parts:
