@@ -160,7 +160,7 @@ Same stack as Dim 3 plus:
 
 ### Dim 6 — Zero high-severity CVEs
 
-This is non-negotiable and continuous. See [SECURITY.md](../SECURITY.md). The mechanisms in §7 of [ARCHITECTURE.md](ARCHITECTURE.md) map 1:1 to the LangChain CVE categories.
+This is non-negotiable and continuous. See [SECURITY.md](../SECURITY.md). The mechanisms in §7 of [ARCHITECTURE.md](ARCHITECTURE.md) map 1:1 to the known agent-framework CVE-class categories (unsafe deserialization, template injection, path traversal, SQL injection) — the mistake *classes*, attributed to no named project.
 
 **Additional layer specific to 100× ambition:**
 

@@ -27,7 +27,7 @@ We honor longer embargoes if the issue is in a downstream dependency we cannot p
 
 ## Hardened-by-construction guarantees
 
-TENET is designed to avoid entire categories of LangChain-class vulnerabilities. These are policies, not aspirations — CI enforces them.
+TENET is designed to avoid entire categories of known agent-framework vulnerability classes. These are policies, not aspirations — CI enforces them.
 
 | Risk | Policy | Enforcement |
 |------|--------|-------------|

@@ -1,7 +1,7 @@
 ---
 layout: default
 title: "TENET — Verification-first TypeScript AI agent framework"
-description: "Multi-judge hallucination verifier, Vectara HHEM-2.1, pre-tool-call governance, WASM tool sandbox, MCP OAuth gateway, 10 surfaces, BENCHMARKS gated in CI. LangChain alternative. 0 CVEs. Apache-2.0."
+description: "Multi-judge hallucination verifier, Vectara HHEM-2.1, pre-tool-call governance, WASM tool sandbox, MCP OAuth gateway, multi-surface, BENCHMARKS gated in CI. LangChain alternative, hardened by construction. Apache-2.0."
 ---
 
 # TENET

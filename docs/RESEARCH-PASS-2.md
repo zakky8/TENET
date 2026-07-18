@@ -127,7 +127,7 @@ Key changes:
 | **OpenAI Agents SDK (TS)** | Next-best TS choice after Mastra | |
 | **Letta** | Niche — persistent-memory assistants | |
 | **Inkeep SDK** | TS extension to no-code platform; MCP + A2A protocols; deep customization | |
-| **LangGraph** | Still strongest mindshare; complex flows | CVE history remains a concern (see SECURITY.md) |
+| **LangGraph** | Still strongest mindshare; complex flows | We design out the ecosystem's CVE-class mistake categories by construction (see SECURITY.md); no advisory attributed here to any named project |
 | **CrewAI** | Multi-agent role-based; simpler than LangGraph | |
 | **Google ADK** | Multi-language flagship (Python + TS + Java + Go) | |
 

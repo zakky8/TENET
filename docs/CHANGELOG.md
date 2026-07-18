@@ -6,6 +6,20 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Changed — remove unsourced competitor security claims (measured, not marketed; 7.2, 2026-07-18)
+An anti-hallucination framework must not ship unsourced attacks on named competitors — that is the
+exact self-contradiction it exists to prevent. Generalized every named-competitor CVE/vulnerability
+claim to threat-model framing that attributes nothing to any project:
+- ARCHITECTURE §1 no longer says named frameworks "shipped CVE-class mistakes"; it describes the
+  ecosystem's CVE-CLASS mistake *categories* we design out.
+- SECURITY.md "LangChain-class vulnerabilities" → "known agent-framework vulnerability classes";
+  BENCHMARKS Dim 6 "the LangChain CVE categories" → "known agent-framework CVE-class categories";
+  RESEARCH-PASS-2's LangGraph "CVE history remains a concern" cell → no advisory attributed.
+- docs/index.md meta description dropped the bare "0 CVEs" boast (unearned for a new, unaudited
+  project) → "hardened by construction". TENET's own MEASURED Dim-6 posture (Trivy / npm audit /
+  GitHub Advisories in CI) stays — it states its method. Self-claims about TENET's own hardening
+  (no pickle, PathHandle, parameterized queries) are unchanged; those describe this repo's code.
+
 ### Added — `counts:check`: the live suite is the single source of truth for doc counts (2026-07-18)
 `scripts/check-counts.mjs` (`pnpm counts:check`, now a CI step) runs the suite, reads the real
 `numTotalTests`/`numTotalTestSuites`, and fails if any tracked doc's count-claim disagrees — so a
