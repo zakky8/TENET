@@ -15,8 +15,9 @@
  */
 import type { Citation, Source } from '@tenet/core';
 import type { Filter } from '@tenet/guardrails';
+import type { PolicyEvaluator } from '@tenet/governance';
 import type { BoundaryGateOptions } from '@tenet/refine';
-import type { ToolCall } from './types.js';
+import type { Reasoner, ToolCall } from './types.js';
 
 /** A scored retrieval result. Structurally identical to `@tenet/retrieval`'s
  *  `ScoredSource`, redeclared here so the agent depends on the PORT, not a concrete
@@ -97,4 +98,13 @@ export interface AgentDeps {
   /** Outbound leak-filter chain (guardrails). Includes `systemPromptLeakFilter()`.
    *  An empty chain means no outbound gating (not recommended in production). */
   readonly outboundFilters: ReadonlyArray<Filter>;
+  /** The decides-and-drafts model turn. */
+  readonly reasoner: Reasoner;
+  /** Max reason/tool turns before the loop fails closed (an answer that never verifies,
+   *  or endless tool calls, abstains once this is hit). */
+  readonly maxAttempts: number;
+  /** Governance policy gating every tool call before execution. */
+  readonly policy: PolicyEvaluator;
+  /** Tool-execution port (only ever handed policy-allowed calls). */
+  readonly tools: ToolExecutor;
 }

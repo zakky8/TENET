@@ -15,6 +15,7 @@
  *     model (a tool error is not a turn-level failure) — but it is never silently
  *     dropped or turned into a fake success.
  */
+import type { ConversationMessage } from '@tenet/core';
 import { PolicyEvaluator, type PolicyDecision } from '@tenet/governance';
 import type { ToolExecutor } from './deps.js';
 import type { ToolCall, ToolResultBlock } from './types.js';
@@ -72,4 +73,19 @@ export async function runTools(
     }
   }
   return { denied: false, results };
+}
+
+/** Fold executed tool results back into the conversation as `role: 'tool'` messages so
+ *  the next reasoning pass (which reads `history`) sees them. An error result is marked
+ *  in the text — it is surfaced to the model, never hidden. */
+export function appendToolResults(
+  history: ReadonlyArray<ConversationMessage>,
+  blocks: ReadonlyArray<ToolResultBlock>,
+): ReadonlyArray<ConversationMessage> {
+  const messages: ConversationMessage[] = blocks.map((b) => ({
+    role: 'tool' as const,
+    content: b.isError ? `[tool error] ${b.content}` : b.content,
+    toolCallId: b.toolUseId,
+  }));
+  return [...history, ...messages];
 }

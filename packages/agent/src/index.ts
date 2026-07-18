@@ -39,6 +39,7 @@ export type {
 export type { ToolResultBlock } from './types.js';
 export { injectionGate, retrieveNode, cacheNode } from './nodes.js';
 export { verifyAndEmit, knowledgeBlock, type EmitDecision } from './emit.js';
-export { runTools, type ToolRunContext, type ToolRunResult } from './tools.js';
+export { runTools, appendToolResults, type ToolRunContext, type ToolRunResult } from './tools.js';
+export { criticLoop } from './criticLoop.js';
 
 export const VERSION = '0.0.0';
