@@ -9,6 +9,7 @@ Measured, not marketed: every capability below is code in the monorepo, every be
 ## Documentation
 
 - [README](README.md): what TENET is, the honest read (framework not model), the capability map, quickstart, and what ships today.
+- [FAQ](docs/FAQ.md): answer-shaped questions — how TENET prevents hallucination, what grounded-or-abstain means, supported models and surfaces, how the verifier works, and whether it is production-ready.
 - [Architecture](docs/ARCHITECTURE.md): component map, the security stance (CVE-class mistakes designed out by construction), and §17's as-built account of the canonical `ChatModel` contract and the agent turn.
 - [Agent-turn design](docs/design/agent-turn.md): the design record for the driven turn — the discriminated `ReasonerOutput`, the single emit edge (`verifyAndEmit`), the fail-closed inventory of every graph edge, and the composition root `runAgent`.
 - [BENCHMARKS](docs/BENCHMARKS.md): the measurable targets per dimension and the hermetic-stub vs real-model measurement split (the CI gate runs a deterministic stub; real-model numbers come from a local runner with the operator's own key).

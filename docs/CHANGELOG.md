@@ -6,6 +6,14 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — `docs/FAQ.md` answer-shaped FAQ for AEO/SEO (7.3, 2026-07-18)
+A structured FAQ with answer-shaped questions (how TENET prevents hallucination, what grounded-or-abstain
+means, is-it-a-LangChain-alternative, supported models/surfaces, how the verifier works, is-it-production-ready,
+licensing, getting started). Every answer is measured — capabilities named are code in the tree (6 model
+adapters, 9 surface adapters, 4 ticketing connectors, `infra/helm/tenet`), no unsourced competitor claims,
+and the production-readiness answer is honest (pre-1.0; adapters transport-injected; in-repo numbers are the
+hermetic stub). Linked from `llms.txt`; sets up the JSON-LD `FAQPage` (remaining 7.3).
+
 ### Added — `skillToolPolicyRule`: `allowed-tools` is now ENFORCED, not decorative (8.2, 2026-07-18)
 `@tenet/skills` gains `skillToolPolicyRule(frontmatter)` → a `@tenet/governance` `PolicyRule` that allows
 ONLY the tools a skill declared. Dropped into a `PolicyEvaluator`, a skill physically cannot call a tool it
