@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   parseFrontmatter,
   SkillRegistry,
@@ -170,5 +172,27 @@ describe('skillAllowedTools', () => {
   it('returns [] when none declared', () => {
     const { frontmatter } = parseFrontmatter('---\nname: a\ndescription: b\n---\n');
     expect(skillAllowedTools(frontmatter)).toEqual([]);
+  });
+});
+
+// The flagship skill is a shipped repo artifact; this guarantees it stays a VALID
+// SKILL.md that this very registry can parse + register (a malformed frontmatter would
+// break `SkillRegistry` loading it — 8.2). Reads from the repo root (jest cwd).
+describe('repo-root SKILL.md (the flagship verification-first-agent skill)', () => {
+  const text = readFileSync(join(process.cwd(), 'SKILL.md'), 'utf8');
+
+  it('parses with the required + optional frontmatter fields', () => {
+    const { frontmatter, body } = parseFrontmatter(text);
+    expect(frontmatter.name).toBe('verification-first-agent');
+    expect(frontmatter.description.length).toBeGreaterThan(0);
+    expect(frontmatter.license).toBe('Apache-2.0');
+    expect(frontmatter.userInvocable).toBe(true); // proves the kebab `user-invocable:` key parsed
+    expect(body).toContain('grounded'); // the body survived the frontmatter split
+  });
+
+  it('registers in a SkillRegistry without throwing', () => {
+    const reg = new SkillRegistry(new InMemoryBodyLoader({}));
+    expect(() => reg.registerFromText('SKILL.md', text)).not.toThrow();
+    expect(reg.list().map((f) => f.name)).toContain('verification-first-agent');
   });
 });

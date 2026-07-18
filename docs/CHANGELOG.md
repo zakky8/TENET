@@ -6,6 +6,16 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — flagship `SKILL.md`: build a verification-first, grounded-or-abstain agent (8.1, 2026-07-18)
+A repo-root `SKILL.md` (parseable by `@tenet/skills`' own `SkillRegistry`, frontmatter
+`name: verification-first-agent`) distilling how to build an agent whose worst outcome is a human
+handoff, never an ungrounded fact: the one rule, the fail-closed turn shape, 8 techniques (no default
+answer, one emit edge, grounded-citation guard, fail-closed on infra failure, verify-against-sources,
+gate-tools-before-run, knowledge-boundary + cache re-verify, required AbortSignal), the anti-patterns that
+cause hallucination, a build checklist, and TENET as the reference implementation. Generic and zero
+cross-project content. A regression test in `@tenet/skills` reads the shipped `SKILL.md` and asserts it
+parses + registers, so the flagship skill can never silently become malformed. Suite 1193 → 1195.
+
 ### Added — `llms.txt` AEO index for AI agents / crawlers (7.3, 2026-07-18)
 A repo-root `llms.txt` (llmstxt.org format): one-line guarantee, an honest-read context paragraph,
 and linked sections (Documentation, Core concepts, What ships today) so an LLM or agent can navigate
