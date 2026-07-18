@@ -35,6 +35,9 @@ export interface RetrievedChunk {
 export type Result = {
   readonly reply: NormalizedReply;
   readonly outcome: Outcome;
+  /** Diagnostic reason for a non-`resolved` terminal (abstain/handoff) — carried
+   *  for telemetry/debugging so it is not dropped. Not shown to the member. */
+  readonly reason?: string;
 };
 
 /** The orchestrator's working state. IS an `AgentState` (so retrieve/draft/verify

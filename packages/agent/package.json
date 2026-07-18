@@ -24,7 +24,8 @@
   },
   "dependencies": {
     "@tenet/core": "workspace:*",
-    "@tenet/harness": "workspace:*"
+    "@tenet/harness": "workspace:*",
+    "@tenet/workflow": "workspace:*"
   },
   "keywords": [
     "agent-framework",

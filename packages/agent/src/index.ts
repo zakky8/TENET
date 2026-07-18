@@ -17,4 +17,13 @@ export type {
 
 export { modelReasoner, parseEnvelope, buildSystem } from './reasoner.js';
 
+export {
+  emitResult,
+  abstainResult,
+  handoffResult,
+  ABSTAIN_REPLY,
+  HANDOFF_REPLY,
+} from './terminals.js';
+export { halting, finalize } from './orchestrator.js';
+
 export const VERSION = '0.0.0';
