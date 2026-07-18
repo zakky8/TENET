@@ -6,6 +6,20 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — retryable-vs-fatal error taxonomy in `@tenet/rate-limit` (5.1 partial, 2026-07-18)
+`classifyError(err) → { retryClass: 'retryable' | 'fatal', reason }` + `isRetryable(err)` — the foundation a
+resilience layer (retry / backoff / cross-provider failover) must consult BEFORE any retry. Encodes 5.1's
+fail-closed rules: an **AbortError is fatal** (a cancelled request must stay cancelled — retrying defeats
+cancellation and can duplicate a side effect); **4xx is fatal** (a client error fails identically on retry,
+and 401/403/429 blind-retries risk an egress-IP ban — the existing CircuitBreaker's own concern); **429/408
+and 5xx are retryable** (transient — with backoff); known transient socket/DNS codes (ECONNRESET, ETIMEDOUT,
+…) are retryable. Everything unrecognized is **fatal** — a non-idempotent call is never blindly re-sent on an
+error we cannot classify. Pure + duck-typed on `name`/`status`/`code`, so it works across model adapters and
+`fetch` impls without importing them. 9 tests across every branch (incl. AbortError-wins-over-503 and the
+fail-closed unknown/null/string cases); 3 mutation probes non-vacuous (abort→retryable, unknown→retryable,
+4xx→retryable each redden). Suite 1234 → 1243 (+9), 92 → 93 suites. STILL OPEN in 5.1: the retry-with-jittered-
+backoff wrapper, wiring the CircuitBreaker, and the cross-provider failover chain (all consume this taxonomy).
+
 ### Security — harden the web-widget HS256 JWT verifier to REST parity (5.3 partial, 2026-07-18)
 The web-widget surface's `hs256Verifier` was the weaker of the repo's two HS256 verifiers: it verified the
 HMAC signature but never checked the header's `alg`, and never checked `nbf`. Two gaps closed, mirroring the
