@@ -62,7 +62,7 @@ Each is in [ROADMAP.md Phase 1](ROADMAP.md). All 11 packages landed (see [CHANGE
 
 **Still pending (stated honestly):**
 
-- The **answer repair-retry** capability (`RewriteFn` in the `criticLoop` answer branch) — a capability enhancement on the safe floor; today an unverifiable draft fails closed to `abstain`. And **real-model validation** of the decides-and-drafts prompt (`buildSystem`) — deferred until an API key exists in the build env. Neither weakens the control-flow guarantee.
+- **Real-model validation** of the decides-and-drafts prompt (`buildSystem`) — deferred until an API key exists in the build env. The control-flow guarantee does not depend on it. (The answer repair-retry — `RewriteFn` + re-verify in the `criticLoop` answer branch — is now shipped.)
 - The verifier's own fail-CLOSED changes are a later phase (Phase 3).
 - REAL-MODEL benchmark numbers still do not exist (no model access in this environment). The hermetic stub remains the only measured plane; keep the stub-vs-real split in the benchmark docs honest — no real-model numbers are claimed.
 

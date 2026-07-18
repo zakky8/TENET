@@ -81,6 +81,14 @@ export interface ToolExecutor {
   ): Promise<{ readonly content: string; readonly isError: boolean }>;
 }
 
+/** Rewrite a draft to address a verifier critique — a model call. Structurally matches
+ *  `@tenet/refine`'s `RewriteFn`, declared locally so the agent owns its DI surface (a
+ *  refine rewriter satisfies it directly). The rewritten draft is NOT trusted — it
+ *  re-enters the same fail-closed emit edge, so a bad rewrite cannot ship. */
+export interface RewriteFn {
+  (args: { readonly draft: string; readonly critique: string; readonly signal?: AbortSignal }): Promise<string>;
+}
+
 /** Everything the orchestrator injects into the turn's nodes. */
 export interface AgentDeps {
   /** Inbound filter chain (guardrails). An empty chain means no inbound blocking. */
@@ -100,9 +108,15 @@ export interface AgentDeps {
   readonly outboundFilters: ReadonlyArray<Filter>;
   /** The decides-and-drafts model turn. */
   readonly reasoner: Reasoner;
-  /** Max reason/tool turns before the loop fails closed (an answer that never verifies,
-   *  or endless tool calls, abstains once this is hit). */
+  /** Max reason/tool turns before the loop fails closed (endless tool calls abstain once
+   *  this is hit). */
   readonly maxAttempts: number;
+  /** Rewrite a draft that failed verification, given the verifier's critique. The result
+   *  re-enters the emit edge, so it is never trusted blindly. */
+  readonly rewrite: RewriteFn;
+  /** How many times a failed draft may be rewritten-and-re-verified before the turn fails
+   *  closed to abstain. 0 = no repair (a verify failure abstains immediately). */
+  readonly maxRepairRounds: number;
   /** Governance policy gating every tool call before execution. */
   readonly policy: PolicyEvaluator;
   /** Tool-execution port (only ever handed policy-allowed calls). */

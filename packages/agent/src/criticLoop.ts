@@ -69,11 +69,33 @@ export function criticLoop(deps: AgentDeps): Step<OrchestratorState, Orchestrato
         }
 
         case 'answer': {
-          const emit = await verifyAndEmit(decision.draft, state, deps);
-          if (emit.kind === 'emit') return { ...state, halt: emit.result };
-          // repair OR abstain → FAIL CLOSED to abstain (rewrite-retry lands in a follow-up).
-          const reason = emit.kind === 'repair' ? `unverified: ${emit.critique}` : emit.reason;
-          return { ...state, halt: abstainResult(reason) };
+          // Verify → (on repair) rewrite from the critique → re-verify, up to maxRepairRounds.
+          // The rewritten draft is NOT trusted: it re-enters the SAME emit edge, so a bad
+          // rewrite can never ship. A verifier-throw / uncited / outbound-leak abstain is NOT
+          // repairable — only a `repair` (verify pass=false) is retried.
+          let draft = decision.draft;
+          for (let round = 0; round <= deps.maxRepairRounds; round++) {
+            if (ctx.signal.aborted) return { ...state, halt: abstainResult('aborted') }; // FAIL CLOSED
+
+            const emit = await verifyAndEmit(draft, state, deps);
+            if (emit.kind === 'emit') return { ...state, halt: emit.result };
+            if (emit.kind === 'abstain') return { ...state, halt: abstainResult(emit.reason) }; // not repairable
+
+            // emit.kind === 'repair'
+            if (round === deps.maxRepairRounds) {
+              return {
+                ...state,
+                halt: abstainResult(`unverified after ${deps.maxRepairRounds} repair round(s): ${emit.critique}`),
+              }; // FAIL CLOSED — budget spent
+            }
+            try {
+              draft = await deps.rewrite({ draft, critique: emit.critique, signal: ctx.signal });
+            } catch (err) {
+              return { ...state, halt: abstainResult(`repair failed: ${(err as Error).message}`) }; // FAIL CLOSED
+            }
+          }
+          // Unreachable (the loop returns on every path), but fail closed by construction.
+          return { ...state, halt: abstainResult('repair budget exhausted') };
         }
       }
     }

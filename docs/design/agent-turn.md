@@ -315,8 +315,9 @@ Nodes are `Step<OrchestratorState, OrchestratorState>`. Terminals are carried in
 > grounding against the real dependencies: (1) `verifyAndEmit` returns a discriminated **`EmitDecision`**
 > (`emit | repair | abstain`), not `Result | null` with a `state.critique` side-effect; (2) the turn depends on
 > a **narrow `Verifier` port** (`deps.verify.check`) — there is no `failClosed` verifier-config field (it never
-> existed); (3) the answer **repair-retry** (`refine.repairDraft`) is a deferred capability — an unverifiable
-> draft currently fails closed to `abstain`. The safety floor holds without it.
+> existed); (3) the answer **repair-retry** rewrites a failed draft via `deps.rewrite` (a `RewriteFn`) and
+> re-verifies it through the SAME emit edge up to `deps.maxRepairRounds` — it does NOT use `refine.repairDraft`,
+> and a rewritten draft is never trusted (a bad rewrite re-enters verification, so it cannot ship).
 
 ### 4.1 Graph topology
 
@@ -422,8 +423,9 @@ export function cacheNode(deps: AgentDeps): Step<OrchestratorState, Orchestrator
 ### 4.3 `criticLoop` — the turn driver, and `verifyAndEmit` the single emit edge
 
 `criticLoop` owns the reason/tool loop and consumes `verifyAndEmit`'s `EmitDecision` directly.
-`refine.repairDraft` is **not** used; a `repair` signal fails closed to `abstain` (the rewrite-retry is a
-tracked capability follow-up, not a safety gap — see §7).
+`refine.repairDraft` is **not** used; on a `repair` signal criticLoop rewrites the draft via `deps.rewrite`
+(a `RewriteFn`) and re-verifies it through the SAME emit edge, up to `deps.maxRepairRounds`, then fails closed
+to `abstain`. The rewritten draft is never trusted — it re-enters `verifyAndEmit`, so a bad rewrite cannot ship.
 
 ```ts
 // packages/agent/src/criticLoop.ts
@@ -458,11 +460,22 @@ export function criticLoop(deps: AgentDeps): Step<OrchestratorState, Orchestrato
         }
 
         case 'answer': {
-          const emit = await verifyAndEmit(decision.draft, state, deps);    // the ONLY emit edge
-          if (emit.kind === 'emit') return { ...state, halt: emit.result };
-          // repair OR abstain → FAIL CLOSED to abstain (rewrite-retry lands in a follow-up).
-          const reason = emit.kind === 'repair' ? `unverified: ${emit.critique}` : emit.reason;
-          return { ...state, halt: abstainResult(reason) };
+          // Verify → (on repair) rewrite from the critique → re-verify, up to maxRepairRounds.
+          // The rewritten draft is NOT trusted — it re-enters the SAME emit edge.
+          let draft = decision.draft;
+          for (let round = 0; round <= deps.maxRepairRounds; round++) {
+            if (ctx.signal.aborted) return { ...state, halt: abstainResult('aborted') };
+            const emit = await verifyAndEmit(draft, state, deps);           // the ONLY emit edge
+            if (emit.kind === 'emit') return { ...state, halt: emit.result };
+            if (emit.kind === 'abstain') return { ...state, halt: abstainResult(emit.reason) }; // not repairable
+            // emit.kind === 'repair'
+            if (round === deps.maxRepairRounds) {
+              return { ...state, halt: abstainResult(`unverified after ${deps.maxRepairRounds} repair round(s): ${emit.critique}`) };
+            }
+            try { draft = await deps.rewrite({ draft, critique: emit.critique, signal: ctx.signal }); }
+            catch (err) { return { ...state, halt: abstainResult(`repair failed: ${(err as Error).message}`) }; }
+          }
+          return { ...state, halt: abstainResult('repair budget exhausted') }; // unreachable; fail closed
         }
       }
     }
@@ -526,7 +539,7 @@ export async function verifyAndEmit(
 | D | reasoner | throw / parse-fail / `tool_use`-with-no-tools / refusal / aborted | `disqualified` (abstain) | §3 |
 | D | tool | `PolicyEvaluator` deny / approval unmet | `handed_off` (ops) | governance evaluate |
 | D | verify | `deps.verify.check` **throws** | `abstain` (`EmitDecision`) — orchestrator never trusts internal fail-open | emit.ts (Verifier port) |
-| D | verify | verdict `pass=false` | `EmitDecision:'repair'` → criticLoop `abstain` (rewrite-retry deferred — §7) | emit.ts |
+| D | verify | verdict `pass=false` | `EmitDecision:'repair'` → rewrite via `deps.rewrite` + re-verify (≤ `maxRepairRounds`), then `abstain` | criticLoop.ts / emit.ts |
 | D.emit | uncited pass | verdict `pass=true` but no citation with non-blank `sourceId`+`quote` (incl. zero-claim) | `abstain` — an uncited answer never ships | emit.ts (grounded-citation guard) |
 | D.emit | outbound leak | `runFilterChain(draft, outboundFilters)` → `block` (incl. `systemPromptLeakFilter`) | `abstain` — leaked draft never emits | promptInjection.ts:66 |
 | F | top-level | any `WorkflowError` (timeout/aborted/retry_exhausted) or uncaught node throw | `disqualified` (abstain) | orchestrator catch |

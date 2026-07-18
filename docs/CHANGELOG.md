@@ -24,7 +24,10 @@ nothing drove; it is now driven end-to-end.
   ≥1 grounded citation (non-blank `sourceId` + `quote`) → outbound leak gate → emit.
 - **Fail-closed backstops:** terminals CARRIED in `state.halt` (never thrown); `finalize` abstains
   on an unset terminal; a top-level catch turns any `WorkflowError`/throw into an abstain.
-- Deferred (do not weaken the guarantee): answer repair-retry capability; real-model prompt validation.
+- **Answer repair-retry** (`criticLoop`): on a `repair` verdict the draft is rewritten via `deps.rewrite`
+  (a `RewriteFn`) and re-verified through the SAME emit edge, up to `maxRepairRounds`, then abstains. The
+  rewritten draft is never trusted — it re-enters `verifyAndEmit`, so a bad rewrite cannot ship.
+- Deferred (does not weaken the guarantee): real-model prompt validation (no model access in this env).
 
 ### Added — canonical `ChatModel` contract + `@tenet/agent` Phase 2 start (2026-07-18)
 Branch `upgrade/top-1pct`. Test suite: 1051 → 1117 tests across 83 → 85 suites,

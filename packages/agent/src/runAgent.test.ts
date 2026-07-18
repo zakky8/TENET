@@ -69,6 +69,8 @@ function makeDeps(over: Partial<AgentDeps> = {}): AgentDeps {
     maxAttempts: 3,
     policy: new PolicyEvaluator([]),
     tools: { async execute() { return { content: '', isError: false }; } },
+    rewrite: async ({ draft }) => draft,
+    maxRepairRounds: 0,
     timeouts: { gate: 1000, retrieve: 1000, cache: 1000 },
     ...over,
   };

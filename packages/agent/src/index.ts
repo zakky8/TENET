@@ -36,6 +36,7 @@ export type {
   VerifierInput,
   VerifierVerdict,
   ToolExecutor,
+  RewriteFn,
 } from './deps.js';
 export type { ToolResultBlock } from './types.js';
 export { injectionGate, retrieveNode, cacheNode } from './nodes.js';

@@ -11,7 +11,7 @@ import type { Citation } from '@tenet/core';
 import type { Filter } from '@tenet/guardrails';
 import { PolicyEvaluator, type PolicyRule } from '@tenet/governance';
 import type { StepContext } from '@tenet/workflow';
-import type { AgentDeps, ToolExecutor, Verifier, VerifierVerdict } from './deps.js';
+import type { AgentDeps, RewriteFn, ToolExecutor, Verifier, VerifierVerdict } from './deps.js';
 import type { OrchestratorState, ReasonerOutput, Reasoner } from './types.js';
 import { criticLoop } from './criticLoop.js';
 
@@ -80,8 +80,33 @@ function makeDeps(over: Partial<AgentDeps> = {}): AgentDeps {
     maxAttempts: 3,
     policy: new PolicyEvaluator([]),
     tools: recordingExecutor(),
+    rewrite: async ({ draft }) => draft, // identity by default (no repair unless a test overrides)
+    maxRepairRounds: 0,
     ...over,
   };
+}
+
+/** Verifier that returns a scripted sequence of verdicts, one per check() call. */
+function scriptedVerifier(verdicts: VerifierVerdict[]): Verifier {
+  let i = 0;
+  return {
+    async check() {
+      return verdicts[i++] ?? PASS;
+    },
+  };
+}
+
+/** Rewrite fn that records every call and transforms the draft. */
+function recordingRewrite(transform: (draft: string) => string = (d) => `rewritten(${d})`): {
+  fn: RewriteFn;
+  calls: Array<{ draft: string; critique: string }>;
+} {
+  const calls: Array<{ draft: string; critique: string }> = [];
+  const fn: RewriteFn = async ({ draft, critique }) => {
+    calls.push({ draft, critique });
+    return transform(draft);
+  };
+  return { fn, calls };
 }
 
 describe('criticLoop — the turn driver', () => {
@@ -92,8 +117,8 @@ describe('criticLoop — the turn driver', () => {
     expect(out.halt?.reply.citations).toEqual([CITATION]);
   });
 
-  it('answer that FAILS verify → abstain (fail closed; no emit, no ship)', async () => {
-    const deps = makeDeps({ verify: fixedVerifier(FAIL) });
+  it('answer that FAILS verify with NO repair budget → abstain (fail closed; no emit, no ship)', async () => {
+    const deps = makeDeps({ verify: fixedVerifier(FAIL), maxRepairRounds: 0 });
     const out = await criticLoop(deps)(makeState(), ctxWith());
     expect(out.halt?.outcome).toBe('disqualified');
     expect(out.halt?.reason).toContain('unverified');
@@ -182,6 +207,56 @@ describe('criticLoop — the turn driver', () => {
     const out = await criticLoop(makeDeps({ reasoner: spyReasoner, tools: exec }))(makeState(), ctxWith(true));
     expect(out.halt?.outcome).toBe('disqualified');
     expect(out.halt?.reason).toBe('aborted');
+  });
+
+  // ── rewrite-retry (2.1b-v) ──────────────────────────────────────────────────
+
+  it('a draft that fails, then a rewrite that verifies → resolved (repair recovers)', async () => {
+    const rw = recordingRewrite((d) => `fixed(${d})`);
+    const deps = makeDeps({
+      verify: scriptedVerifier([FAIL, PASS]), // 1st draft fails, rewritten draft passes
+      rewrite: rw.fn,
+      maxRepairRounds: 1,
+    });
+    const out = await criticLoop(deps)(makeState(), ctxWith());
+    expect(out.halt?.outcome).toBe('resolved');
+    expect(out.halt?.reply.text).toBe('fixed(The limit is 5%.)'); // the REWRITTEN draft emitted
+    expect(rw.calls).toHaveLength(1);
+    expect(rw.calls[0]?.critique).toBe('claim 2 unsupported'); // the verifier critique drove the rewrite
+  });
+
+  it('repair budget exhausted (still failing after N rewrites) → abstain (fail closed)', async () => {
+    const rw = recordingRewrite();
+    const deps = makeDeps({ verify: fixedVerifier(FAIL), rewrite: rw.fn, maxRepairRounds: 2 });
+    const out = await criticLoop(deps)(makeState(), ctxWith());
+    expect(out.halt?.outcome).toBe('disqualified');
+    expect(out.halt?.reason).toContain('unverified after 2 repair round(s)');
+    expect(rw.calls).toHaveLength(2); // rewrote exactly maxRepairRounds times, then gave up
+  });
+
+  it('a rewrite that THROWS → abstain (fail closed), never ships', async () => {
+    const throwingRewrite: RewriteFn = async () => {
+      throw new Error('rewriter down');
+    };
+    const deps = makeDeps({ verify: fixedVerifier(FAIL), rewrite: throwingRewrite, maxRepairRounds: 2 });
+    const out = await criticLoop(deps)(makeState(), ctxWith());
+    expect(out.halt?.outcome).toBe('disqualified');
+    expect(out.halt?.reason).toContain('repair failed');
+    expect(out.halt?.reason).toContain('rewriter down');
+  });
+
+  it('an ABSTAIN verdict (verifier throw) is NOT repairable — abstain immediately, no rewrite', async () => {
+    const rw = recordingRewrite();
+    const throwingVerify: Verifier = {
+      async check() {
+        throw new Error('judge down');
+      },
+    };
+    const deps = makeDeps({ verify: throwingVerify, rewrite: rw.fn, maxRepairRounds: 3 });
+    const out = await criticLoop(deps)(makeState(), ctxWith());
+    expect(out.halt?.outcome).toBe('disqualified');
+    expect(out.halt?.reason).toContain('verifier error');
+    expect(rw.calls).toHaveLength(0); // a non-repairable abstain must not trigger a rewrite
   });
 
   it('endless tool calls exhaust maxAttempts → abstain, never ships (fail closed)', async () => {

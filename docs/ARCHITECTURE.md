@@ -34,11 +34,12 @@ a description of shipped code. Numbers are measured, not aspirational.
   re-verify → fail-closed decides-and-drafts Reasoner → governance-gated tools →
   fail-closed verify → **single emit edge** — with terminals CARRIED in `state.halt` (not
   thrown), a `finalize` fail-closed default, and a top-level catch that turns any error
-  into an abstain. Repair-retry (a capability, not a safety gap) and real-model prompt
-  validation remain follow-ups. See §17.
-- **Still pending:** the verifier's own fail-closed changes (Phase 3), the answer
-  repair-retry capability, real-model validation of the turn prompt, and real-model
-  benchmarks. The stub plane is the only measured plane.
+  into an abstain. A failed draft is rewritten (`deps.rewrite`) and re-verified through the
+  same emit edge up to `maxRepairRounds`, then abstains. Only real-model prompt validation
+  remains a follow-up. See §17.
+- **Still pending:** the verifier's own fail-closed changes (Phase 3), real-model
+  validation of the turn prompt, and real-model benchmarks. The stub plane is the only
+  measured plane.
 
 ---
 
@@ -418,9 +419,9 @@ halting(withTimeout(cacheNode)), halting(criticLoop))` run via `runWorkflow`.
   terminal; the top-level catch turns any `WorkflowError` (timeout/abort) or uncaught throw into an
   abstain. Terminals are CARRIED in `state.halt`, never thrown, so a handoff is never mistaken for a crash.
 
-Follow-ups (neither weakens the guarantee): the answer repair-retry capability, and real-model
-validation of the decides-and-drafts prompt (deferred until a key exists). The verifier's own
-fail-closed changes are Phase 3.
+The answer repair-retry (`deps.rewrite` + re-verify, ≤ `maxRepairRounds`) is shipped. Follow-up (does
+not weaken the guarantee): real-model validation of the decides-and-drafts prompt (deferred until a
+key exists). The verifier's own fail-closed changes are Phase 3.
 
 ### 17.3 Turn-spoof kill (`apps/community-bot`)
 
