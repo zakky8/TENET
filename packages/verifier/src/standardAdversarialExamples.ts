@@ -1,10 +1,11 @@
 /**
  * Standard adversarial examples for the strict-judge prompt.
  *
- * These are domain-agnostic trap patterns that improve a judge's
- * catch-rate from ~50% (single-pass) to ~85% (with examples) on
- * production-sampled traffic (FP-discord measurement, ported into
- * the TENET reference deployment).
+ * These are domain-agnostic trap patterns that improve a strict judge's
+ * catch-rate over an example-free prompt: labelled worked examples teach
+ * the judge the failure CLASS, not a surface form, so it generalizes to
+ * unseen traps. (Effect size is corpus-dependent; see eval/ for
+ * reproducible measurement — no fixed number is claimed here.)
  *
  * Each example is short and labels the failure mode explicitly so
  * the judge learns the CLASS, not the surface form. Apps append

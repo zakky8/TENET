@@ -23,9 +23,11 @@ import {
  *   4. Permissive re-judge of strict-failures only.
  *   5. A claim FAILs only if BOTH strict and permissive disagree.
  *
- * Catch-rate vs single-pass (per FP-discord measurement):
- *   single-pass FAIL/PASS catches ~50% of hallucinations.
- *   atomic + multi-judge catches ~85%.
+ * Why decompose: a fabrication buried in an otherwise-correct paragraph can
+ * survive a single whole-draft judge but fails when isolated as an atomic
+ * claim and judged in a strict/permissive pair — so atomic multi-judge
+ * catches materially more hallucinations than a single pass. (No fixed
+ * benchmark number is asserted here; see eval/ for reproducible measurement.)
  */
 export async function verifyDraft(
   model: ChatModel,
