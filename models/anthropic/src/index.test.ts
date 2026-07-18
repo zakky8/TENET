@@ -218,6 +218,19 @@ describe('AnthropicChatModel — response handling', () => {
     expect(res.usage).toEqual({ inputTokens: 12, outputTokens: 100 });
   });
 
+  it('maps stop_reason refusal → refusal (a refused generation must abstain, not ship)', async () => {
+    const body = JSON.stringify({
+      type: 'message',
+      role: 'assistant',
+      content: [{ type: 'text', text: '' }],
+      stop_reason: 'refusal',
+      usage: { input_tokens: 9, output_tokens: 0 },
+    });
+    const m = new AnthropicChatModel(mockHttp({ status: 200, body }), { apiKey: 'k', model: 'm' });
+    // Dropping the 'refusal' case would default to 'end_turn' — masking a refused generation.
+    expect((await m.chat(req())).stopReason).toBe('refusal');
+  });
+
   it('maps tool_use response blocks + stop_reason tool_use', async () => {
     const body = JSON.stringify({
       id: 'msg_3',

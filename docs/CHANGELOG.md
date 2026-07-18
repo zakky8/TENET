@@ -6,6 +6,21 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — lock the abnormal-stop → `refusal` mapping in every model adapter's tests (2026-07-18)
+A content-filtered / refused generation MUST map to canonical `refusal` (not `end_turn`), because the reasoner
+abstains on `refusal`/`max_tokens` *before* parsing — mapping it to `end_turn` would let a filtered draft be
+parsed and shipped (the same failure class as truncation-masking). The mappings were correct in code, but
+audit found the `refusal` case was **untested in 4 of 6 adapters** (only Google tested it): a regression
+flipping `content_filter`/`refusal` → `end_turn` would have shipped a filtered response uncaught. Added the
+missing regression test to each:
+- **openai** + **mistral**: `finish_reason: 'content_filter'` → `stopReason 'refusal'`.
+- **anthropic** + **bedrock**: `stop_reason: 'refusal'` → `stopReason 'refusal'` (the Anthropic-family
+  passthrough case).
+Mutation probe non-vacuous: `content_filter`→`end_turn` (openai) and dropping the `refusal` passthrough case
+(anthropic) each redden their new test. Test-only — the mappings are unchanged (already correct); `pnpm -r
+build`/`pnpm test` green, suite 1316 → **1320** (+4). This complements the existing `length`→`max_tokens`
+(truncation) tests every adapter already had.
+
 ### Fixed — the outbound system-prompt-leak filter now matches TENET's ACTUAL prompt (it didn't) (2026-07-18)
 `systemPromptLeakFilter`'s default patterns are supposed to block a reply that quotes the agent's system prompt
 back at the user (defense in depth behind the verifier's grounded-citation guard). But trust-code review found

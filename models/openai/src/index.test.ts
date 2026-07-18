@@ -112,6 +112,19 @@ describe('OpenAiChatModel.chat (non-streaming)', () => {
     expect(res.usage).toEqual({ inputTokens: 10, outputTokens: 5 });
   });
 
+  it('maps finish_reason content_filter → stopReason refusal (a filtered draft must abstain, not ship)', async () => {
+    const { http } = mockHttp({
+      status: 200,
+      text: JSON.stringify({
+        choices: [{ message: { content: 'partial text before the filter cut in' }, finish_reason: 'content_filter' }],
+      }),
+    });
+    const m = new OpenAiChatModel(http, { apiKey: 'k', model: 'gpt-4o' });
+    // If content_filter fell through to the default this would be 'end_turn' — the reasoner
+    // would treat a content-filtered generation as a clean completion and could ship it.
+    expect((await m.chat(req())).stopReason).toBe('refusal');
+  });
+
   it('maps tool_calls → tool_use blocks + stopReason tool_use; maps req.tools onto wire', async () => {
     const { http, calls } = mockHttp({
       status: 200,

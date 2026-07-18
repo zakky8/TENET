@@ -93,6 +93,18 @@ describe('MistralChatModel', () => {
     expect(res.stopReason).toBe('max_tokens');
   });
 
+  it('chat() maps finish_reason content_filter → refusal (a filtered draft must abstain, not ship)', async () => {
+    const { http } = mockHttp({
+      status: 200,
+      text: JSON.stringify({
+        choices: [{ message: { content: 'filtered' }, finish_reason: 'content_filter' }],
+      }),
+    });
+    const m = new MistralChatModel(http, { apiKey: 'k', model: 'm' });
+    // Default fall-through would be 'end_turn' — shipping a content-filtered generation as clean.
+    expect((await m.chat(req())).stopReason).toBe('refusal');
+  });
+
   it('chat() throws on non-2xx', async () => {
     const { http } = mockHttp({ status: 429, text: 'rate' });
     const m = new MistralChatModel(http, { apiKey: 'k', model: 'm' });

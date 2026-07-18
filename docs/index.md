@@ -32,7 +32,7 @@ TENET is a framework, not a model: it *calls* whichever frontier model you bring
 
 ## What ships today
 
-Every row is a package in the monorepo — no capability claimed here that isn't in the code, and the repo's own numbers (**1316 tests across 98 suites**) are checked against the live suite in CI (`pnpm counts:check`).
+Every row is a package in the monorepo — no capability claimed here that isn't in the code, and the repo's own numbers (**1320 tests across 98 suites**) are checked against the live suite in CI (`pnpm counts:check`).
 
 | Capability | Package | What it does |
 |---|---|---|

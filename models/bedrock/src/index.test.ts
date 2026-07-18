@@ -113,6 +113,17 @@ describe('AnthropicOnBedrockChatModel — response parsing', () => {
     expect(res.usage).toEqual({ inputTokens: 11, outputTokens: 7 });
   });
 
+  it('maps stop_reason refusal → refusal (a refused generation must abstain, not ship)', async () => {
+    const refused = JSON.stringify({
+      content: [{ type: 'text', text: '' }],
+      stop_reason: 'refusal',
+      usage: { input_tokens: 8, output_tokens: 0 },
+    });
+    const model = new AnthropicOnBedrockChatModel(mockInvoker(refused), { modelId: 'm' });
+    // Dropping the 'refusal' case would default to 'end_turn' — masking a refused generation.
+    expect((await model.chat(req())).stopReason).toBe('refusal');
+  });
+
   it('parses tool_use blocks + stopReason tool_use', async () => {
     const toolReply = JSON.stringify({
       content: [{ type: 'tool_use', id: 'tu_1', name: 'get_weather', input: { city: 'Paris' } }],
