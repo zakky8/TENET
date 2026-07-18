@@ -238,7 +238,7 @@ pnpm benchmarks             # hermetic BENCHMARKS gate (exits 1 on FAIL)
 Honest list.
 
 1. **Real-model validation of the agent turn** — `runAgent` ships and is green end-to-end (`packages/agent/src/orchestrator.ts`), proving the fail-closed control flow deterministically against fake models. The decides-and-drafts *prompt* (`buildSystem`) and the answer-repair-retry loop are validated only against fakes; a real-model probe is deferred until an API key is available in the build environment. The control-flow guarantee does not depend on it.
-2. **Verifier fail-closed changes** — moving the verifier's own path to fail-closed is a later phase.
+2. **Verifier hardening (Phase 3)** — the verifier's own fail-closed MODE ships as an opt-in `failClosed` flag (extractor error / judge error / judge-garbage → not-supported, never a spurious pass); still ahead: the non-numeric claim tier (named-entity coverage + negation/scope guard) and spelled-out-number / truncation hardening.
 3. **Real HHEM-2.1 model bytes** — `@tenet/judge-hhem-onnx` wraps any HF / ONNX pipeline; the operator brings the model weights (license / install choice is theirs).
 4. **Real-fetch integration job in CI** — secret-gated workflow that runs `apps/measure-real/examples/anthropic-sonnet.ts` when `ANTHROPIC_API_KEY` is set. Never blocks PRs from forks.
 5. **Self-distillation loop** — BENCHMARKS Dim 2 ("cost < $0.01") depends on weekly LoRA fine-tunes of a cheap-path model on verified flagship traces. Trace capture ships; the fine-tune pipeline does not.

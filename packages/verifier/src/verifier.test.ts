@@ -51,6 +51,39 @@ describe('verifyDraft — empty + trivial cases', () => {
   });
 });
 
+describe('verifyDraft — failClosed (3.1)', () => {
+  it('DEFAULT is fail-OPEN: a broken judge ships the claim (pass:true) — documents the hole', async () => {
+    // extract → 1 claim; strict + permissive judge → garbage (no parse) → fail-open supported:true.
+    const model = scriptedModel(['The company was founded in Berlin', 'garbage prose', 'garbage prose']);
+    const out = await verifyDraft(model, { sources: 'The company is based in Munich.', draft: 'x' });
+    expect(out.pass).toBe(true); // the pre-3.1 fail-open default
+  });
+
+  it('failClosed: a broken JUDGE → pass:false (closes the fail-open ship hole)', async () => {
+    const model = scriptedModel(['The company was founded in Berlin', 'garbage prose', 'garbage prose']);
+    const out = await verifyDraft(
+      model,
+      { sources: 'The company is based in Munich.', draft: 'x' },
+      { failClosed: true },
+    );
+    expect(out.pass).toBe(false); // a judge we could not run cannot clear the claim
+    expect(out.approvedCitations).toEqual([]);
+  });
+
+  it('failClosed: a claim-extractor failure → pass:false (not a spurious auto-pass)', async () => {
+    const model: ChatModel = { chat: async () => { throw new Error('extractor down'); } };
+    const out = await verifyDraft(model, { sources: 's', draft: 'The limit is 5%.' }, { failClosed: true });
+    expect(out.pass).toBe(false);
+    expect(out.critique).toContain('extraction failed');
+  });
+
+  it('failClosed: a genuinely claim-free draft (NONE) STILL passes — a greeting is not fabrication', async () => {
+    const model = scriptedModel(['NONE']);
+    const out = await verifyDraft(model, { sources: 's', draft: 'Hello!' }, { failClosed: true });
+    expect(out.pass).toBe(true); // deliberate: failClosed hardens infra failures, not legitimate empties
+  });
+});
+
 describe('verifyDraft — URL pre-pass', () => {
   it('auto-passes claims about allowlisted URLs without calling the judge', async () => {
     let judgeCalls = 0;

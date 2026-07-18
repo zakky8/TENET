@@ -616,26 +616,30 @@ Each adapter unit test asserts the mapping table above.
 
 ---
 
-## 6. Verifier fail-CLOSED changes (Phase 3 — PROPOSED, not yet built)
+## 6. Verifier fail-CLOSED mode (Phase 3.1 — SHIPPED)
 
-> **AS-BUILT status.** This section is forward-looking. The verifier-internal `failClosed` field below does
-> **not** yet exist in `@tenet/verifier`. What DOES ship (2.1b) is the enforcement at the ORCHESTRATOR's emit
-> edge: `verifyAndEmit` (§4.3) wraps the narrow `deps.verify.check` in `try/catch` → abstain, requires ≥1
-> grounded citation (so a `pass=true` with zero/blank citations cannot emit — closing the zero-claim path from
-> the *consumer* side today), and runs the outbound leak gate. Making the verifier fail closed *internally* (so
-> it never returns a spurious `pass`) is the additional defense-in-depth below, and remains Phase 3.
+> **AS-BUILT status.** `VerifierConfig.failClosed?: boolean` (default `false`, preserving existing callers) now
+> ships in `@tenet/verifier`. Two layers of defense now exist: (a) the ORCHESTRATOR's emit edge — `verifyAndEmit`
+> (§4.3) wraps `deps.verify.check` in `try/catch` → abstain, requires ≥1 grounded citation, runs the outbound
+> leak gate; and (b) the VERIFIER's own `failClosed` mode below, so it never returns a spurious `pass` on infra
+> breakage even for consumers that lack the orchestrator's guard. The composition that adapts `verifyDraft`
+> behind the agent's `Verifier` port sets `failClosed: true`.
 
-The proposal's original invariant ("nothing else can produce a fact") was false because two fail-**open** paths bypass the verifier without throwing. The proposed verifier-internal change closes them at the source.
+The original invariant ("nothing else can produce a fact") was false because fail-**open** paths let verifier INFRA breakage ship a claim. `failClosed` closes them at the source. When `failClosed === true`:
 
-Add `VerifierConfig.failClosed?: boolean` (default `false` to preserve existing callers; the composition would set `true` when adapting `verifyDraft` behind the `Verifier` port). When `failClosed === true`:
+1. **`claimExtractor.ts`** — on an extractor error/timeout, throws `ClaimExtractionError` (not `[]`); `verifyDraft` catches it → `pass:false`. A slow/broken extractor can no longer masquerade as zero claims → auto-pass.
+2. **`judge.ts`** — a judge error/timeout OR a total-garbage (no-parse) response marks the affected claims `supported:false` (was the fail-OPEN "all supported"). A judge we could not run cannot clear a claim; the permissive re-judge runs the same broken model, so it stays `supported:false` → `pass:false`.
 
-1. **`claimExtractor.ts:38`** — on throw, do **not** return `[]`. Propagate a typed `ExtractorError` (verifier converts to `pass:false`). A slow/broken extractor can no longer yield zero claims → auto-pass.
-2. **`verifier.ts:38-40`** — zero extracted claims returns `pass:false` (was `pass:true`). No claims ⇒ nothing verified ⇒ cannot emit.
-3. **`judge.ts:113-116`** — on judge throw, return `supported:false` for the affected claims (was all-supported).
+> **DELIBERATE DEVIATION from the original proposal (point 2, "zero claims → pass:false"):** a GENUINELY
+> claim-free draft (greeting/filler; extractor returns `NONE`/empty, no error) still returns `pass:true`. It is
+> vacuously grounded — there is nothing to fabricate — and whether to EMIT a citation-free reply is emit policy,
+> which belongs to the orchestrator (its grounded-citation guard abstains on it), NOT to the verifier's grounding
+> check. Conflating the two would make the verifier reject legitimate greetings. The extractor-ERROR case (which
+> point 1 handles by throwing) is what must fail closed — not a legitimate empty.
 
-Until that lands, the orchestrator's emit edge already wraps the verifier port in `try/catch` → abstain and enforces the grounded-citation guard (§4.3), so a *thrown* verifier and a zero-claim/uncited `pass` both resolve to non-emit from the consumer side.
+**Consequence, stated plainly:** with `failClosed:true` and no real judge/extractor model, the runtime abstains on any non-deterministic claim, emitting only what the deterministic tier (quote-grounding / numeric) supports. The system stays silent rather than fabricating.
 
-**Consequence, stated plainly:** because no real judge/extractor model ships today, `failClosed:true` means the default runtime state abstains on any non-deterministic claim, emitting only what the deterministic tier (quote-grounding / numeric) can support. This is the intended north-star behavior: the system stays silent rather than fabricating.
+**Still Phase 3 (NOT in 3.1):** the non-numeric claim tier (3.2 — named-entity coverage + negation/scope guard), spelled-out-number fabrication + `max_tokens` truncation→abstain + `maxClaims`-drop→abstain (3.3).
 
 ---
 

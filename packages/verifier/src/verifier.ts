@@ -36,8 +36,16 @@ export async function verifyDraft(
 ): Promise<VerifyResult> {
   const config: VerifierConfig = { ...DEFAULT_VERIFIER_CONFIG, ...configOverrides };
 
-  const allClaims = await extractClaims(model, input.draft, config);
+  let allClaims: string[];
+  try {
+    allClaims = await extractClaims(model, input.draft, config);
+  } catch {
+    // Only thrown when config.failClosed: a failed extraction is NOT zero claims → fail closed.
+    return { pass: false, critique: 'claim extraction failed', verdicts: [], approvedCitations: [] };
+  }
   if (allClaims.length === 0) {
+    // A genuinely claim-free draft (greeting/filler) is vacuously grounded → pass. Emit
+    // policy (require a citation) is the orchestrator's job, not the verifier's.
     return { pass: true, critique: '', verdicts: [], approvedCitations: [] };
   }
 

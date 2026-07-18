@@ -1,5 +1,5 @@
 import type { ChatResponse } from '@tenet/core';
-import { extractClaims } from './claimExtractor.js';
+import { ClaimExtractionError, extractClaims } from './claimExtractor.js';
 import { DEFAULT_VERIFIER_CONFIG, type ChatModel } from './types.js';
 
 function textResponse(text: string): ChatResponse {
@@ -32,10 +32,22 @@ describe('extractClaims — basic behavior', () => {
     expect(called).toBe(0);
   });
 
-  it('fail-open on extractor error (returns [])', async () => {
+  it('fail-open on extractor error (returns []) — DEFAULT', async () => {
     const model: ChatModel = { chat: async () => { throw new Error('x'); } };
     const out = await extractClaims(model, 'd', DEFAULT_VERIFIER_CONFIG);
     expect(out).toEqual([]);
+  });
+
+  it('failClosed: THROWS ClaimExtractionError on extractor error (never [] — an error is not zero claims)', async () => {
+    const model: ChatModel = { chat: async () => { throw new Error('x'); } };
+    await expect(
+      extractClaims(model, 'd', { ...DEFAULT_VERIFIER_CONFIG, failClosed: true }),
+    ).rejects.toBeInstanceOf(ClaimExtractionError);
+  });
+
+  it('failClosed: a genuine NONE draft still returns [] (empty is distinct from an error)', async () => {
+    const out = await extractClaims(mockModel('NONE'), 'd', { ...DEFAULT_VERIFIER_CONFIG, failClosed: true });
+    expect(out).toEqual([]); // no throw — the distinction the fail-closed path depends on
   });
 
   it('filters claims by length window (>=8, <=240)', async () => {

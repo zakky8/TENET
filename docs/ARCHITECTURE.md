@@ -37,9 +37,9 @@ a description of shipped code. Numbers are measured, not aspirational.
   into an abstain. A failed draft is rewritten (`deps.rewrite`) and re-verified through the
   same emit edge up to `maxRepairRounds`, then abstains. Only real-model prompt validation
   remains a follow-up. See §17.
-- **Still pending:** the verifier's own fail-closed changes (Phase 3), real-model
-  validation of the turn prompt, and real-model benchmarks. The stub plane is the only
-  measured plane.
+- **Still pending:** the rest of Phase 3 (verifier `failClosed` MODE ships — 3.1; the
+  non-numeric claim tier + truncation/maxClaims hardening remain), real-model validation
+  of the turn prompt, and real-model benchmarks. The stub plane is the only measured plane.
 
 ---
 
@@ -421,7 +421,8 @@ halting(withTimeout(cacheNode)), halting(criticLoop))` run via `runWorkflow`.
 
 The answer repair-retry (`deps.rewrite` + re-verify, ≤ `maxRepairRounds`) is shipped. Follow-up (does
 not weaken the guarantee): real-model validation of the decides-and-drafts prompt (deferred until a
-key exists). The verifier's own fail-closed changes are Phase 3.
+key exists). The verifier's own fail-closed MODE ships (3.1 — `failClosed` flag); the rest of Phase 3
+(non-numeric claim tier, truncation/maxClaims hardening) remains.
 
 ### 17.3 Turn-spoof kill (`apps/community-bot`)
 

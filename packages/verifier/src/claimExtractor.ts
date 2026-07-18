@@ -13,7 +13,20 @@ EXCLUDE: greetings, follow-up questions, clarifying questions, generic filler, o
 
 If the draft has NO factual claims (it's just a greeting / clarifying question / filler), output exactly the word: NONE`;
 
-/** Extract up to config.maxClaims atomic claims from a draft. Fail-open: returns [] on error. */
+/** Thrown by `extractClaims` on an extractor error ONLY when `config.failClosed` is set.
+ *  Lets `verifyDraft` distinguish "extraction failed" (→ fail closed) from "the draft
+ *  genuinely has no claims" (→ empty list, safe). */
+export class ClaimExtractionError extends Error {
+  constructor(cause?: unknown) {
+    super('claim extraction failed');
+    this.name = 'ClaimExtractionError';
+    if (cause !== undefined) this.cause = cause;
+  }
+}
+
+/** Extract up to config.maxClaims atomic claims from a draft. On an extractor error the
+ *  default is fail-OPEN (returns []); when `config.failClosed` is set it throws
+ *  `ClaimExtractionError` so the caller cannot mistake a failed extraction for zero claims. */
 export async function extractClaims(
   model: ChatModel,
   draft: string,
@@ -36,8 +49,9 @@ export async function extractClaims(
         'extract',
       ),
     );
-  } catch {
-    return [];
+  } catch (err) {
+    if (config.failClosed) throw new ClaimExtractionError(err); // FAIL CLOSED: not the same as zero claims
+    return []; // fail-open default (preserves existing callers)
   }
 
   const text = raw.trim();

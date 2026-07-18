@@ -178,6 +178,26 @@ describe('judgeOneBatch', () => {
     expect(out[1]!.supported).toBe(true);
   });
 
+  it('failClosed: total-garbage → all UNSUPPORTED (a judge we could not run cannot clear a claim)', async () => {
+    const model = mockModel('the model is having a stroke and emitting prose');
+    const out = await judgeOneBatch(model, 'sources', ['x', 'y'], false, {
+      ...DEFAULT_VERIFIER_CONFIG,
+      failClosed: true,
+    });
+    expect(out[0]!.supported).toBe(false);
+    expect(out[1]!.supported).toBe(false);
+  });
+
+  it('failClosed: judge THROW/timeout → all UNSUPPORTED (fail closed on judge breakage)', async () => {
+    const model: ChatModel = { chat: async () => { throw new Error('judge down'); } };
+    const out = await judgeOneBatch(model, 'sources', ['x', 'y'], false, {
+      ...DEFAULT_VERIFIER_CONFIG,
+      failClosed: true,
+    });
+    expect(out[0]!.supported).toBe(false);
+    expect(out[1]!.supported).toBe(false);
+  });
+
   it('rejects out-of-range indices ([99] SUPPORTED with 2 claims)', async () => {
     const model = mockModel('[99] SUPPORTED\n[1] UNSUPPORTED: x');
     const out = await judgeOneBatch(

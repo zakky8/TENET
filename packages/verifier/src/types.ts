@@ -75,6 +75,18 @@ export interface VerifierConfig {
    * Default: none — opt-in, fully backwards compatible.
    */
   claimPreChecks?: ReadonlyArray<import('./deterministic.js').ClaimPreCheck>;
+  /**
+   * FAIL-CLOSED mode (default `false`, preserving existing callers). When `true`, the
+   * verifier's own infra failures resolve toward NOT-supported instead of ship:
+   *   - a claim-extractor error/timeout → `verifyDraft` returns `pass:false` (instead of
+   *     silently yielding zero claims → auto-pass);
+   *   - a judge error/timeout or total-garbage response marks the affected claims
+   *     `supported:false` (instead of the fail-OPEN "all supported so we don't block ship").
+   * A GENUINELY claim-free draft (greeting/filler) still passes — there is nothing to
+   * ground, and emit policy (require a citation) belongs to the orchestrator, not here.
+   * The reference `@tenet/agent` orchestrator sets this `true` behind its Verifier port.
+   */
+  failClosed?: boolean;
 }
 
 export const DEFAULT_VERIFIER_CONFIG: VerifierConfig = {

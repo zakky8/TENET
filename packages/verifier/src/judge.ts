@@ -114,8 +114,13 @@ export async function judgeOneBatch(
       ),
     );
   } catch {
-    // fail-open — mark all supported so we don't block shipping on judge breakage
-    return claims.map((claim) => ({ claim, supported: true, reason: '' }));
+    // Judge model down/timeout. Default fail-OPEN (supported) so we don't block shipping;
+    // under failClosed, mark all NOT-supported — a judge we couldn't run cannot clear a claim.
+    return claims.map((claim) => ({
+      claim,
+      supported: !config.failClosed,
+      reason: config.failClosed ? 'judge unavailable (fail-closed)' : '',
+    }));
   }
 
   const verdictByIdx = new Map<number, ClaimVerdict>();
@@ -137,15 +142,17 @@ export async function judgeOneBatch(
   //     skipped this claim. Default UNSUPPORTED (fail-CLOSED): don't ship
   //     fabrication just because the judge forgot a line.
   //   - If NO lines parsed at all → judge response was total garbage / down.
-  //     Fail-OPEN (supported) to avoid blocking shipping on judge breakage.
+  //     Default fail-OPEN (supported); under failClosed, NOT-supported (garbage from the
+  //     judge cannot clear a claim).
   const parsedAny = verdictByIdx.size > 0;
   return claims.map((claim, i) => {
     const v = verdictByIdx.get(i + 1);
     if (v) return v;
+    if (parsedAny) return { claim, supported: false, reason: 'no verdict from judge' };
     return {
       claim,
-      supported: !parsedAny,
-      reason: parsedAny ? 'no verdict from judge' : '',
+      supported: !config.failClosed,
+      reason: config.failClosed ? 'judge response unparseable (fail-closed)' : '',
     };
   });
 }

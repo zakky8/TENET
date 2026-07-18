@@ -63,7 +63,7 @@ Each is in [ROADMAP.md Phase 1](ROADMAP.md). All 11 packages landed (see [CHANGE
 **Still pending (stated honestly):**
 
 - **Real-model validation** of the decides-and-drafts prompt (`buildSystem`) — deferred until an API key exists in the build env. The control-flow guarantee does not depend on it. (The answer repair-retry — `RewriteFn` + re-verify in the `criticLoop` answer branch — is now shipped.)
-- The verifier's own fail-CLOSED changes are a later phase (Phase 3).
+- The verifier's own fail-CLOSED MODE ships (Phase 3.1 — `VerifierConfig.failClosed`: extractor error / judge error / judge-garbage → not-supported). The rest of Phase 3 (non-numeric claim tier 3.2; truncation + `maxClaims`-drop hardening 3.3) is still ahead.
 - REAL-MODEL benchmark numbers still do not exist (no model access in this environment). The hermetic stub remains the only measured plane; keep the stub-vs-real split in the benchmark docs honest — no real-model numbers are claimed.
 
 ## Bucket D — Fresh research worth doing on current state of the field

@@ -6,6 +6,24 @@ Pre-1.0 the API surface and behavior may change without major bumps. We will pin
 
 ## [Unreleased]
 
+### Added — verifier `failClosed` mode: close the infra fail-open (Phase 3.1, 2026-07-18)
+Branch `upgrade/top-1pct`. Test suite: 1181 → 1189 tests across 92 suites, all green.
+`VerifierConfig.failClosed?: boolean` (default `false`, preserving existing callers).
+Closes a real ship hole: a broken/down JUDGE marked all claims `supported:true` →
+`verifyDraft` returned `pass:true` WITH citations → the orchestrator's grounded-citation
+guard emitted an unverified answer.
+- `claimExtractor.ts`: on extractor error/timeout, throws `ClaimExtractionError` (not `[]`)
+  when `failClosed` — so `verifyDraft` returns `pass:false` instead of mistaking a failed
+  extraction for zero claims.
+- `judge.ts`: a judge error/timeout OR a total-garbage (no-parse) response marks claims
+  `supported:false` when `failClosed` (was the fail-open "all supported"). The permissive
+  re-judge runs the same broken model, so it stays unsupported → `pass:false`.
+- DELIBERATE: a genuinely claim-free draft (greeting; extractor returns `NONE`) still
+  passes — it is vacuously grounded; emit policy (require a citation) is the orchestrator's
+  job. `failClosed` hardens infra failures, not legitimate empties.
+- Default (no `failClosed`) is byte-for-byte the old fail-open behavior (116 prior verifier
+  tests unchanged). The reference orchestrator sets `failClosed:true` behind its Verifier port.
+
 ### Added — `@tenet/agent` orchestrator SHIPPED: the driven, fail-closed turn (2026-07-18)
 Branch `upgrade/top-1pct`. Test suite: 1117 → 1174 tests across 85 → 92 suites, all green.
 62 workspace packages. This completes Phase 2's agent turn — `AgentState` was a state machine
@@ -98,7 +116,8 @@ all green. 62 workspace packages.
 - The `runAgent` workflow graph that DRIVES `AgentState` end-to-end. As of the entry
   above it is shipped (`packages/agent/src/orchestrator.ts`): nodes → Reasoner →
   governance-gated tools → verify → single emit edge, all fail-closed.
-- The verifier's own fail-closed changes are a later phase (Phase 3).
+- The verifier's own fail-closed changes are a later phase (Phase 3). *(Since shipped as the
+  `failClosed` mode — see the Phase 3.1 entry at the top.)*
 - No real-model benchmark numbers exist yet (no model access in this environment);
   the hermetic stub remains the only measured plane.
 - PENDING B1, B4, B5 remain OPEN — not touched by this upgrade.
